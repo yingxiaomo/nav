@@ -19,36 +19,6 @@
   },
   "categories": [
     {
-      "id": "c1",
-      "title": "常用工具",
-      "links": [
-        {
-          "id": "l1",
-          "title": "Google",
-          "url": "https://google.com",
-          "icon": "Search"
-        },
-        {
-          "id": "l2",
-          "title": "GitHub",
-          "url": "https://github.com",
-          "icon": "Github"
-        },
-        {
-          "id": "l3",
-          "title": "ChatGPT",
-          "url": "https://chatgpt.com",
-          "icon": "Bot"
-        },
-        {
-          "id": "l4",
-          "title": "YouTube",
-          "url": "https://youtube.com",
-          "icon": "Youtube"
-        }
-      ]
-    },
-    {
       "id": "c2",
       "title": "开发资源",
       "links": [
@@ -93,6 +63,36 @@
           "title": "Unsplash",
           "url": "https://unsplash.com",
           "icon": "Image"
+        }
+      ]
+    },
+    {
+      "id": "c1",
+      "title": "常用工具",
+      "links": [
+        {
+          "id": "l1",
+          "title": "Google",
+          "url": "https://google.com",
+          "icon": "Search"
+        },
+        {
+          "id": "l2",
+          "title": "GitHub",
+          "url": "https://github.com",
+          "icon": "Github"
+        },
+        {
+          "id": "l3",
+          "title": "ChatGPT",
+          "url": "https://chatgpt.com",
+          "icon": "Bot"
+        },
+        {
+          "id": "l4",
+          "title": "YouTube",
+          "url": "https://youtube.com",
+          "icon": "Youtube"
         }
       ]
     }

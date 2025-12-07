@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { ClockWidget } from "@/components/nav/clock";
-import { WeatherWidget } from "@/components/nav/weather";
 import { SearchBar } from "@/components/nav/search-bar";
 import { LinkGrid } from "@/components/nav/link-grid";
 import { SettingsDialog } from "@/components/nav/settings-dialog";
@@ -24,6 +23,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
+    // 控制台彩蛋
     console.log(
       "%c Clean Nav %c https://github.com/YingXiaoMo/clean-nav",
       "background: #333; color: #fff; padding: 4px 8px; border-radius: 4px 0 0 4px; font-weight: bold;",
@@ -155,26 +155,31 @@ export default function Home() {
 
   return (
     <main 
+      // 启用 flex-col 布局，用于垂直对齐
       className="relative min-h-screen w-full overflow-hidden flex flex-col items-center p-6 md:p-12"
       style={bgStyle}
     >
-      <div className="relative z-10 w-full max-w-5xl flex flex-col items-center mt-10 md:mt-20">
-          
+      
+      {/* 1. 顶部内容 (Clock + SearchBar) */}
+      <div className="relative z-10 w-full max-w-5xl flex flex-col items-center shrink-0 mt-10 md:mt-20">
           <div className={`flex flex-col items-center w-full transition-opacity duration-300 ease-out will-change-opacity ${
             isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'
           }`}>
             <ClockWidget />
-            <WeatherWidget />
-            <div className="h-8" />
             <SearchBar onLocalSearch={setSearchQuery} />
           </div>
-          
+      </div>
+      
+      {/* 2. Spacer: 推动 LinkGrid 到底部 */}
+      <div className="flex-grow" /> 
+
+      {/* 3. LinkGrid: Aligned to the bottom (above footer) */}
+      <div className="relative z-10 w-full max-w-5xl flex flex-col items-center mb-10"> {/* mb-10 确保距离页脚有足够空间 */}
           <LinkGrid 
             categories={displayCategories} 
             onReorder={searchQuery ? undefined : handleReorder}
             onOpenChange={setIsFocusMode}
           />
-          
       </div>
 
       <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${

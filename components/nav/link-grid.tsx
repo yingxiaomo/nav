@@ -57,28 +57,32 @@ function SortableCard({ category, onClick }: { category: Category; onClick: () =
     zIndex: isDragging ? 50 : "auto",
   };
 
+  const id = category.id; 
+
   return (
-    <div
+    <motion.div 
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
       onClick={onClick}
-      className="cursor-pointer group relative transition-transform duration-200 hover:scale-105 active:scale-95 touch-none"
+      className="cursor-pointer group relative p-4 transition-transform duration-200 hover:scale-105 active:scale-95 touch-none"
     >
-      <div className="aspect-video w-full rounded-2xl bg-white/10 dark:bg-black/20 backdrop-blur-md border border-white/20 shadow-lg group-hover:bg-white/15 transition-colors overflow-hidden flex flex-col items-center justify-center gap-1 will-change-transform">
+      <motion.div layoutId={id} className="flex flex-col items-center justify-center text-center gap-1">
         
-        <div className="mb-1 transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-1">
-          <IconRender name={category.icon || "FolderOpen"} className="h-10 w-10 text-yellow-200/90 drop-shadow-[0_4px_4px_rgba(0,0,0,0.3)]" />
+        {/* 关键修改：h-10 w-10 -> h-8 w-8，并去除 mb-1 确保紧凑 */}
+        <div className="transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-0.5">
+          <IconRender name={category.icon || "FolderOpen"} className="h-8 w-8 text-yellow-200/90 drop-shadow-[0_4px_4px_rgba(0,0,0,0.3)]" />
         </div>
         
         <div className="text-center px-4 w-full">
-          <h3 className="text-white font-medium tracking-wide drop-shadow-sm truncate text-lg">
+          {/* 关键修改：text-lg -> text-base，缩小字号 */}
+          <h3 className="text-white font-medium tracking-wide drop-shadow-sm truncate text-base [text-shadow:0_0_8px_rgba(0,0,0,0.8),0_0_4px_rgba(0,0,0,0.6)]">
             {category.title}
           </h3>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -119,9 +123,10 @@ export function LinkGrid({ categories, onReorder, onOpenChange }: LinkGridProps)
   return (
     <>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <div className="w-full max-w-5xl mx-auto pb-20 px-6 relative z-30">
+        <div className="w-full max-w-5xl mx-auto pb-6 px-6 relative z-30">
           <SortableContext items={categories.map(c => c.id)} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {/* 间距已调整为 gap-3 */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {categories.map((category) => (
                 <SortableCard key={category.id} category={category} onClick={() => setSelectedId(category.id)} />
               ))}
@@ -143,15 +148,12 @@ export function LinkGrid({ categories, onReorder, onOpenChange }: LinkGridProps)
             />
 
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              transition={{ type: "spring", stiffness: 350, damping: 30 }}
-              className="w-full max-w-5xl max-h-[85vh] bg-zinc-900 border border-white/10 rounded-[1.5rem] shadow-xl overflow-hidden flex flex-col relative z-10 will-change-transform"
+              layoutId={selectedId}
+              className="w-full max-w-5xl max-h-[85vh] bg-zinc-900/90 backdrop-blur-md border border-white/10 rounded-[1.5rem] shadow-2xl overflow-hidden flex flex-col relative z-10 will-change-transform"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* 修复：压缩标题栏高度 */}
-              <div className="flex items-center justify-between px-4 py-2 border-b border-white/5 shrink-0 bg-zinc-900">
+              {/* 标题栏：已压缩高度 */}
+              <div className="flex items-center justify-between px-4 py-2 border-b border-white/5 shrink-0 bg-transparent">
                 <div className="flex items-center gap-3">
                   <div className="p-1.5 rounded-xl bg-yellow-500/20 text-yellow-200">
                      <IconRender name={selectedCategory.icon || "FolderOpen"} className="h-5 w-5" />
@@ -168,7 +170,8 @@ export function LinkGrid({ categories, onReorder, onOpenChange }: LinkGridProps)
                 </button>
               </div>
 
-              <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-zinc-900">
+              {/* 内容区 */}
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, delay: 0.1 }} className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-transparent">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {selectedCategory.links.map((link) => (
                     <a
@@ -196,7 +199,7 @@ export function LinkGrid({ categories, onReorder, onOpenChange }: LinkGridProps)
                     </a>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             </motion.div>
           </div>
         )}

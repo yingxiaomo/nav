@@ -1,11 +1,12 @@
 import { Octokit } from "@octokit/rest";
-import { DataSchema, DEFAULT_DATA } from "./types";
+import { DataSchema } from "./types";
 
 export interface GithubConfig {
   token: string;
   owner: string;
   repo: string;
-  path: string; // usually 'public/data.json' or just 'data.json' if in root
+  branch?: string; 
+  path: string;
 }
 
 export const GITHUB_CONFIG_KEY = "clean-nav-github-config";
@@ -16,16 +17,15 @@ export async function loadDataFromGithub(config: GithubConfig): Promise<DataSche
   try {
     const octokit = new Octokit({ auth: config.token });
     
-    // Get the file content
     const response = await octokit.repos.getContent({
       owner: config.owner,
       repo: config.repo,
       path: config.path,
+      ref: config.branch, 
     });
 
     if (Array.isArray(response.data)) throw new Error("Path is a directory");
     
-    // Decode content
     if ('content' in response.data) {
       const content = atob(response.data.content);
       const json = JSON.parse(decodeURIComponent(escape(content))); // Handle UTF-8
@@ -45,26 +45,26 @@ export async function saveDataToGithub(config: GithubConfig, data: DataSchema, m
   try {
     const octokit = new Octokit({ auth: config.token });
     
-    // 1. Get current SHA (if file exists) to allow update
+
     let sha: string | undefined;
     try {
       const { data: currentFile } = await octokit.repos.getContent({
         owner: config.owner,
         repo: config.repo,
         path: config.path,
+        ref: config.branch, 
       });
       if (!Array.isArray(currentFile) && 'sha' in currentFile) {
         sha = currentFile.sha;
       }
     } catch (e) {
-      // File might not exist yet, which is fine for 'create'
+  
     }
 
-    // 2. Encode content
-    const content = unescape(encodeURIComponent(JSON.stringify(data, null, 2))); // Handle UTF-8
+
+    const content = unescape(encodeURIComponent(JSON.stringify(data, null, 2))); 
     const base64Content = btoa(content);
 
-    // 3. Update/Create
     await octokit.repos.createOrUpdateFileContents({
       owner: config.owner,
       repo: config.repo,
@@ -72,6 +72,7 @@ export async function saveDataToGithub(config: GithubConfig, data: DataSchema, m
       message,
       content: base64Content,
       sha,
+      branch: config.branch, 
     });
 
     return true;

@@ -19,13 +19,10 @@ export default function Home() {
   const [currentWallpaper, setCurrentWallpaper] = useState("");
   const [isFocusMode, setIsFocusMode] = useState(false);
 
-  // 初始化数据
   useEffect(() => {
     async function initData() {
       try {
         let loadedData = DEFAULT_DATA;
-        
-        // 1. 尝试从 GitHub 配置加载
         const storedConfig = localStorage.getItem(GITHUB_CONFIG_KEY);
         let loadedFromGithub = false;
         
@@ -40,7 +37,6 @@ export default function Home() {
           }
         }
 
-        // 2. 如果没配 GitHub，尝试加载本地 data.json
         if (!loadedFromGithub) {
           try {
             const res = await fetch("/data.json");
@@ -53,7 +49,7 @@ export default function Home() {
         }
 
         setData(loadedData);
-        initWallpaper(loadedData); // 初始化壁纸
+        initWallpaper(loadedData);
 
       } catch (err) {
         console.error("Initialization error", err);
@@ -64,20 +60,16 @@ export default function Home() {
     initData();
   }, []);
 
-  // 壁纸逻辑处理
   const initWallpaper = async (cfg: DataSchema) => {
     const { wallpaperType, wallpaper, wallpaperList } = cfg.settings;
 
     if (wallpaperType === 'local' && wallpaperList && wallpaperList.length > 0) {
-      // 随机抽取一张本地壁纸
       const randomImg = wallpaperList[Math.floor(Math.random() * wallpaperList.length)];
       setCurrentWallpaper(randomImg);
     } else if (wallpaperType === 'bing') {
-      // 使用 Bing 每日壁纸 API (通过 cors-anywhere 或直接引用)
-      // 这里使用一个稳定的 Bing 镜像源，因为直接调 Bing 接口会有跨域问题
-      setCurrentWallpaper("https://bing.img.run/1920x1080.php"); 
+      // 加个时间戳强制刷新
+      setCurrentWallpaper(`https://bing.img.run/1920x1080.php?t=${new Date().getTime()}`); 
     } else {
-      // 默认 URL 或 API
       setCurrentWallpaper(wallpaper);
     }
   };
@@ -86,7 +78,6 @@ export default function Home() {
     setSaving(true);
     try {
       setData(newData);
-      // 保存后重新应用壁纸设置（比如切换了模式）
       initWallpaper(newData);
 
       const storedConfig = localStorage.getItem(GITHUB_CONFIG_KEY);
@@ -136,13 +127,13 @@ export default function Home() {
 
   return (
     <main 
-      className="relative min-h-screen w-full overflow-hidden flex flex-col items-center p-6 md:p-12 transition-all duration-700"
+      className="relative min-h-screen w-full overflow-hidden flex flex-col items-center p-6 md:p-12"
       style={bgStyle}
     >
       <div className="relative z-10 w-full max-w-5xl flex flex-col items-center mt-10 md:mt-20">
           
-          <div className={`flex flex-col items-center w-full transition-all duration-500 ease-in-out ${
-            isFocusMode ? 'opacity-0 blur-md scale-95 pointer-events-none' : 'opacity-100 scale-100'
+          <div className={`flex flex-col items-center w-full transition-opacity duration-300 ease-out will-change-opacity ${
+            isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'
           }`}>
             <ClockWidget />
             <WeatherWidget />
@@ -163,6 +154,7 @@ export default function Home() {
           data={data} 
           onSave={handleSave} 
           isSaving={saving}
+          onRefreshWallpaper={() => initWallpaper(data)}
         />
       </div>
       

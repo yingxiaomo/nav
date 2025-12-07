@@ -2,10 +2,11 @@
   "name": "clean-nav",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+"scripts": {
+    "scan": "node scripts/scan-wallpapers.mjs",
+    "dev": "npm run scan && next dev",
+    "build": "npm run scan && next build",
+    "start": "npm run scan && next start",
     "lint": "eslint"
   },
   "dependencies": {

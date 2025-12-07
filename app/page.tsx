@@ -10,7 +10,8 @@ import { DataSchema, DEFAULT_DATA, Category } from "@/lib/types";
 import { loadDataFromGithub, saveDataToGithub, GITHUB_CONFIG_KEY, GithubConfig } from "@/lib/github";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const [data, setData] = useState<DataSchema>(DEFAULT_DATA);
@@ -18,8 +19,18 @@ export default function Home() {
   const [saving, setSaving] = useState(false);
   const [currentWallpaper, setCurrentWallpaper] = useState("");
   const [isFocusMode, setIsFocusMode] = useState(false);
+  
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
+    console.log(
+      "%c Clean Nav %c https://github.com/YingXiaoMo/clean-nav",
+      "background: #333; color: #fff; padding: 4px 8px; border-radius: 4px 0 0 4px; font-weight: bold;",
+      "background: #3b82f6; color: #fff; padding: 4px 8px; border-radius: 0 4px 4px 0;"
+    );
+    console.log("%c Designed & Developed by YingXiaoMo", "color: #aaa; font-size: 12px; margin-top: 5px; font-family: monospace;");
+
     async function initData() {
       try {
         let loadedData = DEFAULT_DATA;
@@ -67,7 +78,6 @@ export default function Home() {
       const randomImg = wallpaperList[Math.floor(Math.random() * wallpaperList.length)];
       setCurrentWallpaper(randomImg);
     } else if (wallpaperType === 'bing') {
-      // 加个时间戳强制刷新
       setCurrentWallpaper(`https://bing.img.run/1920x1080.php?t=${new Date().getTime()}`); 
     } else {
       setCurrentWallpaper(wallpaper);
@@ -84,16 +94,19 @@ export default function Home() {
       if (!storedConfig) {
         toast.success("本地已更新 (未同步 GitHub)");
         setSaving(false);
+        setHasUnsavedChanges(false);
         return;
       }
       const config: GithubConfig = JSON.parse(storedConfig);
       if (!config.token) {
         setSaving(false);
+        setHasUnsavedChanges(false);
         return;
       }
       const success = await saveDataToGithub(config, newData);
       if (success) {
         toast.success("同步成功！");
+        setHasUnsavedChanges(false);
       } else {
         toast.error("同步失败");
       }
@@ -107,8 +120,23 @@ export default function Home() {
 
   const handleReorder = (newCategories: Category[]) => {
     const newData = { ...data, categories: newCategories };
-    handleSave(newData);
+    setData(newData);
+    setHasUnsavedChanges(true);
   };
+
+  const getFilteredCategories = () => {
+    if (!searchQuery) return data.categories;
+    
+    return data.categories.map(cat => ({
+        ...cat,
+        links: cat.links.filter(l => 
+            l.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            l.url.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+    })).filter(cat => cat.links.length > 0);
+  };
+
+  const displayCategories = getFilteredCategories();
 
   const bgStyle = {
     backgroundImage: `url(${currentWallpaper})`,
@@ -138,15 +166,28 @@ export default function Home() {
             <ClockWidget />
             <WeatherWidget />
             <div className="h-8" />
-            <SearchBar />
+            <SearchBar onLocalSearch={setSearchQuery} />
           </div>
           
           <LinkGrid 
-            categories={data.categories} 
-            onReorder={handleReorder}
+            categories={displayCategories} 
+            onReorder={searchQuery ? undefined : handleReorder}
             onOpenChange={setIsFocusMode}
           />
           
+      </div>
+
+      <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${
+        hasUnsavedChanges ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'
+      }`}>
+        <Button 
+          onClick={() => handleSave(data)} 
+          disabled={saving}
+          className="rounded-full shadow-2xl bg-primary/90 backdrop-blur text-primary-foreground px-8 py-6 h-auto text-base font-medium hover:scale-105 transition-transform border border-white/10"
+        >
+          {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
+          保存更改
+        </Button>
       </div>
 
       <div className={`transition-opacity duration-300 ${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
@@ -157,6 +198,20 @@ export default function Home() {
           onRefreshWallpaper={() => initWallpaper(data)}
         />
       </div>
+
+      <footer className={`absolute bottom-2 left-0 w-full text-center z-0 transition-opacity duration-500 ${isFocusMode ? 'opacity-0' : 'opacity-100'}`}>
+        <p className="text-[10px] text-white/30 font-light tracking-widest font-mono select-none">
+          © 2025 Clean Nav · Designed by{' '}
+          <a 
+            href="https://github.com/YingXiaoMo/clean-nav" 
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-white/80 transition-colors cursor-pointer hover:underline underline-offset-4 decoration-white/30"
+          >
+            YingXiaoMo
+          </a>
+        </p>
+      </footer>
       
       <Toaster position="top-center" />
     </main>

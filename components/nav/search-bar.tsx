@@ -11,18 +11,47 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+
 const ENGINES = [
   { name: "Google", url: "https://www.google.com/search?q=" },
   { name: "Baidu", url: "https://www.baidu.com/s?wd=" },
   { name: "Bing", url: "https://www.bing.com/search?q=" },
+  { name: "Bilibili", url: "https://search.bilibili.com/all?keyword=" },
+  { name: "GitHub", url: "https://github.com/search?q=" },
+  { name: "DuckDuckGo", url: "https://duckduckgo.com/?q=" },
+  { name: "Sogou", url: "https://www.sogou.com/web?query=" },
+  { name: "360", url: "https://www.so.com/s?q=" },
+  { name: "Yahoo", url: "https://search.yahoo.com/search?p=" },
+  { name: "本地", url: "local" },
 ];
 
-export function SearchBar() {
+interface SearchBarProps {
+  onLocalSearch?: (query: string) => void;
+}
+
+export function SearchBar({ onLocalSearch }: SearchBarProps) {
   const [query, setQuery] = useState("");
   const [engine, setEngine] = useState(ENGINES[0]);
 
+  const handleEngineChange = (newEngine: typeof ENGINES[0]) => {
+    setEngine(newEngine);
+    if (newEngine.url === "local") {
+      onLocalSearch?.(query);
+    } else {
+      onLocalSearch?.("");
+    }
+  };
+
+  const handleInputChange = (val: string) => {
+    setQuery(val);
+    if (engine.url === "local") {
+      onLocalSearch?.(val);
+    }
+  };
+
   const handleSearch = (e?: React.FormEvent) => {
     e?.preventDefault();
+    if (engine.url === "local") return;
     if (!query.trim()) return;
     window.location.href = `${engine.url}${encodeURIComponent(query)}`;
   };
@@ -33,7 +62,6 @@ export function SearchBar() {
         onSubmit={handleSearch}
         className="relative flex items-center group"
       >
-        {/* Engine Switcher */}
         <div className="absolute left-2 z-50">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -46,26 +74,35 @@ export function SearchBar() {
                 <ChevronDown className="h-3 w-3 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="bg-white/90 backdrop-blur-xl">
-              {ENGINES.map((e) => (
-                <DropdownMenuItem key={e.name} onClick={() => setEngine(e)}>
-                  {e.name}
-                </DropdownMenuItem>
-              ))}
+            
+            <DropdownMenuContent 
+              align="start" 
+              className="w-40 bg-black/60 backdrop-blur-xl border-white/20 text-white p-0 overflow-hidden" 
+            >
+
+              <div className="h-64 overflow-y-auto p-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/40">
+                {ENGINES.map((e) => (
+                  <DropdownMenuItem 
+                    key={e.name} 
+                    onClick={() => handleEngineChange(e)}
+                    className="focus:bg-white/20 focus:text-white cursor-pointer"
+                  >
+                    {e.name}
+                  </DropdownMenuItem>
+                ))}
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
 
-        {/* Search Input */}
         <Input
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={`Search with ${engine.name}...`}
-          className="h-14 pl-28 pr-14 rounded-2xl border-white/20 bg-white/10 dark:bg-black/20 backdrop-blur-xl text-white placeholder:text-white/50 focus-visible:ring-2 focus-visible:ring-white/30 shadow-xl transition-all hover:bg-white/15 text-lg"
+          onChange={(e) => handleInputChange(e.target.value)}
+          placeholder={engine.url === 'local' ? "筛选我的链接..." : `在 ${engine.name} 中搜索...`}
+          className="h-14 pl-32 pr-14 rounded-2xl border-white/20 bg-white/10 dark:bg-black/20 backdrop-blur-xl text-white placeholder:text-white/50 focus-visible:ring-2 focus-visible:ring-white/30 shadow-xl transition-all hover:bg-white/15 text-lg"
         />
         
-        {/* Submit Button */}
         <Button 
           type="submit" 
           size="icon" 

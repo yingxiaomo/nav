@@ -13,7 +13,7 @@ export function ClockWidget() {
     return () => clearInterval(timer);
   }, []);
 
-  if (!time) return <div className="h-24" />; // Avoid hydration mismatch
+  if (!time) return <div className="h-24" />; 
 
   return (
     <div className="text-center text-white drop-shadow-md mb-8">

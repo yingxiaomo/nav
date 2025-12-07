@@ -95,6 +95,7 @@ export default function Home() {
     backgroundImage: `url(${data.settings.wallpaper})`,
     backgroundSize: "cover",
     backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
   };
 
   if (loading) {
@@ -106,19 +107,12 @@ export default function Home() {
   }
 
   return (
-    <main className="relative min-h-screen w-full overflow-hidden transition-all duration-500">
-      {/* Background Layer */}
-      <div 
-        className="fixed inset-0 z-0 transition-all duration-700 ease-in-out transform scale-105"
-        style={bgStyle}
-      />
-      
-      {/* Overlay Layer (Glass Effect) */}
-      <div className={`fixed inset-0 z-10 bg-black/30 backdrop-blur-${data.settings.blurLevel || 'medium'}`} />
-
-      {/* Content Layer */}
-      <div className="relative z-20 flex flex-col items-center min-h-screen p-6 md:p-12 overflow-y-auto w-full">
-        <div className="w-full max-w-5xl flex flex-col items-center mt-10 md:mt-20">
+    <main 
+      className="relative min-h-screen w-full overflow-hidden flex flex-col items-center p-6 md:p-12"
+      style={bgStyle}
+    >
+      {/* Content Layer (z-index ensures it's above the background) */}
+      <div className="relative z-10 w-full max-w-5xl flex flex-col items-center mt-10 md:mt-20">
           
           <ClockWidget />
           
@@ -127,7 +121,6 @@ export default function Home() {
           <LinkGrid categories={data.categories} />
           
         </div>
-      </div>
 
       <SettingsDialog 
         data={data} 

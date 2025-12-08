@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Settings, Loader2, Plus, Trash2, FolderOpen, FolderPlus, Link as LinkIcon, ChevronDown, ChevronRight, Wand2, Shuffle, Image as ImageIcon, Check, X as XIcon, GripVertical } from "lucide-react";
+import { useState, useEffect, ChangeEvent } from "react";
+import { Settings, Loader2, Plus, Trash2, FolderOpen, FolderPlus, Link as LinkIcon, ChevronDown, ChevronRight, Wand2, Shuffle, Image as ImageIcon, Check, X as XIcon, GripVertical, Upload } from "lucide-react";
 import * as Icons from "lucide-react";
 import { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,9 +23,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { DataSchema, Category } from "@/lib/types";
+import { DataSchema, Category, Link } from "@/lib/types";
 import { GithubConfig, GITHUB_CONFIG_KEY } from "@/lib/github";
 import { useLocalStorage } from "@/lib/hooks";
 import {
@@ -46,6 +45,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
+// ... (interfaces and constants remain the same) ...
 interface SettingsDialogProps {
     data: DataSchema;
     onSave: (newData: DataSchema) => Promise<void>;
@@ -73,6 +73,7 @@ interface SettingsDialogProps {
     return <Icon className={className} />;
   };
 
+// ... (SortableCategoryItem remains the same) ...
 function SortableCategoryItem({ cat, isCollapsed, toggleCollapse, children, handleCategoryIconChange, handleDeleteCategory }: { cat: Category, isCollapsed: boolean, toggleCollapse: (id: string) => void, children: React.ReactNode, handleCategoryIconChange: (id: string, icon: string) => void, handleDeleteCategory: (id: string) => void }) {
     const {
       attributes,
@@ -150,7 +151,7 @@ export function SettingsDialog({ data, onSave, isSaving, onRefreshWallpaper }: S
   const [newUrl, setNewUrl] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("");
-  const [newIcon, setNewIcon] = useState("Link"); 
+  const [newIcon, setNewIcon] = useState("Link");
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
@@ -168,22 +169,108 @@ export function SettingsDialog({ data, onSave, isSaving, onRefreshWallpaper }: S
   useEffect(() => {
     if (open) {
       setLocalData(data);
-      setIsCreatingFolder(false); 
+      setIsCreatingFolder(false);
       setNewFolderName("");
     }
   }, [open, data]);
-  
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-        setLocalData((items) => {
-            const oldIndex = items.categories.findIndex((c) => c.id === active.id);
-            const newIndex = items.categories.findIndex((c) => c.id === over.id);
-            return { ...items, categories: arrayMove(items.categories, oldIndex, newIndex) };
-        });
+      setLocalData((items) => {
+        const oldIndex = items.categories.findIndex((c) => c.id === active.id);
+        const newIndex = items.categories.findIndex((c) => c.id === over.id);
+        return { ...items, categories: arrayMove(items.categories, oldIndex, newIndex) };
+      });
     }
   };
 
+  const handleBookmarkImport = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const content = e.target?.result as string;
+        if (!content) {
+            toast.error("无法读取文件内容");
+            return;
+        }
+        
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(content, "text/html");
+            
+            const newCategories: Category[] = [];
+            let totalLinks = 0;
+
+            const parseDl = (dl: HTMLDListElement, parentTitle?: string) => {
+                const categories: Category[] = [];
+                let currentLinks: Link[] = [];
+                let currentCategoryTitle = parentTitle || "导入的书签";
+                
+                for (const child of Array.from(dl.children)) {
+                    if (child.tagName === 'DT') {
+                        const h3 = child.querySelector('h3');
+                        const a = child.querySelector('a');
+
+                        if (h3) { // It's a folder
+                            const nextDl = child.nextElementSibling;
+                            if (nextDl && nextDl.tagName === 'DL') {
+                                categories.push(...parseDl(nextDl as HTMLDListElement, h3.innerText));
+                            }
+                        } else if (a) { // It's a link
+                            currentLinks.push({
+                                id: `l-${Date.now()}-${Math.random()}`,
+                                title: a.innerText,
+                                url: a.href,
+                                icon: `https://www.google.com/s2/favicons?domain=${new URL(a.href).hostname}&sz=128`,
+                            });
+                            totalLinks++;
+                        }
+                    }
+                }
+
+                if (currentLinks.length > 0) {
+                    categories.push({
+                        id: `c-${Date.now()}-${Math.random()}`,
+                        title: currentCategoryTitle,
+                        icon: "FolderDown",
+                        links: currentLinks,
+                    });
+                }
+                return categories;
+            };
+
+            const bodyDl = doc.querySelector('body > dl');
+            if (bodyDl) {
+                newCategories.push(...parseDl(bodyDl));
+            }
+
+            if (newCategories.length > 0) {
+                setLocalData(prevData => ({
+                    ...prevData,
+                    categories: [...prevData.categories, ...newCategories],
+                }));
+                toast.success(`成功导入 ${newCategories.length} 个分类和 ${totalLinks} 个链接！`);
+            } else {
+                toast.warning("没有找到可以导入的书签或文件夹。");
+            }
+
+        } catch (error) {
+            console.error("解析书签文件失败:", error);
+            toast.error("解析书签文件失败，请确保是正确的 HTML 文件。");
+        }
+    };
+    reader.onerror = () => {
+        toast.error("读取文件失败");
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+  };
+
+
+  // ... (all other handler functions remain the same) ...
   const toggleCollapse = (catId: string) => {
     const newSet = new Set(collapsedCats);
     if (newSet.has(catId)) newSet.delete(catId);
@@ -431,6 +518,16 @@ export function SettingsDialog({ data, onSave, isSaving, onRefreshWallpaper }: S
                       </div>
                     </div>
                   </div>
+
+                  {/* Bookmark Import Section */}
+                  <div className="p-4 border rounded-xl bg-muted/30 shrink-0">
+                    <Label htmlFor="bookmark-import" className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                        <Upload className="h-4 w-4" />
+                        导入浏览器书签
+                    </Label>
+                    <Input id="bookmark-import" type="file" accept=".html" onChange={handleBookmarkImport} className="hidden" />
+                    <p className="text-xs text-muted-foreground mt-2">从 Chrome, Edge, Firefox 等浏览器导出书签为 HTML 文件后，在此处上传即可自动导入。</p>
+                  </div>
       
                   <DndContext
                     sensors={sensors}
@@ -485,6 +582,7 @@ export function SettingsDialog({ data, onSave, isSaving, onRefreshWallpaper }: S
                   </DndContext>
                 </TabsContent>
       
+                {/* ... (Other TabsContent remain the same) ... */}
                 <TabsContent value="general" className="space-y-6 py-4 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40">
                   <div className="space-y-2">
                     <Label>网站标题</Label>
@@ -560,4 +658,3 @@ export function SettingsDialog({ data, onSave, isSaving, onRefreshWallpaper }: S
           </Dialog>
         );
       }
-      

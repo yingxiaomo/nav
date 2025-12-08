@@ -13,7 +13,18 @@ export function ClockWidget() {
     return () => clearInterval(timer);
   }, []);
 
-  if (!time) return <div className="h-24" />; 
+  if (!time) {
+    return (
+      <div className="text-center text-white drop-shadow-md mb-8">
+        <div className="text-6xl md:text-8xl font-light tracking-tighter invisible">
+          00:00
+        </div>
+        <div className="text-xl md:text-2xl mt-2 font-medium opacity-90 invisible">
+          2025年12月08日 星期一
+        </div>
+      </div>
+    );
+  } 
 
   return (
     <div className="text-center text-white drop-shadow-md mb-8">

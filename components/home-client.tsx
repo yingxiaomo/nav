@@ -12,15 +12,50 @@ import { toast } from "sonner";
 import { Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export default function HomeClient({ initialWallpapers }: { initialWallpapers: string[] }) {
-  const [currentWallpaper, setCurrentWallpaper] = useState(() => {
-    if (DEFAULT_DATA.settings.wallpaperType === 'local' && initialWallpapers.length > 0) {
+interface HomeClientProps {
+  initialWallpapers: string[]; 
+}
+
+const LOCAL_DATA_KEY = "clean-nav-local-data";
+
+export default function HomeClient({ initialWallpapers }: HomeClientProps) {
+  
+  const getInitialData = (): DataSchema => {
+      if (typeof window !== 'undefined') {
+          const localDataString = localStorage.getItem(LOCAL_DATA_KEY);
+          if (localDataString) {
+               try {
+                  const localData = JSON.parse(localDataString) as DataSchema;
+                  if (initialWallpapers.length > 0) {
+                      localData.settings.wallpaperList = [...initialWallpapers];
+                  }
+                  return localData;
+               } catch (e) {
+                   console.error("Failed to parse local data", e);
+               }
+          }
+      }
+      
+      const dataCopy = JSON.parse(JSON.stringify(DEFAULT_DATA));
+      if (initialWallpapers.length > 0) {
+          dataCopy.settings.wallpaperList = [...initialWallpapers];
+      }
+      return dataCopy;
+  }
+
+  const getInitialWallpaper = (initialData: DataSchema): string => {
+    if (initialData.settings.wallpaperType === 'local' && initialWallpapers.length > 0) {
       return initialWallpapers[0];
     }
+    if (initialData.settings.wallpaperType !== 'local' && initialData.settings.wallpaper) {
+        return initialData.settings.wallpaper;
+    }
     return "";
-  });
-
-  const [data, setData] = useState<DataSchema>(DEFAULT_DATA);
+  }
+  
+  const initialDataState = getInitialData();
+  const [data, setData] = useState<DataSchema>(initialDataState);
+  const [currentWallpaper, setCurrentWallpaper] = useState(getInitialWallpaper(initialDataState));
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -28,11 +63,11 @@ export default function HomeClient({ initialWallpapers }: { initialWallpapers: s
 
   useEffect(() => {
     if (!currentWallpaper) return;
+    
     if (initialWallpapers.includes(currentWallpaper)) {
         setImgLoaded(true);
         return;
     }
-    
     setImgLoaded(false); 
     const img = new Image();
     img.src = currentWallpaper;
@@ -61,10 +96,10 @@ export default function HomeClient({ initialWallpapers }: { initialWallpapers: s
 
     async function initData() {
       try {
-        let loadedData = DEFAULT_DATA;
-        const storedConfig = localStorage.getItem(GITHUB_CONFIG_KEY);
+        let loadedData = data; 
         let loadedFromGithub = false;
-        
+
+        const storedConfig = localStorage.getItem(GITHUB_CONFIG_KEY);
         if (storedConfig) {
           const config: GithubConfig = JSON.parse(storedConfig);
           if (config.token) {
@@ -72,26 +107,35 @@ export default function HomeClient({ initialWallpapers }: { initialWallpapers: s
             if (ghData) {
               loadedData = ghData;
               loadedFromGithub = true;
+              
+              if(initialWallpapers.length > 0) {
+                  loadedData.settings.wallpaperList = [...initialWallpapers];
+              }
+              setData(loadedData); 
+              if (typeof window !== 'undefined') {
+                 localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(loadedData));
+                 setHasUnsavedChanges(false);
+              }
             }
           }
         }
 
-        if (!loadedFromGithub) {
+        if (!loadedFromGithub && !localStorage.getItem(LOCAL_DATA_KEY)) {
           try {
             const res = await fetch("/data.json");
             if (res.ok) {
-              loadedData = await res.json();
+              const fetchedData = await res.json();
+              loadedData = fetchedData;
+              
+              if(initialWallpapers.length > 0) {
+                  loadedData.settings.wallpaperList = [...initialWallpapers];
+              }
+              setData(loadedData);
             }
           } catch (e) {
-            console.log("No local data.json found.");
+            console.log("No deployed data.json found or fetch failed.");
           }
         }
-
-        if(initialWallpapers.length > 0) {
-            loadedData.settings.wallpaperList = [...initialWallpapers];
-        }
-
-        setData(loadedData);
 
         if (loadedData.settings.wallpaperType !== 'local') {
              initWallpaper(loadedData);
@@ -102,13 +146,15 @@ export default function HomeClient({ initialWallpapers }: { initialWallpapers: s
       } 
     }
     initData();
-  }, [initialWallpapers]);
+  }, [initialWallpapers]); 
 
   const initWallpaper = async (cfg: DataSchema) => {
     const { wallpaperType, wallpaper, wallpaperList } = cfg.settings;
 
     if (wallpaperType === 'local') {
-      const list = initialWallpapers.length > 0 ? initialWallpapers : wallpaperList;
+      if (currentWallpaper === initialWallpapers[0]) return; 
+
+      const list = (initialWallpapers.length > 0) ? initialWallpapers : wallpaperList;
       if (list && list.length > 0) {
         const randomImg = list[Math.floor(Math.random() * list.length)];
         setCurrentWallpaper(randomImg);
@@ -124,6 +170,12 @@ export default function HomeClient({ initialWallpapers }: { initialWallpapers: s
     setSaving(true);
     try {
       setData(newData);
+  
+      if (typeof window !== 'undefined') {
+          localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(newData));
+          setHasUnsavedChanges(true);
+      }
+
       if(newData.settings.wallpaperType !== data.settings.wallpaperType || newData.settings.wallpaper !== data.settings.wallpaper) {
           initWallpaper(newData);
       }
@@ -132,13 +184,12 @@ export default function HomeClient({ initialWallpapers }: { initialWallpapers: s
       if (!storedConfig) {
         toast.success("本地已更新 (未同步 GitHub)");
         setSaving(false);
-        setHasUnsavedChanges(false);
         return;
       }
       const config: GithubConfig = JSON.parse(storedConfig);
       if (!config.token) {
+        toast.success("本地已更新 (未同步 GitHub)");
         setSaving(false);
-        setHasUnsavedChanges(false);
         return;
       }
       const success = await saveDataToGithub(config, newData);
@@ -146,7 +197,7 @@ export default function HomeClient({ initialWallpapers }: { initialWallpapers: s
         toast.success("同步成功！");
         setHasUnsavedChanges(false);
       } else {
-        toast.error("同步失败");
+        toast.error("同步失败 (已暂存到本地)");
       }
     } catch (error) {
       console.error(error);
@@ -159,6 +210,9 @@ export default function HomeClient({ initialWallpapers }: { initialWallpapers: s
   const handleReorder = (newCategories: Category[]) => {
     const newData = { ...data, categories: newCategories };
     setData(newData);
+    if (typeof window !== 'undefined') {
+        localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(newData));
+    }
     setHasUnsavedChanges(true);
   };
 
@@ -185,53 +239,56 @@ export default function HomeClient({ initialWallpapers }: { initialWallpapers: s
         }}
       />
       <div className="absolute inset-0 z-0 bg-black/20 pointer-events-none" />
-
-      <div className="relative z-10 w-full max-w-5xl flex flex-col items-center shrink-0 mt-10 md:mt-20">
-          <div className="flex flex-col items-center w-full">
-            <ClockWidget />
-            <SearchBar onLocalSearch={setSearchQuery} />
+      <div className="relative z-10 w-full flex flex-col items-center flex-grow">
+          
+          <div className="w-full max-w-5xl flex flex-col items-center shrink-0 mt-10 md:mt-20">
+              <div className="flex flex-col items-center w-full">
+                <ClockWidget />
+                <SearchBar onLocalSearch={setSearchQuery} />
+              </div>
           </div>
+          
+          <div className="flex-grow" /> 
+
+          <div className="w-full max-w-5xl flex flex-col items-center mb-10"> 
+             <LinkGrid 
+                categories={displayCategories} 
+                onReorder={searchQuery ? undefined : handleReorder}
+             />
+          </div>
+
+          <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${
+            hasUnsavedChanges ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'
+          }`}>
+            <Button 
+              onClick={() => handleSave(data)} 
+              disabled={saving}
+              className="rounded-full shadow-2xl bg-primary/90 backdrop-blur text-primary-foreground px-8 py-6 h-auto text-base font-medium hover:scale-105 transition-transform border border-white/10"
+            >
+              {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
+              {saving ? '正在同步...' : '保存更改'}
+            </Button>
+          </div>
+
+          <div>
+            <SettingsDialog 
+              data={data} 
+              onSave={handleSave} 
+              isSaving={saving}
+              onRefreshWallpaper={() => initWallpaper(data)}
+            />
+          </div>
+
+          <footer className="absolute bottom-2 left-0 w-full text-center z-0">
+            <p className="text-[10px] text-white/30 font-light tracking-widest font-mono select-none">
+              © 2025 Clean Nav · Designed by{' '}
+              <a href="https://github.com/YingXiaoMo/clean-nav" target="_blank" rel="noopener noreferrer" className="hover:text-white/80 transition-colors cursor-pointer hover:underline underline-offset-4 decoration-white/30">
+                YingXiaoMo
+              </a>
+            </p>
+          </footer>
       </div>
       
-      <div className="flex-grow" /> 
-
-      <div className="relative z-10 w-full max-w-5xl flex flex-col items-center mb-10"> 
-          <LinkGrid 
-            categories={displayCategories} 
-            onReorder={searchQuery ? undefined : handleReorder}
-          />
-      </div>
-
-      <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${
-        hasUnsavedChanges ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'
-      }`}>
-        <Button 
-          onClick={() => handleSave(data)} 
-          disabled={saving}
-          className="rounded-full shadow-2xl bg-primary/90 backdrop-blur text-primary-foreground px-8 py-6 h-auto text-base font-medium hover:scale-105 transition-transform border border-white/10"
-        >
-          {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
-          保存更改
-        </Button>
-      </div>
-
-      <div>
-        <SettingsDialog 
-          data={data} 
-          onSave={handleSave} 
-          isSaving={saving}
-          onRefreshWallpaper={() => initWallpaper(data)}
-        />
-      </div>
-
-      <footer className="absolute bottom-2 left-0 w-full text-center z-0">
-        <p className="text-[10px] text-white/30 font-light tracking-widest font-mono select-none">
-          © 2025 Clean Nav · Designed by{' '}
-          <a href="https://github.com/YingXiaoMo/clean-nav" target="_blank" rel="noopener noreferrer" className="hover:text-white/80 transition-colors cursor-pointer hover:underline underline-offset-4 decoration-white/30">
-            YingXiaoMo
-          </a>
-        </p>
-      </footer>
       <Toaster position="top-center" />
     </main>
   );

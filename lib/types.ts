@@ -27,6 +27,7 @@ export interface DataSchema {
   categories: Category[];
 }
 
+
 export const DEFAULT_DATA: DataSchema = {
   settings: {
     title: "Clean Nav",
@@ -34,17 +35,7 @@ export const DEFAULT_DATA: DataSchema = {
     wallpaperType: 'local',
     wallpaperList: [],
     blurLevel: 'medium',
-    maxPackedWallpapers: 10
+    maxPackedWallpapers: 10 
   },
-  categories: [
-    {
-      id: "c1",
-      title: "常用",
-      icon: "FolderOpen", 
-      links: [
-        { id: "l1", title: "Google", url: "https://google.com", icon: "Search" },
-        { id: "l2", title: "GitHub", url: "https://github.com", icon: "Github" },
-      ]
-    }
-  ]
+  categories: [] 
 };

@@ -84,12 +84,10 @@ function SortableCard({ category, onClick }: { category: Category; onClick: () =
 }
 
 export function LinkGrid({ categories, onReorder, onOpenChange }: LinkGridProps) {
-  // 1. 新增：使用 useId 生成稳定的 ID
+
   const dndContextId = useId();
-  
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectedCategory = categories.find((c) => c.id === selectedId);
-
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -122,7 +120,6 @@ export function LinkGrid({ categories, onReorder, onOpenChange }: LinkGridProps)
 
   return (
     <>
-      {/* 2. 修改：将生成的 ID 传给 DndContext，解决 ID 不匹配问题 */}
       <DndContext id={dndContextId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <div className="w-full max-w-5xl mx-auto pb-6 px-4 relative z-30">
           <SortableContext items={categories.map(c => c.id)} strategy={rectSortingStrategy}>

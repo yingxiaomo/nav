@@ -5,7 +5,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ChevronDown, ChevronRight, GripVertical, Trash2, Pencil } from "lucide-react";
+import { ChevronDown, ChevronRight, Trash2, Pencil } from "lucide-react";
 import { IconRender, PRESET_ICONS } from "./shared";
 
 interface SortableCategoryItemProps {
@@ -15,7 +15,7 @@ interface SortableCategoryItemProps {
   children: React.ReactNode;
   handleCategoryIconChange: (id: string, icon: string) => void;
   handleDeleteCategory: (id: string) => void;
-  handleRenameCategory: (id: string, title: string) => void; 
+  handleRenameCategory: (id: string, title: string) => void;
 }
 
 export function SortableCategoryItem({ 
@@ -56,7 +56,7 @@ export function SortableCategoryItem({
     if (editTitle.trim()) {
       handleRenameCategory(cat.id, editTitle.trim());
     } else {
-      setEditTitle(cat.title); 
+      setEditTitle(cat.title);
     }
     setIsEditing(false);
   };
@@ -78,28 +78,34 @@ export function SortableCategoryItem({
   return (
     <div ref={setNodeRef} style={style} className="space-y-1 mb-2">
       <div 
+        {...attributes}
+        {...listeners}
         className={`
-            flex items-center gap-1 px-2 py-2 rounded-md select-none group sticky top-0 z-10 border transition-all
-            ${isDragging ? 'shadow-lg ring-1 ring-primary' : 'hover:border-border/50'}
-            bg-zinc-100 dark:bg-zinc-800 border-transparent
+            flex items-center gap-1 px-2 py-3 rounded-md select-none group sticky top-0 z-10 border transition-all
+            ${isDragging ? 'shadow-lg ring-1 ring-primary cursor-grabbing' : 'hover:border-border/50 cursor-grab'}
+            bg-zinc-100 dark:bg-zinc-800 border-transparent touch-none min-h-[44px] /* 增加高度，方便手指拖拽 */
         `}
       >
-        <Button variant="ghost" size="icon" {...attributes} {...listeners} className="cursor-grab h-6 w-6 active:cursor-grabbing text-muted-foreground/70 hover:text-foreground shrink-0">
-          <GripVertical className="h-4 w-4" />
-        </Button>
-
         <div 
-            className="flex items-center justify-center cursor-pointer h-6 w-6 text-muted-foreground hover:text-foreground shrink-0 transition-transform duration-200"
-            onClick={() => toggleCollapse(cat.id)}
+            className="flex items-center justify-center cursor-pointer h-8 w-8 -ml-1 text-muted-foreground hover:text-foreground shrink-0 transition-transform duration-200"
+            onPointerDown={(e) => e.stopPropagation()} 
+            onClick={(e) => {
+                e.stopPropagation();
+                toggleCollapse(cat.id);
+            }}
         >
-            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {isCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
         </div>
 
-        <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+        <div 
+            className="shrink-0 mr-1" 
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+        >
             <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6 p-0 hover:bg-background/50 text-foreground/80">
-                <IconRender name={cat.icon || "FolderOpen"} className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-8 w-8 p-0 hover:bg-background/50 text-foreground/80">
+                <IconRender name={cat.icon || "FolderOpen"} className="h-5 w-5" />
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-[300px] h-[300px] overflow-y-auto">
@@ -114,7 +120,7 @@ export function SortableCategoryItem({
             </DropdownMenu>
         </div>
           
-        <div className="flex-1 flex items-center gap-2 ml-1 min-w-0">
+        <div className="flex-1 flex items-center gap-2 min-w-0 mr-1">
             {isEditing ? (
                 <Input
                     ref={inputRef}
@@ -122,41 +128,50 @@ export function SortableCategoryItem({
                     onChange={(e) => setEditTitle(e.target.value)}
                     onBlur={handleSave}
                     onKeyDown={handleKeyDown}
-                    className="h-7 text-sm px-2 py-0 bg-background/80"
-                    onClick={(e) => e.stopPropagation()} 
-                    onPointerDown={(e) => e.stopPropagation()} 
+                    className="h-8 text-sm px-2 py-0 bg-background/80 w-full"
+                    onClick={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
                 />
             ) : (
                 <div 
-                    className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" 
-                    onClick={() => toggleCollapse(cat.id)}
-                    onDoubleClick={() => setIsEditing(true)} 
-                    title="双击重命名"
+                    className="flex items-center gap-2 flex-1 min-w-0 h-full py-1 cursor-pointer" 
+                    onClick={(e) => {
+                        toggleCollapse(cat.id);
+                    }}
+                    onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        setIsEditing(true);
+                    }}
                 >
                     <span className="text-sm font-bold text-foreground/80 truncate">{cat.title}</span>
                     <span className="text-[10px] bg-background/50 px-1.5 py-0.5 rounded-full text-muted-foreground font-normal border border-border/20 shrink-0">
                         {cat.links.length}
                     </span>
-                    
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-5 w-5 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setIsEditing(true);
-                        }}
-                    >
-                        <Pencil className="h-3 w-3" />
-                    </Button>
                 </div>
             )}
         </div>
 
+        {!isEditing && (
+            <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0" 
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setIsEditing(true);
+                }}
+                title="重命名"
+            >
+                <Pencil className="h-4 w-4" />
+            </Button>
+        )}
+
         <Button 
             variant="ghost" 
             size="icon" 
-            className="h-7 w-7 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all shrink-0"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+            onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               handleDeleteCategory(cat.id);

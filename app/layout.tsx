@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   description: "Clean Nav 是一个基于 Next.js + Tailwind CSS 构建的极简、免费开源浏览器主页。支持 GitHub 账号直接登录同步数据，无需服务器数据库。具备拖拽排序、自定义壁纸、书签导入等功能。",
   
   keywords: [
-    "Clean Nav", "导航页", "起始页", "浏览器主页", "极简导航", 
+    "Clean Nav", "导航页", "起始页", "浏览器主页", "极简导航", "好看的导航", 
     "开源项目", "Next.js", "React", "Tailwind CSS", "GitHub API", 
     "Serverless", "静态网站", "Vercel", "书签管理", "Dashboard", "Startpage"
   ],

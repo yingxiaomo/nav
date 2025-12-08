@@ -36,7 +36,7 @@ export default function Home() {
       "color: #3b82f6; font-weight: bold;"
     );
     console.log("%c✨ 欢迎来到我的导航页 | 项目已开源", "color: #3b82f6;");
-    console.log("%cGithub: https://github.com/YingXiaoMo/Clean-Nav", "color: #aaa; font-size: 12px; font-family: monospace;");
+    console.log("%cGithub: https://github.com/yingxiaomo/nav", "color: #aaa; font-size: 12px; font-family: monospace;");
     console.log("%c主页: https://ovoxo.cc", "color: #aaa; font-size: 12px; font-family: monospace;");
 
     async function initData() {

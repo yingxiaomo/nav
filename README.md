@@ -119,38 +119,5 @@ npm run dev
 如果你希望包含更多图片，请修改 `app\page.tsx` 中的 `MAX_WALLPAPERS` 常量。
 
 
-## 🛠️ 技术栈
-
-- **框架**: [Next.js](https://nextjs.org) 
-- **UI 库**: [Shadcn/ui](https://ui.shadcn.com)
-- **样式**: [Tailwind CSS](https://tailwindcss.com)
-- **图标**: [Lucide React](https://lucide.dev)
-- **数据层**: GitHub API 
-
-## 📁 目录结构：
-```
-clean-nav/
-├── app/
-│   ├── page.tsx
-│   ├── layout.tsx
-│   └── globals.css
-├── components/
-│   ├── nav/
-│   │   ├── link-grid.tsx
-│   │   ├── search-bar.tsx
-│   │   ├── settings-dialog.tsx
-│   │   ├── weather.tsx
-│   │   └── clock.tsx
-│   └── ui/
-├── lib/
-│   ├── github.ts
-│   ├── types.ts
-│   └── hooks.ts
-├── public/
-│   ├── wallpapers/
-│   └── data.json
-└── scripts/
-    └── scan-wallpapers.mjs
-```
 ## 📄 License:
 MIT License © 2025 YingXiaoMo

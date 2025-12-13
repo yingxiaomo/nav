@@ -99,46 +99,100 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
             const doc = parser.parseFromString(content, "text/html");
             const newCategories: Category[] = [];
             let totalLinks = 0;
+            let totalFolders = 0;
 
-            const parseDl = (dl: HTMLDListElement, parentTitle?: string) => {
-                const categories: Category[] = [];
-                let currentLinks: LinkItem[] = [];
-                let currentCategoryTitle = parentTitle || "导入的书签";
+            // Robust recursive parser
+            const parseBookmarks = (dl: Element): LinkItem[] => {
+                const items: LinkItem[] = [];
+                const children = Array.from(dl.children);
                 
-                for (const child of Array.from(dl.children)) {
-                    if (child.tagName === 'DT') {
-                        const h3 = child.querySelector('h3');
-                        const a = child.querySelector('a');
-                        if (h3) { 
-                            const nextDl = child.nextElementSibling;
-                            if (nextDl && nextDl.tagName === 'DL') {
-                                categories.push(...parseDl(nextDl as HTMLDListElement, h3.innerText));
+                for (let i = 0; i < children.length; i++) {
+                    const node = children[i];
+                    
+                    // We primarily look for DT tags
+                    if (node.tagName === 'DT') {
+                        const h3 = node.querySelector('h3');
+                        const a = node.querySelector('a');
+                        
+                        if (h3) {
+                            // Found a folder header
+                            const folderTitle = h3.innerText;
+                            let childItems: LinkItem[] = [];
+                            
+                            // Strategy 1: Look for DL inside the DT
+                            let itemsDl = node.querySelector('dl');
+
+                            // Strategy 2: Look for DL as the next sibling (common in Chrome/Edge)
+                            // We need to be careful not to skip valid DTs if we look ahead
+                            if (!itemsDl) {
+                                let next = node.nextElementSibling;
+                                while (next && next.tagName !== 'DT' && next.tagName !== 'DL') {
+                                    // Skip non-structural tags like p, dd (if malformed)
+                                    next = next.nextElementSibling;
+                                }
+                                if (next && next.tagName === 'DL') {
+                                    itemsDl = next as HTMLDListElement;
+                                }
                             }
-                        } else if (a) { 
-                            currentLinks.push({
+                            
+                            if (itemsDl) {
+                                childItems = parseBookmarks(itemsDl);
+                            }
+
+                            items.push({
+                                id: `f-${Date.now()}-${Math.random()}`,
+                                title: folderTitle,
+                                url: "",
+                                icon: "FolderOpen",
+                                type: 'folder',
+                                children: childItems
+                            });
+                            totalFolders++;
+                        } else if (a) {
+                            // Found a link
+                            items.push({
                                 id: `l-${Date.now()}-${Math.random()}`,
                                 title: a.innerText,
                                 url: a.href,
                                 icon: `https://www.google.com/s2/favicons?domain=${new URL(a.href).hostname}&sz=128`,
+                                type: 'link'
                             });
                             totalLinks++;
                         }
                     }
                 }
-                if (currentLinks.length > 0) {
-                    categories.push({
-                        id: `c-${Date.now()}-${Math.random()}`,
-                        title: currentCategoryTitle,
-                        icon: "FolderDown",
-                        links: currentLinks,
-                    });
-                }
-                return categories;
+                return items;
             };
 
-            const bodyDl = doc.querySelector('body > dl');
-            if (bodyDl instanceof HTMLDListElement) {
-                newCategories.push(...parseDl(bodyDl));
+            // Find the root DL. Usually body > dl, but sometimes just dl
+            const bodyDl = doc.querySelector('body > dl') || doc.querySelector('dl');
+            
+            if (bodyDl) {
+                const rootItems = parseBookmarks(bodyDl);
+                
+                const looseLinks: LinkItem[] = [];
+                
+                for (const item of rootItems) {
+                    if (item.type === 'folder' && item.children) {
+                        newCategories.push({
+                            id: `c-${Date.now()}-${Math.random()}`,
+                            title: item.title,
+                            icon: "FolderOpen",
+                            links: item.children
+                        });
+                    } else {
+                        looseLinks.push(item);
+                    }
+                }
+
+                if (looseLinks.length > 0) {
+                    newCategories.push({
+                        id: `c-${Date.now()}-${Math.random()}`,
+                        title: "导入的书签",
+                        icon: "FolderDown",
+                        links: looseLinks
+                    });
+                }
             }
 
             if (newCategories.length > 0) {
@@ -146,9 +200,9 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
                     ...prevData,
                     categories: [...prevData.categories, ...newCategories],
                 }));
-                toast.success(`成功导入 ${newCategories.length} 个分类和 ${totalLinks} 个链接！`);
+                toast.success(`成功导入 ${newCategories.length} 个顶级文件夹（共 ${totalFolders} 个文件夹）和 ${totalLinks} 个链接！`);
             } else {
-                toast.warning("没有找到可以导入的书签或文件夹。");
+                toast.warning("没有找到可以导入的书签或文件夹。请确认文件格式是否正确。");
             }
         } catch (error) {
             console.error(error);

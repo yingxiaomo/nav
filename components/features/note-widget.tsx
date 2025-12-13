@@ -40,8 +40,8 @@ export function NoteWidget({ notes = [], onUpdate }: NoteWidgetProps) {
   }
 
   return (
-    <div className="flex h-full gap-2 p-4">
-      <div className="w-[140px] flex flex-col gap-2 border-r border-border/50 pr-2 shrink-0">
+    <div className="flex flex-col md:flex-row h-full gap-2 p-4">
+      <div className="w-full md:w-[140px] h-[140px] md:h-full flex flex-col gap-2 border-b md:border-b-0 md:border-r border-border/50 pb-2 md:pb-0 md:pr-2 shrink-0">
         <Button onClick={addNote} className="w-full shadow-sm" size="sm">
           <Plus className="w-4 h-4 mr-2" /> 新建笔记
         </Button>

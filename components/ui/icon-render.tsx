@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import * as Icons from "lucide-react";
 import { Link as LinkIcon, LucideIcon } from "lucide-react";
 
@@ -7,17 +8,30 @@ interface IconRenderProps {
 }
 
 export const IconRender = ({ name, className }: IconRenderProps) => {
-  if (name?.startsWith("http") || name?.startsWith("/")) {
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    setError(false);
+  }, [name]);
+
+  if ((name?.startsWith("http") || name?.startsWith("/")) && !error) {
     return (
       <img 
         src={name} 
         alt="icon" 
         className={`${className} object-contain rounded-sm`} 
         loading="lazy"
+        onError={() => setError(true)}
       />
     );
   }
   
-  const IconComponent = (Icons[name as keyof typeof Icons] as LucideIcon) || LinkIcon;
-  return <IconComponent className={className} />;
+  const iconName = name as keyof typeof Icons;
+  // Ensure the icon exists AND is a function (React component)
+  const isValidIcon = name && !error && /^[A-Z]/.test(name) && Boolean(Icons[iconName]);
+  
+  const IconComponent = isValidIcon ? Icons[iconName] : LinkIcon;
+  const Icon = IconComponent as LucideIcon;
+  
+  return <Icon className={className} />;
 };

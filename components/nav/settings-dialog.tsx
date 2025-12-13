@@ -26,10 +26,11 @@ interface SettingsDialogProps {
   data: DataSchema;
   onSave: (newData: DataSchema) => Promise<void>;
   isSaving: boolean;
+  hasUnsavedChanges?: boolean;
   onRefreshWallpaper?: () => void;
 }
 
-export function SettingsDialog({ data, onSave, isSaving, onRefreshWallpaper }: SettingsDialogProps) {
+export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRefreshWallpaper }: SettingsDialogProps) {
   const [open, setOpen] = useState(false);
   const [localData, setLocalData] = useState<DataSchema>(data);
   const [ghConfig, setGhConfig] = useLocalStorage<GithubConfig>(GITHUB_CONFIG_KEY, {
@@ -59,6 +60,9 @@ export function SettingsDialog({ data, onSave, isSaving, onRefreshWallpaper }: S
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="fixed bottom-4 right-4 z-50 rounded-full text-white/80 hover:text-white hover:bg-white/10 shadow-lg backdrop-blur-sm">
           <Settings className="h-5 w-5" />
+          {hasUnsavedChanges && (
+            <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-black/20" />
+          )}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[700px] h-[85vh] max-h-[800px] flex flex-col backdrop-blur-xl overflow-hidden">
@@ -92,10 +96,15 @@ export function SettingsDialog({ data, onSave, isSaving, onRefreshWallpaper }: S
           </TabsContent>
         </Tabs>
 
-        <DialogFooter className="mt-2 shrink-0">
+        <DialogFooter className="mt-2 shrink-0 flex-col sm:flex-row gap-2 sm:gap-0">
+          {hasUnsavedChanges && (
+            <div className="flex items-center justify-center sm:justify-start text-xs text-yellow-500 font-medium px-2">
+              有设置未同步到 GitHub
+            </div>
+          )}
           <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            保存并更新
+            {hasUnsavedChanges ? '保存并同步' : '保存'}
           </Button>
         </DialogFooter>
       </DialogContent>

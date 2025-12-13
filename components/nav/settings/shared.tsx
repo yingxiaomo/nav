@@ -15,9 +15,15 @@ export const PRESET_ICONS = [
 
 export const IconRender = ({ name, className }: { name: string; className?: string }) => {
   if (name?.startsWith("http") || name?.startsWith("/")) {
-    return <img src={name} alt="icon" className={`${className} object-contain rounded-sm`} />;
+    return <img src={name} alt="icon" className={`${className} object-contain rounded-sm`} loading="lazy" />;
   }
-  // @ts-ignore
-  const Icon = (Icons[name as keyof typeof Icons] as LucideIcon) || LinkIcon;
+  
+  const iconName = name as keyof typeof Icons;
+  // Ensure the icon exists AND is a function (React component)
+  const isValidIcon = name && /^[A-Z]/.test(name) && Boolean(Icons[iconName]);
+  
+  const IconComponent = isValidIcon ? Icons[iconName] : LinkIcon;
+  const Icon = IconComponent as LucideIcon;
+  
   return <Icon className={className} />;
 };

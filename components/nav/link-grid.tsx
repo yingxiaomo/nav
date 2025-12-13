@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useId } from "react";
-import { Category } from "@/lib/types";
-import { X, FolderOpen } from "lucide-react";
+import React, { useState, useEffect, useId, memo } from "react";
+import { Category, LinkItem } from "@/lib/types";
+import { X, FolderOpen, ChevronLeft } from "lucide-react";
 import * as Icons from "lucide-react";
 import { LucideIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -30,14 +30,36 @@ interface LinkGridProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-const IconRender = ({ name, className }: { name: string; className?: string }) => {
-  if (name?.startsWith("http") || name?.startsWith("/")) {
-    return <img src={name} alt="icon" className={`${className} object-contain rounded-sm`} style={{ width: '100%', height: '100%' }} />;
+const IconRender = memo(({ name, className }: { name: string; className?: string }) => {
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    setError(false);
+  }, [name]);
+
+  if ((name?.startsWith("http") || name?.startsWith("/")) && !error) {
+    return (
+      <img 
+        src={name} 
+        alt="icon" 
+        className={`${className} object-contain rounded-sm`} 
+        style={{ width: '100%', height: '100%' }} 
+        loading="lazy" 
+        onError={() => setError(true)}
+      />
+    );
   }
 
-  const Icon = (Icons[name as keyof typeof Icons] as LucideIcon) || Icons.FolderOpen;
+  const iconName = name as keyof typeof Icons;
+  // Ensure the icon exists AND is a function (React component), not an object/constant
+  const isValidIcon = name && !error && /^[A-Z]/.test(name) && Boolean(Icons[iconName]);
+  
+  const IconComponent = isValidIcon ? Icons[iconName] : Icons.FolderOpen;
+  const Icon = IconComponent as LucideIcon;
+  
   return <Icon className={className} />;
-};
+});
+IconRender.displayName = "IconRender";
 
 const CardContent = ({ category }: { category: Category }) => (
   <motion.div layoutId={category.id} className="flex flex-col items-center justify-center text-center gap-1">
@@ -105,6 +127,9 @@ export function LinkGrid({ categories, onReorder, onOpenChange }: LinkGridProps)
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  // Stack for folder navigation: LinkItem[]
+  const [navStack, setNavStack] = useState<LinkItem[]>([]);
+
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -125,15 +150,37 @@ export function LinkGrid({ categories, onReorder, onOpenChange }: LinkGridProps)
     if (selectedId) {
       document.body.style.overflow = "hidden";
       onOpenChange?.(true);
+      setNavStack([]); // Reset stack when opening a new category
     } else {
       document.body.style.overflow = "auto";
       onOpenChange?.(false);
+      setNavStack([]);
     }
     return () => { 
       document.body.style.overflow = "auto";
       onOpenChange?.(false);
     };
   }, [selectedId, onOpenChange]);
+
+  const currentItems = navStack.length > 0 
+    ? navStack[navStack.length - 1].children || [] 
+    : selectedCategory?.links || [];
+
+  const currentTitle = navStack.length > 0
+    ? navStack[navStack.length - 1].title
+    : selectedCategory?.title;
+
+  const currentIcon = navStack.length > 0
+    ? navStack[navStack.length - 1].icon || "FolderOpen"
+    : selectedCategory?.icon || "FolderOpen";
+
+  const handleBack = () => {
+      setNavStack(prev => prev.slice(0, -1));
+  };
+
+  const handleFolderClick = (folder: LinkItem) => {
+      setNavStack(prev => [...prev, folder]);
+  };
 
   return (
     <>
@@ -179,11 +226,16 @@ export function LinkGrid({ categories, onReorder, onOpenChange }: LinkGridProps)
             >
               <div className="flex items-center justify-between px-4 py-2 border-b border-border/20 shrink-0 bg-transparent">
                 <div className="flex items-center gap-3">
+                  {navStack.length > 0 && (
+                      <button onClick={handleBack} className="p-1.5 rounded-full bg-muted/50 hover:bg-muted transition-colors mr-1">
+                          <ChevronLeft className="h-4 w-4" />
+                      </button>
+                  )}
                   <div className="p-1.5 rounded-xl bg-yellow-500/20 text-yellow-200">
-                     <IconRender name={selectedCategory.icon || "FolderOpen"} className="h-5 w-5" />
+                     <IconRender name={currentIcon} className="h-5 w-5" />
                   </div>
                   <h2 className="text-lg font-semibold text-foreground tracking-tight">
-                    {selectedCategory.title}
+                    {currentTitle}
                   </h2>
                 </div>
                 <button
@@ -194,30 +246,68 @@ export function LinkGrid({ categories, onReorder, onOpenChange }: LinkGridProps)
                 </button>
               </div>
 
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, delay: 0.1 }} className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-transparent">
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                  {selectedCategory.links.map((link) => (
-                    <a
-                      key={link.id}
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group block relative"
-                    >
-                      <div className="flex items-center gap-4 p-4 rounded-xl hover:bg-muted border border-transparent hover:border-border/40 transition-colors">
-                        <div className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center border border-border/40 overflow-hidden ${
-                          link.icon?.startsWith('http') ? 'bg-background/50 p-1.5' : 'bg-blue-500/20 text-blue-200'
-                        }`}>
-                           <IconRender name={link.icon || "Link"} className={link.icon?.startsWith('http') ? "w-full h-full" : "h-5 w-5"} />
+              <motion.div 
+                key={navStack.length} // Force re-render/animation on navigation
+                initial={{ opacity: 0, x: 10 }} 
+                animate={{ opacity: 1, x: 0 }} 
+                exit={{ opacity: 0, x: -10 }} 
+                transition={{ duration: 0.2 }} 
+                className="p-6 overflow-y-auto flex-1 bg-transparent [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {currentItems.map((item) => {
+                     const isFolder = item.type === 'folder';
+                     
+                     if (isFolder) {
+                         return (
+                            <div
+                                key={item.id}
+                                onClick={() => handleFolderClick(item)}
+                                className="group block relative cursor-pointer"
+                            >
+                                <div className="flex items-center gap-4 p-4 rounded-xl hover:bg-muted border border-transparent hover:border-border/40 transition-colors">
+                                    <div className="h-10 w-10 shrink-0 rounded-lg flex items-center justify-center border border-border/40 overflow-hidden bg-yellow-500/10 text-yellow-500">
+                                        <IconRender name="FolderOpen" className="h-5 w-5" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-foreground font-medium text-sm" title={item.title}>
+                                            {item.title}
+                                        </h4>
+                                    </div>
+                                    <ChevronLeft className="h-4 w-4 text-muted-foreground rotate-180" />
+                                </div>
+                            </div>
+                         );
+                     }
+
+                    return (
+                        <a
+                        key={item.id}
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group block relative"
+                        >
+                        <div className="flex items-center gap-4 p-4 rounded-xl hover:bg-muted border border-transparent hover:border-border/40 transition-colors">
+                            <div className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center border border-border/40 overflow-hidden ${
+                            (item.icon || "").startsWith('http') ? 'bg-background/50 p-1.5' : 'bg-blue-500/20 text-blue-200'
+                            }`}>
+                            <IconRender name={item.icon || "Link"} className={(item.icon || "").startsWith('http') ? "w-full h-full" : "h-5 w-5"} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                            <h4 className="text-foreground font-medium text-sm" title={item.title}>
+                                {item.title}
+                            </h4>
+                            </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <h4 className="text-foreground font-medium text-sm truncate">
-                            {link.title}
-                          </h4>
-                        </div>
+                        </a>
+                    );
+                  })}
+                  {currentItems.length === 0 && (
+                      <div className="col-span-full py-10 text-center text-muted-foreground">
+                          此文件夹为空
                       </div>
-                    </a>
-                  ))}
+                  )}
                 </div>
               </motion.div>
             </motion.div>

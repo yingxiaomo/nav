@@ -4,6 +4,8 @@ export interface LinkItem {
   url: string;
   icon?: string;
   description?: string;
+  type?: 'link' | 'folder';
+  children?: LinkItem[];
 }
 
 export interface Category {

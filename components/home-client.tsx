@@ -265,6 +265,7 @@ export default function HomeClient({ initialWallpapers }: HomeClientProps) {
           data={data} 
           onSave={handleSave} 
           isSaving={saving}
+          hasUnsavedChanges={hasUnsavedChanges}
           onRefreshWallpaper={() => initWallpaper(data)}
         />
       </div>
@@ -297,18 +298,7 @@ export default function HomeClient({ initialWallpapers }: HomeClientProps) {
              />
           </div>
 
-          <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${
-            hasUnsavedChanges ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'
-          }`}>
-            <Button 
-              onClick={() => handleSave(data)} 
-              disabled={saving}
-              className="rounded-full shadow-2xl bg-primary/70 backdrop-blur text-primary-foreground px-8 py-6 h-auto text-base font-medium hover:scale-105 transition-transform border border-white/10"
-            >
-              {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
-              {saving ? '正在同步...' : '有设置未同步，点击提交到Github'}
-            </Button>
-          </div>
+
 
           <footer className="absolute bottom-2 left-0 w-full text-center z-0">
             <p className="text-[10px] text-white/30 font-light tracking-widest font-mono select-none">

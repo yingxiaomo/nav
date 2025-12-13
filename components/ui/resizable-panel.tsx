@@ -35,12 +35,25 @@ export function ResizablePanel({
 
   useEffect(() => {
     if (typeof window !== "undefined" && rect === null) {
-      setRect({
-        x: Math.max(0, (window.innerWidth - defaultWidth) / 2),
-        y: Math.max(0, (window.innerHeight - defaultHeight) / 2),
-        w: defaultWidth,
-        h: defaultHeight,
-      });
+      const isMobile = window.innerWidth < 768;
+      
+      if (isMobile) {
+        const w = window.innerWidth - 32; // 16px padding on each side
+        const h = Math.min(defaultHeight, window.innerHeight * 0.6);
+        setRect({
+          x: 16,
+          y: (window.innerHeight - h) / 2,
+          w,
+          h
+        });
+      } else {
+        setRect({
+          x: Math.max(0, (window.innerWidth - defaultWidth) / 2),
+          y: Math.max(0, (window.innerHeight - defaultHeight) / 2),
+          w: defaultWidth,
+          h: defaultHeight,
+        });
+      }
     }
   }, [defaultWidth, defaultHeight, rect]);
 

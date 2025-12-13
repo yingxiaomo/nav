@@ -13,6 +13,20 @@ export interface Category {
   links: LinkItem[];
 }
 
+export interface Todo {
+  id: string;
+  text: string;
+  completed: boolean;
+  createdAt: number;
+}
+
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  updatedAt: number;
+}
+
 export interface SiteSettings {
   title: string;
   wallpaper: string;
@@ -20,13 +34,15 @@ export interface SiteSettings {
   wallpaperList: string[];
   blurLevel: 'low' | 'medium' | 'high';
   maxPackedWallpapers?: number;
+  showFeatures?: boolean; 
 }
 
 export interface DataSchema {
   settings: SiteSettings;
   categories: Category[];
+  todos?: Todo[];
+  notes?: Note[];
 }
-
 
 export const DEFAULT_DATA: DataSchema = {
   settings: {
@@ -35,7 +51,10 @@ export const DEFAULT_DATA: DataSchema = {
     wallpaperType: 'local',
     wallpaperList: [],
     blurLevel: 'medium',
-    maxPackedWallpapers: 10 
+    maxPackedWallpapers: 10,
+    showFeatures: true
   },
-  categories: [] 
+  categories: [],
+  todos: [],
+  notes: []
 };

@@ -39,6 +39,31 @@ const IconRender = ({ name, className }: { name: string; className?: string }) =
   return <Icon className={className} />;
 };
 
+const CardContent = ({ category }: { category: Category }) => (
+  <motion.div layoutId={category.id} className="flex flex-col items-center justify-center text-center gap-1">
+    <div className="mb-1 transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-0.5">
+      <IconRender name={category.icon || "FolderOpen"} className="h-8 w-8 text-yellow-200/90 drop-shadow-[0_4px_4px_rgba(0,0,0,0.3)]" />
+    </div>
+    
+    <div className="text-center w-full"> 
+      <h3 className="text-white font-medium tracking-tight drop-shadow-sm truncate text-xs [text-shadow:0_0_8px_rgba(0,0,0,0.8),0_0_4px_rgba(0,0,0,0.6)]">
+        {category.title}
+      </h3>
+    </div>
+  </motion.div>
+);
+
+function StaticCard({ category, onClick }: { category: Category; onClick: () => void }) {
+  return (
+    <div 
+      onClick={onClick}
+      className="cursor-pointer group relative p-4 transition-transform duration-200 hover:scale-105 active:scale-95 touch-none"
+    >
+      <CardContent category={category} />
+    </div>
+  );
+}
+
 function SortableCard({ category, onClick }: { category: Category; onClick: () => void }) {
   const {
     attributes,
@@ -56,8 +81,6 @@ function SortableCard({ category, onClick }: { category: Category; onClick: () =
     zIndex: isDragging ? 50 : "auto",
   };
 
-  const id = category.id; 
-
   return (
     <motion.div 
       ref={setNodeRef}
@@ -67,18 +90,7 @@ function SortableCard({ category, onClick }: { category: Category; onClick: () =
       onClick={onClick}
       className="cursor-pointer group relative p-4 transition-transform duration-200 hover:scale-105 active:scale-95 touch-none"
     >
-      <motion.div layoutId={id} className="flex flex-col items-center justify-center text-center gap-1">
-        
-        <div className="mb-1 transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-0.5">
-          <IconRender name={category.icon || "FolderOpen"} className="h-8 w-8 text-yellow-200/90 drop-shadow-[0_4px_4px_rgba(0,0,0,0.3)]" />
-        </div>
-        
-        <div className="text-center w-full"> 
-          <h3 className="text-white font-medium tracking-tight drop-shadow-sm truncate text-xs [text-shadow:0_0_8px_rgba(0,0,0,0.8),0_0_4px_rgba(0,0,0,0.6)]">
-            {category.title}
-          </h3>
-        </div>
-      </motion.div>
+      <CardContent category={category} />
     </motion.div>
   );
 }
@@ -92,6 +104,11 @@ export function LinkGrid({ categories, onReorder, onOpenChange }: LinkGridProps)
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -120,17 +137,27 @@ export function LinkGrid({ categories, onReorder, onOpenChange }: LinkGridProps)
 
   return (
     <>
-      <DndContext id={dndContextId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      {mounted ? (
+        <DndContext id={dndContextId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <div className="w-full max-w-5xl mx-auto pb-6 px-4 relative z-30">
+            <SortableContext items={categories.map(c => c.id)} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-9 gap-2">
+                {categories.map((category) => (
+                  <SortableCard key={category.id} category={category} onClick={() => setSelectedId(category.id)} />
+                ))}
+              </div>
+            </SortableContext>
+          </div>
+        </DndContext>
+      ) : (
         <div className="w-full max-w-5xl mx-auto pb-6 px-4 relative z-30">
-          <SortableContext items={categories.map(c => c.id)} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-9 gap-2">
-              {categories.map((category) => (
-                <SortableCard key={category.id} category={category} onClick={() => setSelectedId(category.id)} />
-              ))}
-            </div>
-          </SortableContext>
+          <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-9 gap-2">
+            {categories.map((category) => (
+              <StaticCard key={category.id} category={category} onClick={() => setSelectedId(category.id)} />
+            ))}
+          </div>
         </div>
-      </DndContext>
+      )}
 
       <AnimatePresence>
         {selectedId && selectedCategory && (

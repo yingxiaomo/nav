@@ -84,7 +84,7 @@ export function SettingsDialog({ data, onSave, isSaving, onRefreshWallpaper }: S
           </TabsContent>
 
           <TabsContent value="general" className="flex-1 flex flex-col min-h-0 data-[state=active]:flex">
-             <GeneralTab localData={localData} setLocalData={setLocalData} onRefreshWallpaper={onRefreshWallpaper} />
+             <GeneralTab localData={localData} setLocalData={setLocalData} onRefreshWallpaper={onRefreshWallpaper} onSave={onSave} />
           </TabsContent>
 
           <TabsContent value="github" className="flex-1 flex flex-col min-h-0 data-[state=active]:flex">

@@ -2,21 +2,50 @@ import { DataSchema } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ImageIcon, Shuffle, Info } from "lucide-react"; 
+import { Switch } from "@/components/ui/switch"; 
+import { ImageIcon, Shuffle, Layers } from "lucide-react"; 
 
 interface GeneralTabProps {
   localData: DataSchema;
   setLocalData: React.Dispatch<React.SetStateAction<DataSchema>>;
   onRefreshWallpaper?: () => void;
+  onSave?: (data: DataSchema) => Promise<void>; 
 }
 
-export function GeneralTab({ localData, setLocalData, onRefreshWallpaper }: GeneralTabProps) {
+export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave }: GeneralTabProps) {
   return (
-    <div className="space-y-6 py-4 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40">
+    <div className="space-y-6 py-4 overflow-y-auto h-full [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40">
+      
       <div className="space-y-2">
         <Label>网站标题</Label>
         <Input value={localData.settings.title} onChange={e => setLocalData({...localData, settings: {...localData.settings, title: e.target.value}})} className="h-9" />
       </div>
+
+      <div className="flex items-center justify-between border border-border/50 p-4 rounded-xl bg-muted/30">
+        <div className="space-y-0.5 flex flex-col">
+          <Label className="flex items-center gap-2">
+            <Layers className="w-4 h-4" />
+            功能组件
+          </Label>
+          <span className="text-xs text-muted-foreground">在主页显示待办事项和笔记入口</span>
+        </div>
+        <Switch
+          checked={localData.settings.showFeatures !== false} 
+          onCheckedChange={(checked) => {
+            const newData = {
+              ...localData,
+              settings: { ...localData.settings, showFeatures: checked },
+            };
+            
+            setLocalData(newData);
+
+            if (onSave) {
+              onSave(newData);
+            }
+          }}
+        />
+      </div>
+
       <div className="space-y-3 border border-border/50 p-4 rounded-xl bg-muted/30">
         <Label>壁纸模式</Label>
         <div className="flex gap-2">
@@ -61,7 +90,7 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper }: Gene
           <div className="space-y-4 animate-in fade-in pt-1">
             <div className="space-y-2">
                <div className="flex items-center justify-between">
-                 <Label className="text-xs text-muted-foreground">随机打包数量 (构建生效)</Label>
+                 <Label className="text-xs text-muted-foreground">随机打包数量</Label>
                  <span className="text-xs font-mono bg-background px-2 py-0.5 rounded border">
                     当前: {localData.settings.maxPackedWallpapers || 10} 张
                  </span>
@@ -81,10 +110,6 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper }: Gene
                     className="h-8 text-sm"
                  />
                </div>
-               <p className="flex items-start gap-1.5 text-[10px] text-orange-500/80 leading-tight">
-                  <Info className="h-3 w-3 shrink-0 mt-0.5" />
-                  <span>此数值决定了 Base64 打包的图片数量。修改并保存后，需要等待 Vercel 重新构建才会生效。数值过大会导致首次加载变慢。</span>
-               </p>
             </div>
 
             <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-background/50">

@@ -6,7 +6,6 @@ import { SearchBar } from "@/components/nav/search-bar";
 import { LinkGrid } from "@/components/nav/link-grid";
 import { SettingsDialog } from "@/components/nav/settings-dialog";
 import { FeaturesLauncher } from "@/components/features/features-launcher";
-
 import { DataSchema, DEFAULT_DATA, Category, Todo, Note } from "@/lib/types";
 import { loadDataFromGithub, saveDataToGithub, GITHUB_CONFIG_KEY, GithubConfig } from "@/lib/github";
 import { Toaster } from "@/components/ui/sonner";
@@ -83,6 +82,12 @@ export default function HomeClient({ initialWallpapers }: HomeClientProps) {
           if (localDataString) {
             try {
               const localData = JSON.parse(localDataString) as DataSchema;
+              
+              if (!localData || !localData.settings || !localData.categories) {
+                 console.warn("Detected corrupted local data, discarding...");
+                 throw new Error("Invalid data structure");
+              }
+              
               if (initialWallpapers.length > 0) {
                 if (!localData.settings.wallpaperList || localData.settings.wallpaperList.length === 0) {
                     localData.settings.wallpaperList = [...initialWallpapers];
@@ -92,7 +97,13 @@ export default function HomeClient({ initialWallpapers }: HomeClientProps) {
               setData(localData);
               loadedFromStorage = true;
             } catch (e) {
-              console.error("Failed to parse local data", e);
+              console.error("Failed to parse local data or data is corrupted, resetting...", e);
+              localStorage.removeItem(LOCAL_DATA_KEY);
+              currentData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+              if (initialWallpapers.length > 0) {
+                  currentData.settings.wallpaperList = [...initialWallpapers];
+              }
+              setData(currentData);
             }
           }
         }
@@ -115,10 +126,15 @@ export default function HomeClient({ initialWallpapers }: HomeClientProps) {
                     const localNotes = currentData.notes || [];
                     const mergedTodos = (ghData.todos && ghData.todos.length > 0) ? ghData.todos : localTodos;
                     const mergedNotes = (ghData.notes && ghData.notes.length > 0) ? ghData.notes : localNotes;
-                    const finalData = { ...ghData, todos: mergedTodos, notes: mergedNotes };
+                    const finalData: DataSchema = { 
+                        ...ghData, 
+                        settings: ghData.settings || currentData.settings, 
+                        todos: mergedTodos, 
+                        notes: mergedNotes 
+                    };
                     
                     if (JSON.stringify(finalData) !== JSON.stringify(currentData)) {
-                        if (initialWallpapers.length > 0) {
+                        if (initialWallpapers.length > 0 && finalData.settings) {
                             finalData.settings.wallpaperList = [...initialWallpapers];
                         }
                         setData(finalData);
@@ -146,7 +162,7 @@ export default function HomeClient({ initialWallpapers }: HomeClientProps) {
             if (res.ok) {
               const fetchedData = await res.json();
               const finalData = { ...fetchedData, todos: [], notes: [] };
-              if(initialWallpapers.length > 0) finalData.settings.wallpaperList = [...initialWallpapers];
+              if(initialWallpapers.length > 0 && finalData.settings) finalData.settings.wallpaperList = [...initialWallpapers];
               setData(finalData);
             }
           } catch (e) {

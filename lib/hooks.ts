@@ -5,36 +5,46 @@ import { StorageAdapter, GithubRepoAdapter, S3Adapter, STORAGE_CONFIG_KEY, Stora
 import { toast } from "sonner";
 
 export function useLocalStorage<T>(key: string, initialValue: T | (() => T)) {
+  // 1. Initialize with default value (SSR safe)
   const [storedValue, setStoredValue] = useState<T>(() => {
-    if (typeof window === "undefined") {
-      return initialValue instanceof Function ? initialValue() : initialValue;
-    }
-    try {
-      const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : (initialValue instanceof Function ? initialValue() : initialValue);
-    } catch (error) {
-      console.error(error);
-      return initialValue instanceof Function ? initialValue() : initialValue;
-    }
+    return initialValue instanceof Function ? initialValue() : initialValue;
   });
 
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    setInitialized(true);
-  }, []);
-
-  const setValue = (value: T | ((val: T) => T)) => {
     try {
-      const valueToStore = value instanceof Function ? value(storedValue) : value;
-      setStoredValue(valueToStore);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(key, JSON.stringify(valueToStore));
+      const item = window.localStorage.getItem(key);
+      if (item) {
+        setStoredValue(JSON.parse(item));
+      } else {
+        // If nothing in storage, re-evaluate initialValue logic in client context
+        // This allows migration logic (checking other keys) to run correctly on client
+        if (initialValue instanceof Function) {
+            const clientValue = initialValue();
+            // Only update if it's different (basic check, object ref might be different but that's ok)
+            setStoredValue(clientValue);
+        }
       }
     } catch (error) {
       console.error(error);
     }
-  };
+    setInitialized(true);
+  }, [key]);
+
+  const setValue = useCallback((value: T | ((val: T) => T)) => {
+    try {
+      setStoredValue((prev) => {
+         const valueToStore = value instanceof Function ? value(prev) : value;
+         if (typeof window !== "undefined") {
+            window.localStorage.setItem(key, JSON.stringify(valueToStore));
+         }
+         return valueToStore;
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  }, [key]);
 
   return [storedValue, setValue, initialized] as const;
 }

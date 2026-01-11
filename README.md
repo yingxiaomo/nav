@@ -19,7 +19,7 @@
   </p>
 
   <p>
-    <a href="https://nav.ovoxo.cc" target="_blank" rel="noopener noreferrer">🔴 演示地址</a>
+    <a href="https://nav.ovoxo.cc">🔴 演示地址</a>
   </p>
 </div>
 
@@ -63,7 +63,7 @@
 
 
 ## 3. 在网页中配置
-1. 打开 [Clean Nav 演示站](https://nav.ovoxo.cc){:target="_blank"}.
+1. 打开 [Clean Nav 演示站](https://nav.ovoxo.cc)。
 2. 点击右下角的 `设置 (⚙️)` 图标，切换到 `云同步` 标签。
 3. 按照以下表格填写配置：
 

@@ -4,6 +4,7 @@ import { StorageConfig, GithubRepoSettings, S3Settings } from "@/lib/storage";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertCircle } from "lucide-react";
 import { useEffect } from "react";
 
 interface StorageTabProps {
@@ -176,9 +177,16 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
                 className="h-9" 
               />
             </div>
-            <p className="text-[10px] text-muted-foreground pt-2">
-              * 注意：请确保 S3 桶已配置正确的 <b>CORS</b> 策略，允许当前域名访问。
-            </p>
+            
+            <div className="rounded-md bg-yellow-500/10 p-3 mt-4 border border-yellow-500/20">
+              <div className="flex items-start gap-2 text-yellow-500 mb-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span className="text-xs font-medium">必须配置 CORS 策略</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                由于浏览器安全限制，你必须在 S3/R2 后台配置 CORS 规则，允许本站域名访问。具体配置请参考 docs/storage-guide.md 文档。
+              </p>
+            </div>
           </>
         )}
       </div>

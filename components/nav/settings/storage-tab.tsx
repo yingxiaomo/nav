@@ -214,23 +214,23 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
                 <span className="text-xs font-medium">必须配置 CORS 策略</span>
               </div>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                由于浏览器安全限制，你必须在 S3/R2 后台配置 CORS 规则，允许本站域名访问。具体配置请参考 docs/storage-guide.md 文档。
+                由于浏览器安全限制，你必须在 S3/R2 后台配置 CORS 规则，允许你自己的域名访问。具体配置请参考 docs/storage-guide.md 文档。
               </p>
             </div>
           </>
         )}
       </div>
 
-      <div className="rounded-md bg-red-500/10 p-3 border border-red-500/20 space-y-1">
-          <div className="flex items-center gap-2 text-red-500 mb-1">
+      <div className="rounded-md bg-red-500/10 p-3 border border-red-500/20 mt-4">
+          <div className="flex items-center gap-2 text-red-500 mb-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span className="text-xs font-bold">同步机制与延迟警告</span>
           </div>
-          <ul className="text-[11px] text-red-400/90 space-y-1 list-disc pl-4 leading-relaxed">
-            <li><strong>刷新页面</strong>：从云端拉取数据（智能合并本地新增内容）。</li>
-            <li><strong>点击保存</strong>：将本地数据推送到云端（覆盖云端旧数据）。</li>
-            <li><strong>CDN 延迟</strong>：保存后云端生效可能需要 <strong>1-5 分钟</strong>，在此期间刷新可能会拉取到旧数据，请耐心等待，切勿频繁操作！</li>
-          </ul>
+          <div className="text-[11px] text-red-400/90 space-y-1.5 leading-relaxed">
+            <p><span className="font-bold text-red-400">刷新页面：</span>从云端拉取数据（智能合并本地新增）。</p>
+            <p><span className="font-bold text-red-400">点击保存：</span>将本地数据推送到云端（覆盖云端旧数据）。</p>
+            <p><span className="font-bold text-red-400">CDN 延迟：</span>保存后可能需 <strong>1-5 分钟</strong>生效，请勿频繁操作！</p>
+          </div>
       </div>
 
       <div className="pt-2">

@@ -172,9 +172,24 @@ export function useNavData(initialWallpapers: string[]) {
               if (remoteData) {
                 const localTodos = currentData.todos || [];
                 const localNotes = currentData.notes || [];
+                const localCategories = currentData.categories || [];
+
+                // Smart Merge: Protect local data if remote is empty
+                let mergedCategories = remoteData.categories;
+                // If remote has no categories but we do, keep ours (prevent data loss on fresh sync)
+                if ((!mergedCategories || mergedCategories.length === 0) && localCategories.length > 0) {
+                    mergedCategories = localCategories;
+                }
+
                 const mergedTodos = (remoteData.todos && remoteData.todos.length > 0) ? remoteData.todos : localTodos;
                 const mergedNotes = (remoteData.notes && remoteData.notes.length > 0) ? remoteData.notes : localNotes;
-                const finalData = { ...remoteData, todos: mergedTodos, notes: mergedNotes };
+                
+                const finalData = { 
+                  ...remoteData, 
+                  categories: mergedCategories,
+                  todos: mergedTodos, 
+                  notes: mergedNotes 
+                };
 
                 if (JSON.stringify(finalData) !== JSON.stringify(currentData)) {
                   if (initialWallpapers.length > 0) {

@@ -14,13 +14,14 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DataSchema } from "@/lib/types";
-import { GithubConfig, GITHUB_CONFIG_KEY } from "@/lib/github";
+import { STORAGE_CONFIG_KEY, StorageConfig } from "@/lib/storage";
+import { GITHUB_CONFIG_KEY } from "@/lib/github";
 import { useLocalStorage } from "@/lib/hooks";
 
 import { AddLinkTab } from "./settings/add-link-tab";
 import { ManageLinksTab } from "./settings/manage-links-tab";
 import { GeneralTab } from "./settings/general-tab";
-import { GithubTab } from "./settings/github-tab";
+import { StorageTab } from "./settings/storage-tab";
 
 interface SettingsDialogProps {
   data: DataSchema;
@@ -33,8 +34,22 @@ interface SettingsDialogProps {
 export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRefreshWallpaper }: SettingsDialogProps) {
   const [open, setOpen] = useState(false);
   const [localData, setLocalData] = useState<DataSchema>(data);
-  const [ghConfig, setGhConfig] = useLocalStorage<GithubConfig>(GITHUB_CONFIG_KEY, {
-    token: "", owner: "", repo: "", branch: "main", path: "public/data.json"
+
+  const [storageConfig, setStorageConfig] = useLocalStorage<StorageConfig>(STORAGE_CONFIG_KEY, () => {
+    // Migration logic for initial state
+    if (typeof window !== 'undefined') {
+        const oldGithub = localStorage.getItem(GITHUB_CONFIG_KEY);
+        if (oldGithub) {
+            return {
+                type: 'github',
+                settings: JSON.parse(oldGithub)
+            };
+        }
+    }
+    return {
+        type: 'github',
+        settings: { token: "", owner: "", repo: "", branch: "main", path: "public/data.json" }
+    };
   });
 
   useEffect(() => {
@@ -76,7 +91,7 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
             <TabsTrigger value="add">添加链接</TabsTrigger>
             <TabsTrigger value="manage">链接管理</TabsTrigger>
             <TabsTrigger value="general">外观设置</TabsTrigger>
-            <TabsTrigger value="github">云同步</TabsTrigger>
+            <TabsTrigger value="storage">云同步</TabsTrigger>
           </TabsList>
 
           <TabsContent value="add" className="flex-1 flex flex-col min-h-0 data-[state=active]:flex">
@@ -91,15 +106,15 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
              <GeneralTab localData={localData} setLocalData={setLocalData} onRefreshWallpaper={onRefreshWallpaper} onSave={onSave} />
           </TabsContent>
 
-          <TabsContent value="github" className="flex-1 flex flex-col min-h-0 data-[state=active]:flex">
-             <GithubTab config={ghConfig} setConfig={setGhConfig} />
+          <TabsContent value="storage" className="flex-1 flex flex-col min-h-0 data-[state=active]:flex">
+             <StorageTab config={storageConfig} setConfig={setStorageConfig} />
           </TabsContent>
         </Tabs>
 
         <DialogFooter className="mt-2 shrink-0 flex-col sm:flex-row gap-2 sm:gap-0">
           {hasUnsavedChanges && (
             <div className="flex items-center justify-center sm:justify-start text-xs text-yellow-500 font-medium px-2">
-              有设置未同步到 GitHub
+              有设置未同步到云端
             </div>
           )}
           <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">

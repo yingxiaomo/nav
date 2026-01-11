@@ -1,24 +1,28 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { DataSchema, DEFAULT_DATA, Category, Todo, Note } from "./types";
-import { GITHUB_CONFIG_KEY, GithubConfig, loadDataFromGithub, saveDataToGithub } from "./github";
+import { GITHUB_CONFIG_KEY } from "./github";
+import { StorageAdapter, GithubRepoAdapter, S3Adapter, STORAGE_CONFIG_KEY, StorageConfig } from "./storage";
 import { toast } from "sonner";
 
-export function useLocalStorage<T>(key: string, initialValue: T) {
-  const [storedValue, setStoredValue] = useState<T>(initialValue);
+export function useLocalStorage<T>(key: string, initialValue: T | (() => T)) {
+  const [storedValue, setStoredValue] = useState<T>(() => {
+    if (typeof window === "undefined") {
+      return initialValue instanceof Function ? initialValue() : initialValue;
+    }
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : (initialValue instanceof Function ? initialValue() : initialValue);
+    } catch (error) {
+      console.error(error);
+      return initialValue instanceof Function ? initialValue() : initialValue;
+    }
+  });
+
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    try {
-      const item = window.localStorage.getItem(key);
-      if (item) {
-        setStoredValue(JSON.parse(item));
-      }
-      setInitialized(true);
-    } catch (error) {
-      console.error(error);
-      setInitialized(true);
-    }
-  }, [key]);
+    setInitialized(true);
+  }, []);
 
   const setValue = (value: T | ((val: T) => T)) => {
     try {
@@ -93,7 +97,6 @@ export function useNavData(initialWallpapers: string[]) {
     return dataCopy;
   });
 
-  // Use a ref to track the latest data for the effect
   const dataRef = useRef(data);
   useEffect(() => {
     dataRef.current = data;
@@ -105,6 +108,33 @@ export function useNavData(initialWallpapers: string[]) {
     if (typeof window !== 'undefined') {
       localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(newData));
     }
+  }, []);
+
+  const getAdapter = useCallback((config: StorageConfig): StorageAdapter | null => {
+    if (config.type === 'github') return new GithubRepoAdapter(config.settings);
+    if (config.type === 's3') return new S3Adapter(config.settings);
+    return null;
+  }, []);
+
+  const getEffectiveConfig = useCallback((): StorageConfig | null => {
+    if (typeof window === 'undefined') return null;
+    
+    const storageConfigStr = localStorage.getItem(STORAGE_CONFIG_KEY);
+    if (storageConfigStr) return JSON.parse(storageConfigStr);
+
+    const githubConfigStr = localStorage.getItem(GITHUB_CONFIG_KEY);
+    if (githubConfigStr) {
+      const githubSettings = JSON.parse(githubConfigStr);
+      const migrated: StorageConfig = {
+        type: 'github',
+        settings: githubSettings
+      };
+      // Auto migrate for next time
+      localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(migrated));
+      return migrated;
+    }
+
+    return null;
   }, []);
 
   useEffect(() => {
@@ -134,17 +164,17 @@ export function useNavData(initialWallpapers: string[]) {
 
         setIsReady(true);
 
-        const storedConfig = localStorage.getItem(GITHUB_CONFIG_KEY);
-        if (storedConfig) {
-          const config: GithubConfig = JSON.parse(storedConfig);
-          if (config.token) {
-            loadDataFromGithub(config).then(ghData => {
-              if (ghData) {
+        const config = getEffectiveConfig();
+        if (config) {
+          const adapter = getAdapter(config);
+          if (adapter) {
+            adapter.load().then(remoteData => {
+              if (remoteData) {
                 const localTodos = currentData.todos || [];
                 const localNotes = currentData.notes || [];
-                const mergedTodos = (ghData.todos && ghData.todos.length > 0) ? ghData.todos : localTodos;
-                const mergedNotes = (ghData.notes && ghData.notes.length > 0) ? ghData.notes : localNotes;
-                const finalData = { ...ghData, todos: mergedTodos, notes: mergedNotes };
+                const mergedTodos = (remoteData.todos && remoteData.todos.length > 0) ? remoteData.todos : localTodos;
+                const mergedNotes = (remoteData.notes && remoteData.notes.length > 0) ? remoteData.notes : localNotes;
+                const finalData = { ...remoteData, todos: mergedTodos, notes: mergedNotes };
 
                 if (JSON.stringify(finalData) !== JSON.stringify(currentData)) {
                   if (initialWallpapers.length > 0) {
@@ -156,12 +186,12 @@ export function useNavData(initialWallpapers: string[]) {
                   }
 
                   const isDifferent =
-                    JSON.stringify(mergedTodos) !== JSON.stringify(ghData.todos) ||
-                    JSON.stringify(mergedNotes) !== JSON.stringify(ghData.notes);
+                    JSON.stringify(mergedTodos) !== JSON.stringify(remoteData.todos) ||
+                    JSON.stringify(mergedNotes) !== JSON.stringify(remoteData.notes);
 
                   if (isDifferent) {
                     setHasUnsavedChanges(true);
-                    toast.info("有设置未同步，点击提交到github");
+                    toast.info("有设置未同步，点击提交到云端");
                   }
                 }
               }
@@ -169,7 +199,7 @@ export function useNavData(initialWallpapers: string[]) {
           }
         }
 
-        if (!loadedFromStorage && !storedConfig) {
+        if (!loadedFromStorage && !config) {
           try {
             const res = await fetch("/data.json");
             if (res.ok) {
@@ -189,7 +219,7 @@ export function useNavData(initialWallpapers: string[]) {
     }
 
     initData();
-  }, [initialWallpapers]);
+  }, [initialWallpapers, getAdapter, getEffectiveConfig]);
 
   const handleSave = async (newData: DataSchema, onWallpaperUpdate?: (cfg: DataSchema) => void) => {
     setSaving(true);
@@ -205,19 +235,22 @@ export function useNavData(initialWallpapers: string[]) {
         onWallpaperUpdate(newData);
       }
 
-      const storedConfig = localStorage.getItem(GITHUB_CONFIG_KEY);
-      if (!storedConfig) {
-        toast.success("本地已更新 (未同步 GitHub)");
+      const config = getEffectiveConfig();
+      if (!config) {
+        toast.success("本地已更新 (未配置云端)");
         setSaving(false);
         return;
       }
-      const config: GithubConfig = JSON.parse(storedConfig);
-      if (!config.token) {
-        toast.success("本地已更新 (未同步 GitHub)");
+
+      const adapter = getAdapter(config);
+      if (!adapter) {
+        toast.success("本地已更新 (不支持的存储类型)");
         setSaving(false);
         return;
       }
-      const success = await saveDataToGithub(config, newData);
+
+      const success = await adapter.save(newData);
+      
       if (success) {
         toast.success("同步成功！");
         setHasUnsavedChanges(false);

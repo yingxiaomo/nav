@@ -50,6 +50,8 @@ export class S3Adapter implements StorageAdapter {
   }
 
   async load(): Promise<DataSchema | null> {
+    if (!this.config.endpoint) return null;
+
     try {
       const command = new GetObjectCommand({
         Bucket: this.config.bucket,

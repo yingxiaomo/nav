@@ -99,6 +99,7 @@ export function useNavData(initialWallpapers: string[]) {
   const [isReady, setIsReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [syncError, setSyncError] = useState(false);
   const [data, setData] = useState<DataSchema>(() => {
     const dataCopy = JSON.parse(JSON.stringify(DEFAULT_DATA));
     if (initialWallpapers.length > 0) {
@@ -310,6 +311,8 @@ export function useNavData(initialWallpapers: string[]) {
         }
       } catch (err) {
         console.error("Initialization error", err);
+        setSyncError(true);
+        toast.error("初始化同步失败，请检查网络或配置");
         setIsReady(true);
       }
     }
@@ -319,6 +322,7 @@ export function useNavData(initialWallpapers: string[]) {
 
   const handleSave = async (newData: DataSchema, onWallpaperUpdate?: (cfg: DataSchema) => void) => {
     setSaving(true);
+    setSyncError(false);
     try {
       const oldData = data;
       setData(newData);
@@ -354,10 +358,12 @@ export function useNavData(initialWallpapers: string[]) {
         });
         setHasUnsavedChanges(false);
       } else {
+        setSyncError(true);
         toast.error("同步失败 (已暂存到本地)");
       }
     } catch (error) {
       console.error(error);
+      setSyncError(true);
       toast.error("保存时发生错误");
     } finally {
       setSaving(false);
@@ -379,6 +385,7 @@ export function useNavData(initialWallpapers: string[]) {
     isReady,
     saving,
     hasUnsavedChanges,
+    syncError,
     handleSave,
     handleReorder,
     handleTodosUpdate,

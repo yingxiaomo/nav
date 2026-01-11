@@ -29,9 +29,10 @@ interface SettingsDialogProps {
   isSaving: boolean;
   hasUnsavedChanges?: boolean;
   onRefreshWallpaper?: () => void;
+  syncError?: boolean;
 }
 
-export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRefreshWallpaper }: SettingsDialogProps) {
+export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRefreshWallpaper, syncError }: SettingsDialogProps) {
   const [open, setOpen] = useState(false);
   const [localData, setLocalData] = useState<DataSchema>(data);
 
@@ -42,13 +43,14 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
         if (oldGithub) {
             return {
                 type: 'github',
-                settings: JSON.parse(oldGithub)
+                github: JSON.parse(oldGithub),
+                settings: undefined
             };
         }
     }
     return {
         type: 'github',
-        settings: { token: "", owner: "", repo: "", branch: "main", path: "public/data.json" }
+        settings: undefined
     };
   });
 
@@ -75,7 +77,7 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="fixed bottom-4 right-4 z-50 rounded-full text-white/80 hover:text-white hover:bg-white/10 shadow-lg backdrop-blur-sm">
           <Settings className="h-5 w-5" />
-          {hasUnsavedChanges && (
+          {hasUnsavedChanges && !syncError && (
             <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-black/20" />
           )}
         </Button>
@@ -112,14 +114,19 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
         </Tabs>
 
         <DialogFooter className="mt-2 shrink-0 flex-col sm:flex-row gap-2 sm:gap-0">
-          {hasUnsavedChanges && (
+          {hasUnsavedChanges && !syncError && (
             <div className="flex items-center justify-center sm:justify-start text-xs text-yellow-500 font-medium px-2">
               有设置未同步到云端
             </div>
           )}
-          <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
+          {syncError && (
+            <div className="flex items-center justify-center sm:justify-start text-xs text-red-500 font-medium px-2">
+              同步遇到错误，请检查网络
+            </div>
+          )}
+          <Button onClick={handleSave} disabled={isSaving || syncError} className="w-full sm:w-auto">
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {hasUnsavedChanges ? '保存并同步' : '保存'}
+            {syncError ? '同步失败' : (hasUnsavedChanges ? '保存并同步' : '保存')}
           </Button>
         </DialogFooter>
       </DialogContent>

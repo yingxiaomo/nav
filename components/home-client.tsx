@@ -20,6 +20,7 @@ export default function HomeClient({ initialWallpapers }: HomeClientProps) {
     isReady,
     saving,
     hasUnsavedChanges,
+    syncError,
     handleSave,
     handleReorder,
     handleTodosUpdate,
@@ -80,6 +81,7 @@ export default function HomeClient({ initialWallpapers }: HomeClientProps) {
           onSave={(newData) => handleSave(newData, initWallpaper)} 
           isSaving={saving}
           hasUnsavedChanges={hasUnsavedChanges}
+          syncError={syncError}
           onRefreshWallpaper={() => initWallpaper(data)}
         />
       </div>

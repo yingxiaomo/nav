@@ -217,15 +217,49 @@ export function useNavData(initialWallpapers: string[]) {
                 const localNotes = currentData.notes || [];
                 const localCategories = currentData.categories || [];
 
-                // Smart Merge: Protect local data if remote is empty
-                let mergedCategories = remoteData.categories;
-                // If remote has no categories but we do, keep ours (prevent data loss on fresh sync)
-                if ((!mergedCategories || mergedCategories.length === 0) && localCategories.length > 0) {
-                    mergedCategories = localCategories;
-                }
+                // Smart Merge Logic
+                const mergeCategories = (remoteCats: Category[], localCats: Category[]): Category[] => {
+                    const merged = [...remoteCats];
+                    const remoteCatMap = new Map(remoteCats.map(c => [c.id, c]));
+                    
+                    for (const localCat of localCats) {
+                        if (!remoteCatMap.has(localCat.id)) {
+                            // New local category -> Add
+                            merged.push(localCat);
+                        } else {
+                            // Existing category -> Merge links
+                            const remoteCat = remoteCatMap.get(localCat.id)!;
+                            const remoteLinkIds = new Set(remoteCat.links.map(l => l.id));
+                            const newLocalLinks = localCat.links.filter(l => !remoteLinkIds.has(l.id));
+                            
+                            if (newLocalLinks.length > 0) {
+                                const index = merged.findIndex(c => c.id === localCat.id);
+                                if (index !== -1) {
+                                    merged[index] = {
+                                        ...merged[index],
+                                        links: [...merged[index].links, ...newLocalLinks]
+                                    };
+                                }
+                            }
+                        }
+                    }
+                    return merged;
+                };
 
-                const mergedTodos = (remoteData.todos && remoteData.todos.length > 0) ? remoteData.todos : localTodos;
-                const mergedNotes = (remoteData.notes && remoteData.notes.length > 0) ? remoteData.notes : localNotes;
+                const mergeItems = <T extends { id: string }>(remoteItems: T[] = [], localItems: T[] = []): T[] => {
+                    const merged = [...remoteItems];
+                    const remoteIds = new Set(remoteItems.map(i => i.id));
+                    for (const item of localItems) {
+                        if (!remoteIds.has(item.id)) {
+                            merged.push(item);
+                        }
+                    }
+                    return merged;
+                };
+
+                const mergedCategories = mergeCategories(remoteData.categories || [], localCategories);
+                const mergedTodos = mergeItems(remoteData.todos, localTodos);
+                const mergedNotes = mergeItems(remoteData.notes, localNotes);
                 
                 const finalData = { 
                   ...remoteData, 
@@ -243,13 +277,17 @@ export function useNavData(initialWallpapers: string[]) {
                     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(finalData));
                   }
 
-                  const isDifferent =
+                  // Check if effective data is different from remote (meaning we have unsaved local additions)
+                  const isEffectiveDifferent =
+                    JSON.stringify(mergedCategories) !== JSON.stringify(remoteData.categories) ||
                     JSON.stringify(mergedTodos) !== JSON.stringify(remoteData.todos) ||
                     JSON.stringify(mergedNotes) !== JSON.stringify(remoteData.notes);
 
-                  if (isDifferent) {
+                  if (isEffectiveDifferent) {
                     setHasUnsavedChanges(true);
-                    toast.info("有设置未同步，点击提交到云端");
+                    toast.info("已合并云端数据，本地新增内容已保留 (请点击保存以同步到云端)");
+                  } else {
+                    toast.success("已从云端同步最新数据");
                   }
                 }
               }

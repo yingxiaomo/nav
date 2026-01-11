@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, Wifi, Loader2, CheckCircle2 } from "lucide-react";
+import { AlertCircle, Wifi, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -14,51 +14,47 @@ interface StorageTabProps {
   setConfig: (config: StorageConfig) => void;
 }
 
+const DEFAULT_GITHUB: GithubRepoSettings = { token: "", owner: "", repo: "", branch: "main", path: "public/data.json" };
+const DEFAULT_S3: S3Settings = { endpoint: "", region: "auto", accessKeyId: "", secretAccessKey: "", bucket: "", key: "data.json" };
+
 export function StorageTab({ config, setConfig }: StorageTabProps) {
   const [isTesting, setIsTesting] = useState(false);
   
-  // Ensure we have a valid structure
+  // Ensure we have a valid type
   useEffect(() => {
     if (!config.type) {
-      setConfig({
-        type: 'github',
-        settings: { token: "", owner: "", repo: "", branch: "main", path: "public/data.json" }
-      });
+      setConfig({ ...config, type: 'github' });
     }
   }, [config, setConfig]);
 
   const handleTypeChange = (type: string) => {
     const newType = type as StorageConfig['type'];
-    let defaultSettings = {};
-    
-    if (newType === 'github') {
-      defaultSettings = { token: "", owner: "", repo: "", branch: "main", path: "public/data.json" };
-    } else if (newType === 's3') {
-      defaultSettings = { endpoint: "", region: "auto", accessKeyId: "", secretAccessKey: "", bucket: "", key: "data.json" };
-    }
-    
-    setConfig({ type: newType, settings: defaultSettings });
+    setConfig({ ...config, type: newType });
   };
 
   const updateGithub = (fields: Partial<GithubRepoSettings>) => {
-    setConfig({ ...config, settings: { ...config.settings, ...fields } });
+    const current = config.github || DEFAULT_GITHUB;
+    setConfig({ ...config, github: { ...current, ...fields } });
   };
 
   const updateS3 = (fields: Partial<S3Settings>) => {
-    setConfig({ ...config, settings: { ...config.settings, ...fields } });
+    const current = config.s3 || DEFAULT_S3;
+    setConfig({ ...config, s3: { ...current, ...fields } });
   };
 
   const handleTestConnection = async () => {
     setIsTesting(true);
     try {
       if (config.type === 'github') {
-        const adapter = new GithubRepoAdapter(config.settings as GithubRepoSettings);
+        const settings = config.github || DEFAULT_GITHUB;
+        const adapter = new GithubRepoAdapter(settings);
         if (adapter.testConnection) {
             await adapter.testConnection();
             toast.success("GitHub 连接成功！", { description: "配置正确，有权访问该仓库。" });
         }
       } else if (config.type === 's3') {
-        const adapter = new S3Adapter(config.settings as S3Settings);
+        const settings = config.s3 || DEFAULT_S3;
+        const adapter = new S3Adapter(settings);
         if (adapter.testConnection) {
             await adapter.testConnection();
             toast.success("S3/R2 连接成功！", { description: "Bucket 可访问且配置正确。" });
@@ -73,6 +69,11 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
       setIsTesting(false);
     }
   };
+
+  // Safe accessors with fallback to legacy settings if necessary (though migration usually handles it)
+  // But for UI rendering, we rely on the specific fields + defaults
+  const githubCfg = config.github || (config.type === 'github' ? config.settings : undefined) || DEFAULT_GITHUB;
+  const s3Cfg = config.s3 || (config.type === 's3' ? config.settings : undefined) || DEFAULT_S3;
 
   return (
     <div className="space-y-4 py-4 overflow-y-auto h-full px-1 custom-scrollbar">
@@ -96,7 +97,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
               <Label>Token</Label>
               <Input 
                 type="password" 
-                value={config.settings.token || ""} 
+                value={githubCfg.token || ""} 
                 onChange={e => updateGithub({ token: e.target.value })} 
                 placeholder="ghp_..." 
                 className="h-9" 
@@ -106,7 +107,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
               <div className="space-y-2">
                 <Label>用户名</Label>
                 <Input 
-                  value={config.settings.owner || ""} 
+                  value={githubCfg.owner || ""} 
                   onChange={e => updateGithub({ owner: e.target.value })} 
                   placeholder="GitHub Username" 
                   className="h-9" 
@@ -115,7 +116,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
               <div className="space-y-2">
                 <Label>仓库名</Label>
                 <Input 
-                  value={config.settings.repo || ""} 
+                  value={githubCfg.repo || ""} 
                   onChange={e => updateGithub({ repo: e.target.value })} 
                   placeholder="Repository Name" 
                   className="h-9" 
@@ -126,7 +127,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
               <div className="space-y-2">
                 <Label>分支</Label>
                 <Input 
-                  value={config.settings.branch || ""} 
+                  value={githubCfg.branch || ""} 
                   onChange={e => updateGithub({ branch: e.target.value })} 
                   placeholder="main" 
                   className="h-9" 
@@ -135,7 +136,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
               <div className="space-y-2">
                 <Label>文件路径</Label>
                 <Input 
-                  value={config.settings.path || ""} 
+                  value={githubCfg.path || ""} 
                   onChange={e => updateGithub({ path: e.target.value })} 
                   placeholder="public/data.json" 
                   className="h-9" 
@@ -150,7 +151,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
             <div className="space-y-2">
               <Label>Endpoint (服务地址/端点)</Label>
               <Input 
-                value={config.settings.endpoint || ""} 
+                value={s3Cfg.endpoint || ""} 
                 onChange={e => updateS3({ endpoint: e.target.value })} 
                 placeholder="例如: https://...r2.cloudflarestorage.com" 
                 className="h-9" 
@@ -160,7 +161,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
               <div className="space-y-2">
                 <Label>Access Key ID (访问密钥 ID)</Label>
                 <Input 
-                  value={config.settings.accessKeyId || ""} 
+                  value={s3Cfg.accessKeyId || ""} 
                   onChange={e => updateS3({ accessKeyId: e.target.value })} 
                   placeholder="Access Key" 
                   className="h-9" 
@@ -170,7 +171,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
                 <Label>Secret Access Key (私有访问密钥)</Label>
                 <Input 
                   type="password"
-                  value={config.settings.secretAccessKey || ""} 
+                  value={s3Cfg.secretAccessKey || ""} 
                   onChange={e => updateS3({ secretAccessKey: e.target.value })} 
                   placeholder="Secret Key" 
                   className="h-9" 
@@ -181,7 +182,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
               <div className="space-y-2">
                 <Label>Bucket (桶名称)</Label>
                 <Input 
-                  value={config.settings.bucket || ""} 
+                  value={s3Cfg.bucket || ""} 
                   onChange={e => updateS3({ bucket: e.target.value })} 
                   placeholder="例如: my-nav-data" 
                   className="h-9" 
@@ -190,7 +191,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
               <div className="space-y-2">
                 <Label>Region (区域)</Label>
                 <Input 
-                  value={config.settings.region || ""} 
+                  value={s3Cfg.region || ""} 
                   onChange={e => updateS3({ region: e.target.value })} 
                   placeholder="默认 auto" 
                   className="h-9" 
@@ -200,7 +201,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
             <div className="space-y-2">
               <Label>File Path (存储文件路径)</Label>
               <Input 
-                value={config.settings.key || ""} 
+                value={s3Cfg.key || ""} 
                 onChange={e => updateS3({ key: e.target.value })} 
                 placeholder="例如: data.json" 
                 className="h-9" 

@@ -6,7 +6,11 @@ export const STORAGE_CONFIG_KEY = "clean-nav-storage-config";
 
 export interface StorageConfig {
   type: 'github' | 's3' | 'webdav' | 'gist';
-  settings: any;
+  // Specific configs strictly typed
+  github?: GithubRepoSettings;
+  s3?: S3Settings;
+  // Legacy support
+  settings?: any;
 }
 
 export interface StorageAdapter {

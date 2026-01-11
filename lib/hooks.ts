@@ -121,8 +121,15 @@ export function useNavData(initialWallpapers: string[]) {
   }, []);
 
   const getAdapter = useCallback((config: StorageConfig): StorageAdapter | null => {
-    if (config.type === 'github') return new GithubRepoAdapter(config.settings);
-    if (config.type === 's3') return new S3Adapter(config.settings);
+    if (config.type === 'github') {
+        // Support both new structure (config.github) and legacy (config.settings)
+        const settings = config.github || config.settings;
+        return settings ? new GithubRepoAdapter(settings) : null;
+    }
+    if (config.type === 's3') {
+        const settings = config.s3 || config.settings;
+        return settings ? new S3Adapter(settings) : null;
+    }
     return null;
   }, []);
 
@@ -130,14 +137,40 @@ export function useNavData(initialWallpapers: string[]) {
     if (typeof window === 'undefined') return null;
     
     const storageConfigStr = localStorage.getItem(STORAGE_CONFIG_KEY);
-    if (storageConfigStr) return JSON.parse(storageConfigStr);
+    if (storageConfigStr) {
+        try {
+            const config = JSON.parse(storageConfigStr) as StorageConfig;
+            // Auto migrate legacy structure
+            let hasChanges = false;
+            
+            // Migrate generic 'settings' to specific fields if they are missing
+            if (config.settings && Object.keys(config.settings).length > 0) {
+                if (config.type === 'github' && !config.github) {
+                    config.github = config.settings;
+                    delete config.settings;
+                    hasChanges = true;
+                } else if (config.type === 's3' && !config.s3) {
+                    config.s3 = config.settings;
+                    delete config.settings;
+                    hasChanges = true;
+                }
+            }
+            
+            if (hasChanges) {
+                localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(config));
+            }
+            return config;
+        } catch (e) {
+            console.error("Error parsing storage config", e);
+        }
+    }
 
     const githubConfigStr = localStorage.getItem(GITHUB_CONFIG_KEY);
     if (githubConfigStr) {
       const githubSettings = JSON.parse(githubConfigStr);
       const migrated: StorageConfig = {
         type: 'github',
-        settings: githubSettings
+        github: githubSettings
       };
       // Auto migrate for next time
       localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(migrated));

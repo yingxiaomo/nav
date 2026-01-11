@@ -1,11 +1,13 @@
 "use client";
 
-import { StorageConfig, GithubRepoSettings, S3Settings } from "@/lib/storage";
+import { StorageConfig, GithubRepoSettings, S3Settings, GithubRepoAdapter, S3Adapter } from "@/lib/storage";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle } from "lucide-react";
-import { useEffect } from "react";
+import { AlertCircle, Wifi, Loader2, CheckCircle2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 interface StorageTabProps {
   config: StorageConfig;
@@ -13,6 +15,7 @@ interface StorageTabProps {
 }
 
 export function StorageTab({ config, setConfig }: StorageTabProps) {
+  const [isTesting, setIsTesting] = useState(false);
   
   // Ensure we have a valid structure
   useEffect(() => {
@@ -43,6 +46,32 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
 
   const updateS3 = (fields: Partial<S3Settings>) => {
     setConfig({ ...config, settings: { ...config.settings, ...fields } });
+  };
+
+  const handleTestConnection = async () => {
+    setIsTesting(true);
+    try {
+      if (config.type === 'github') {
+        const adapter = new GithubRepoAdapter(config.settings as GithubRepoSettings);
+        if (adapter.testConnection) {
+            await adapter.testConnection();
+            toast.success("GitHub 连接成功！", { description: "配置正确，有权访问该仓库。" });
+        }
+      } else if (config.type === 's3') {
+        const adapter = new S3Adapter(config.settings as S3Settings);
+        if (adapter.testConnection) {
+            await adapter.testConnection();
+            toast.success("S3/R2 连接成功！", { description: "Bucket 可访问且配置正确。" });
+        }
+      } else {
+        toast.info("当前存储类型暂不支持连接测试");
+      }
+    } catch (error: any) {
+      console.error("Test connection failed:", error);
+      toast.error("连接失败", { description: error.message || "请检查配置信息" });
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   return (
@@ -189,6 +218,22 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
             </div>
           </>
         )}
+      </div>
+
+      <div className="pt-2">
+        <Button 
+            variant="outline" 
+            className="w-full gap-2 text-muted-foreground hover:text-foreground"
+            onClick={handleTestConnection}
+            disabled={isTesting}
+        >
+            {isTesting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+                <Wifi className="w-4 h-4" />
+            )}
+            {isTesting ? "正在测试连接..." : "测试连接配置"}
+        </Button>
       </div>
     </div>
   );

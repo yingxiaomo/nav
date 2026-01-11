@@ -1,6 +1,6 @@
 import { DataSchema } from "./types";
 import { Octokit } from "@octokit/rest";
-import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand, PutObjectCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
 
 export const STORAGE_CONFIG_KEY = "clean-nav-storage-config";
 
@@ -12,6 +12,7 @@ export interface StorageConfig {
 export interface StorageAdapter {
   load(): Promise<DataSchema | null>;
   save(data: DataSchema): Promise<boolean>;
+  testConnection?(): Promise<void>;
 }
 
 // GitHub Repository Adapter
@@ -47,6 +48,22 @@ export class S3Adapter implements StorageAdapter {
       // Important for R2/Custom S3 providers
       forcePathStyle: true,
     });
+  }
+
+  async testConnection(): Promise<void> {
+    try {
+      const command = new HeadBucketCommand({ Bucket: this.config.bucket });
+      await this.client.send(command);
+    } catch (error: any) {
+      // 404 means bucket not found, 403 means forbidden (but connected)
+      if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+        throw new Error(`Bucket "${this.config.bucket}" 不存在`);
+      }
+      if (error.$metadata?.httpStatusCode === 403) {
+        throw new Error(`没有访问 Bucket "${this.config.bucket}" 的权限 (403)`);
+      }
+      throw error;
+    }
   }
 
   async load(): Promise<DataSchema | null> {
@@ -89,6 +106,15 @@ export class S3Adapter implements StorageAdapter {
 
 export class GithubRepoAdapter implements StorageAdapter {
   constructor(private config: GithubRepoSettings) {}
+
+  async testConnection(): Promise<void> {
+    const { token, owner, repo } = this.config;
+    if (!token || !owner || !repo) throw new Error("请先填写完整的配置信息");
+
+    const octokit = new Octokit({ auth: token });
+    // Check if repo exists and we have access
+    await octokit.repos.get({ owner, repo });
+  }
 
   async load(): Promise<DataSchema | null> {
     const { token, owner, repo, branch, path } = this.config;

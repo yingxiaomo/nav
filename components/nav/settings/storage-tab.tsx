@@ -46,7 +46,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
   };
 
   return (
-    <div className="space-y-4 py-4 overflow-y-auto max-h-[400px] px-1 custom-scrollbar">
+    <div className="space-y-4 py-4 overflow-y-auto h-full px-1 custom-scrollbar">
       <div className="space-y-2">
         <Label>存储类型</Label>
         <Select value={config.type} onValueChange={handleTypeChange}>

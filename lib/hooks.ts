@@ -348,7 +348,10 @@ export function useNavData(initialWallpapers: string[]) {
       const success = await adapter.save(newData);
       
       if (success) {
-        toast.success("同步成功！");
+        toast.success("同步成功！", {
+          description: "云端更新可能受 CDN 缓存影响有 1-5 分钟延迟，请勿频繁刷新或重复保存。",
+          duration: 5000,
+        });
         setHasUnsavedChanges(false);
       } else {
         toast.error("同步失败 (已暂存到本地)");

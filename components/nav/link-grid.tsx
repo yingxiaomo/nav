@@ -117,7 +117,6 @@ function SortableCard({ category, onClick }: { category: Category; onClick: () =
   );
 }
 
-// Re-defined LinkItemCard component
 const LinkItemCard = ({ item, onClick }: { item: LinkItem, onClick?: (item: LinkItem) => void }) => {
     const isFolder = item.type === 'folder';
                      
@@ -165,7 +164,7 @@ const LinkItemCard = ({ item, onClick }: { item: LinkItem, onClick?: (item: Link
    );
 };
 
-// Recursive component to render folder content in list mode
+
 const RenderFolderContent = ({ items, onFolderClick }: { 
     items: LinkItem[]; 
     onFolderClick: (item: LinkItem) => void;
@@ -195,15 +194,15 @@ const RenderFolderContent = ({ items, onFolderClick }: {
 export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'folder' }: LinkGridProps) {
 
   const dndContextId = useId();
-  const [selectedId, setSelectedId] = useState<string | null>(null); // This is the ID of the TOP-LEVEL Category
+  const [selectedId, setSelectedId] = useState<string | null>(null); 
   const selectedCategory = categories.find((c) => c.id === selectedId);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const [navStack, setNavStack] = useState<LinkItem[]>([]); // Stack for modal internal navigation
-  const [allCollapsedState, setAllCollapsedState] = useState<Record<string, boolean>>({}); // For list mode internal collapse
+  const [navStack, setNavStack] = useState<LinkItem[]>([]); 
+  const [allCollapsedState, setAllCollapsedState] = useState<Record<string, boolean>>({}); 
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -225,7 +224,7 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
     if (selectedId) {
       document.body.style.overflow = "hidden";
       onOpenChange?.(true);
-      // setNavStack([]); // Don't reset stack here, rely on close to reset or manual reset if needed
+
     } else {
       document.body.style.overflow = "auto";
       onOpenChange?.(false);
@@ -238,7 +237,6 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
   }, [selectedId, onOpenChange]);
 
 
-  // Content for the modal
   const modalCurrentItems = navStack.length > 0 
     ? navStack[navStack.length - 1].children || [] 
     : selectedCategory?.links || [];
@@ -255,7 +253,7 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
       setNavStack(prev => prev.slice(0, -1));
   };
 
-  // This is the onClick for LinkItemCards *inside* the modal (folder mode)
+
   const handleModalFolderClick = (item: LinkItem) => {
       if (item.type === 'folder') {
           setNavStack(prev => [...prev, item]);
@@ -270,7 +268,6 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
   };
 
 
-  // Main content rendering based on displayMode
   const renderMainContent = () => {
     if (displayMode === 'list') {
       return (
@@ -318,7 +315,6 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
       );
     }
 
-    // Default Folder Mode
     return mounted ? (
         <DndContext id={dndContextId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <div className="w-full max-w-5xl mx-auto pb-6 px-4 relative z-30">

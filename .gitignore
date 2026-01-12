@@ -1,5 +1,4 @@
 node_modules
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
 /node_modules
@@ -31,20 +30,15 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
 .env*
 
-# vercel
 .vercel
 
-# typescript
 *.tsbuildinfo
 next-env.d.ts
 
-# local logs and AI context
 .1.md
 
-# editors
 .vscode/
 .idea/
 *.swp

@@ -101,7 +101,6 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
             let totalLinks = 0;
             let totalFolders = 0;
 
-            // Robust recursive parser
             const parseBookmarks = (dl: Element): LinkItem[] => {
                 const items: LinkItem[] = [];
                 const children = Array.from(dl.children);
@@ -109,25 +108,18 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
                 for (let i = 0; i < children.length; i++) {
                     const node = children[i];
                     
-                    // We primarily look for DT tags
                     if (node.tagName === 'DT') {
                         const h3 = node.querySelector('h3');
                         const a = node.querySelector('a');
                         
                         if (h3) {
-                            // Found a folder header
                             const folderTitle = h3.innerText;
                             let childItems: LinkItem[] = [];
-                            
-                            // Strategy 1: Look for DL inside the DT
                             let itemsDl = node.querySelector('dl');
 
-                            // Strategy 2: Look for DL as the next sibling (common in Chrome/Edge)
-                            // We need to be careful not to skip valid DTs if we look ahead
                             if (!itemsDl) {
                                 let next = node.nextElementSibling;
                                 while (next && next.tagName !== 'DT' && next.tagName !== 'DL') {
-                                    // Skip non-structural tags like p, dd (if malformed)
                                     next = next.nextElementSibling;
                                 }
                                 if (next && next.tagName === 'DL') {
@@ -149,7 +141,6 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
                             });
                             totalFolders++;
                         } else if (a) {
-                            // Found a link
                             items.push({
                                 id: `l-${Date.now()}-${Math.random()}`,
                                 title: a.innerText,
@@ -164,7 +155,6 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
                 return items;
             };
 
-            // Find the root DL. Usually body > dl, but sometimes just dl
             const bodyDl = doc.querySelector('body > dl') || doc.querySelector('dl');
             
             if (bodyDl) {

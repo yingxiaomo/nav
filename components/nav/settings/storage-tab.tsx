@@ -22,7 +22,6 @@ const DEFAULT_GIST: GistSettings = { token: "", gistId: "", filename: "nav-data.
 export function StorageTab({ config, setConfig }: StorageTabProps) {
   const [isTesting, setIsTesting] = useState(false);
   
-  // Ensure we have a valid type
   useEffect(() => {
     if (!config.type) {
       setConfig({ ...config, type: 'github' });
@@ -228,7 +227,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
                 <span className="text-xs font-medium">必须配置 CORS 策略</span>
               </div>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                请确保 S3/R2 允许跨域访问。
+                由于浏览器安全限制，你必须在 S3/R2 后台配置 CORS 规则，允许你自己的域名访问。具体配置请参考 docs/storage-guide.md 文档。
               </p>
             </div>
           </>
@@ -325,10 +324,12 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
       <div className="rounded-md bg-red-500/10 p-3 border border-red-500/20 mt-4">
           <div className="flex items-center gap-2 text-red-500 mb-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
-            <span className="text-xs font-bold">同步机制</span>
+            <span className="text-xs font-bold">同步机制与延迟警告</span>
           </div>
           <div className="text-[11px] text-red-400/90 space-y-1.5 leading-relaxed">
-            <p>保存配置后，点击下方的“测试连接”以验证。成功后点击底部的“保存”按钮生效。</p>
+            <p><span className="font-bold text-red-400">刷新页面：</span>从云端拉取数据（智能合并本地新增）。</p>
+            <p><span className="font-bold text-red-400">点击保存：</span>将本地数据推送到云端（覆盖云端旧数据）。</p>
+            <p><span className="font-bold text-red-400">CDN 延迟：</span>保存后可能需 <strong>1-5 分钟</strong>生效，请勿频繁操作！</p>
           </div>
       </div>
 

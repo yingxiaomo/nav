@@ -19,9 +19,7 @@ export const IconRender = ({ name, className }: { name: string; className?: stri
   }
   
   const iconName = name as keyof typeof Icons;
-  // Ensure the icon exists AND is a function (React component)
   const isValidIcon = name && /^[A-Z]/.test(name) && Boolean(Icons[iconName]);
-  
   const IconComponent = isValidIcon ? Icons[iconName] : LinkIcon;
   const Icon = IconComponent as LucideIcon;
   

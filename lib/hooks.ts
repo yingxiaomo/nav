@@ -5,7 +5,7 @@ import { StorageAdapter, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapte
 import { toast } from "sonner";
 
 export function useLocalStorage<T>(key: string, initialValue: T | (() => T)) {
-  // 1. Initialize with default value (SSR safe)
+
   const [storedValue, setStoredValue] = useState<T>(() => {
     return initialValue instanceof Function ? initialValue() : initialValue;
   });
@@ -18,11 +18,10 @@ export function useLocalStorage<T>(key: string, initialValue: T | (() => T)) {
       if (item) {
         setStoredValue(JSON.parse(item));
       } else {
-        // If nothing in storage, re-evaluate initialValue logic in client context
-        // This allows migration logic (checking other keys) to run correctly on client
+
         if (initialValue instanceof Function) {
             const clientValue = initialValue();
-            // Only update if it's different (basic check, object ref might be different but that's ok)
+
             setStoredValue(clientValue);
         }
       }
@@ -123,7 +122,7 @@ export function useNavData(initialWallpapers: string[]) {
 
   const getAdapter = useCallback((config: StorageConfig): StorageAdapter | null => {
     if (config.type === 'github') {
-        // Support both new structure (config.github) and legacy (config.settings)
+
         const settings = config.github || config.settings;
         return settings ? new GithubRepoAdapter(settings) : null;
     }
@@ -149,10 +148,9 @@ export function useNavData(initialWallpapers: string[]) {
     if (storageConfigStr) {
         try {
             const config = JSON.parse(storageConfigStr) as StorageConfig;
-            // Auto migrate legacy structure
+
             let hasChanges = false;
             
-            // Migrate generic 'settings' to specific fields if they are missing
             if (config.settings && Object.keys(config.settings).length > 0) {
                 if (config.type === 'github' && !config.github) {
                     config.github = config.settings;
@@ -181,7 +179,7 @@ export function useNavData(initialWallpapers: string[]) {
         type: 'github',
         github: githubSettings
       };
-      // Auto migrate for next time
+
       localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(migrated));
       return migrated;
     }
@@ -225,8 +223,6 @@ export function useNavData(initialWallpapers: string[]) {
                 const localTodos = currentData.todos || [];
                 const localNotes = currentData.notes || [];
                 const localCategories = currentData.categories || [];
-
-                // Smart Merge Logic
                 const mergeItems = <T extends { id: string, updatedAt?: number }>(remoteItems: T[] = [], localItems: T[] = []): T[] => {
                     const merged = [...remoteItems];
                     const remoteMap = new Map(remoteItems.map(i => [i.id, i]));
@@ -234,14 +230,14 @@ export function useNavData(initialWallpapers: string[]) {
                     for (const localItem of localItems) {
                         const remoteItem = remoteMap.get(localItem.id);
                         if (!remoteItem) {
-                            // New local item -> Add
+
                             merged.push(localItem);
                         } else {
-                            // Conflict -> Check timestamps
+
                             const localTime = localItem.updatedAt || 0;
                             const remoteTime = remoteItem.updatedAt || 0;
                             if (localTime > remoteTime) {
-                                // Local is newer -> Replace
+
                                 const index = merged.findIndex(i => i.id === localItem.id);
                                 if (index !== -1) {
                                     merged[index] = localItem;
@@ -259,20 +255,16 @@ export function useNavData(initialWallpapers: string[]) {
                     for (const localLink of localLinks) {
                         const remoteLink = remoteMap.get(localLink.id);
                         if (!remoteLink) {
-                            // New local link -> Add
+
                             merged.push(localLink);
                         } else {
-                            // Existing link -> Merge recursively or replace based on time
+
                             const localTime = localLink.updatedAt || 0;
                             const remoteTime = remoteLink.updatedAt || 0;
-                            
-                            // If it's a folder, we might need to merge children regardless of folder timestamp
-                            // But usually folder timestamp updates when content updates if we implemented it right.
-                            // Let's do a mix: if local is newer, take local props. Then merge children.
-                            
+                                                        
                             let baseLink = (localTime > remoteTime) ? localLink : remoteLink;
                             
-                            // If both have children, merge them
+
                             if (localLink.children || remoteLink.children) {
                                 const mergedChildren = mergeLinks(remoteLink.children || [], localLink.children || []);
                                 baseLink = { ...baseLink, children: mergedChildren };
@@ -294,16 +286,15 @@ export function useNavData(initialWallpapers: string[]) {
                     for (const localCat of localCats) {
                         const remoteCat = remoteCatMap.get(localCat.id);
                         if (!remoteCat) {
-                            // New local category -> Add
+
                             merged.push(localCat);
                         } else {
-                            // Existing category -> Merge
+
                             const localTime = localCat.updatedAt || 0;
                             const remoteTime = remoteCat.updatedAt || 0;
                             
                             let baseCat = (localTime > remoteTime) ? localCat : remoteCat;
                             
-                            // Always merge links
                             const mergedLinks = mergeLinks(remoteCat.links, localCat.links);
                             
                             const index = merged.findIndex(c => c.id === localCat.id);
@@ -338,7 +329,6 @@ export function useNavData(initialWallpapers: string[]) {
                     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(finalData));
                   }
 
-                  // Check if effective data is different from remote (meaning we have unsaved local additions)
                   const isEffectiveDifferent =
                     JSON.stringify(mergedCategories) !== JSON.stringify(remoteData.categories) ||
                     JSON.stringify(mergedTodos) !== JSON.stringify(remoteData.todos) ||

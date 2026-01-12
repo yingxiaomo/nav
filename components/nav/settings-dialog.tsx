@@ -36,9 +36,8 @@ interface SettingsDialogProps {
 export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRefreshWallpaper, syncError, uploadWallpaper }: SettingsDialogProps) {
   const [open, setOpen] = useState(false);
   const [localData, setLocalData] = useState<DataSchema>(data);
-
   const [storageConfig, setStorageConfig] = useLocalStorage<StorageConfig>(STORAGE_CONFIG_KEY, () => {
-    // Migration logic for initial state
+
     if (typeof window !== 'undefined') {
         const oldGithub = localStorage.getItem(GITHUB_CONFIG_KEY);
         if (oldGithub) {

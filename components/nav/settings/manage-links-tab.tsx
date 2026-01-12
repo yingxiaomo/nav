@@ -49,12 +49,10 @@ interface ManageLinksTabProps {
   setLocalData: React.Dispatch<React.SetStateAction<DataSchema>>;
 }
 
-// Helper to check if an item has children (Category or Folder LinkItem)
 const getChildren = (item: Category | LinkItem): LinkItem[] | undefined => {
     return (item as Category).links || (item as LinkItem).children;
 };
 
-// Helper to set children (return new item)
 const setChildren = (item: Category | LinkItem, newChildren: LinkItem[]): Category | LinkItem => {
     if ('links' in item) {
         return { ...item, links: newChildren } as Category;
@@ -67,8 +65,6 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeLink, setActiveLink] = useState<LinkItem | null>(null);
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
-  
-  // Navigation stack for drilling down into folders
   const [folderPath, setFolderPath] = useState<LinkItem[]>([]);
   const [editingLink, setEditingLink] = useState<LinkItem | null>(null);
   const [movingLink, setMovingLink] = useState<LinkItem | null>(null);
@@ -126,7 +122,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
                           children[idx] = updatedLink;
                           if ('links' in item) (item as Category).links = children;
                           else (item as LinkItem).children = children;
-                          // Also update parent folder timestamp if needed? Ideally yes, but let's stick to item level first.
+
                           return true;
                       }
                       if (updateRecursive(children)) return true;
@@ -149,7 +145,6 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
           const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
           let movedItem: LinkItem | null = null;
 
-          // 1. Remove from old location
           const removeRecursive = (items: (Category|LinkItem)[]) => {
               for (const item of items) {
                   const children = getChildren(item);
@@ -171,7 +166,6 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
           if (!movedItem) return prev; 
 
-          // 2. Add to new location
           const addRecursive = (items: (Category|LinkItem)[]) => {
               for (const item of items) {
                   if (item.id === targetId) {
@@ -221,13 +215,9 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       return options;
   }, [localData.categories, movingLink]);
 
-  // Recursive findContainer
   const findContainer = (id: string, items: (Category | LinkItem)[]): string | undefined => {
-      // Direct match
-      if (items.find(i => i.id === id)) return id; // It's a container itself? No, we want the *parent* container id usually. 
-      // Actually dnd-kit wants the container ID where the item resides.
-      // If 'id' is a sortable item, we want the ID of the container that holds it.
-      
+      if (items.find(i => i.id === id)) return id; 
+  
       for (const item of items) {
           const children = getChildren(item);
           if (children) {
@@ -261,10 +251,8 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
     if (!overId || active.id === overId) return;
 
-    // Only allow sorting links/folders within containers, not moving Categories into folders
     if (active.data.current?.type !== "Link") return;
 
-    // We need to pass the whole tree to findContainer
     const activeContainer = findContainer(active.id as string, localData.categories);
     const overContainer = findContainer(overId as string, localData.categories);
 
@@ -272,19 +260,9 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       return;
     }
 
-    // Logic for moving items between containers is complex with deep recursion.
-    // For now, to ensure stability, let's limit DragOver (moving between containers) 
-    // to the *current view* context if possible, or implement deep update.
-    
-    // Implementing deep update for DragOver:
     setLocalData((prev) => {
-        // We need a deep clone/update function. 
-        // Since we don't have Immer, this is verbose.
-        // Strategy: traverse and replace.
-        
+     
         const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
-        
-        // Helper to find and return the array containing the item
         const findParentContainerAndList = (items: (Category|LinkItem)[], id: string): [Category|LinkItem, LinkItem[]] | null => {
             for (const item of items) {
                 const children = getChildren(item);
@@ -304,13 +282,11 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
         const [activeParent, activeList] = activeRes;
         const [overParent, overList] = overRes;
-        
-        // Find indexes
         const activeIndex = activeList.findIndex(l => l.id === active.id);
         const overIndex = overList.findIndex(l => l.id === overId);
 
         let newIndex;
-        if (overList.includes(over.data.current?.link)) { // If over is a link/item
+        if (overList.includes(over.data.current?.link)) { 
              const isBelowOverItem = over && active.rect.current.translated && active.rect.current.translated.top > over.rect.top + over.rect.height;
              const modifier = isBelowOverItem ? 1 : 0;
              newIndex = overIndex >= 0 ? overIndex + modifier : overList.length + 1;
@@ -318,7 +294,6 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
              newIndex = overList.length + 1;
         }
 
-        // Move item
         const [movedItem] = activeList.splice(activeIndex, 1);
         overList.splice(newIndex, 0, movedItem);
 
@@ -456,14 +431,10 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
     }),
   };
   
-  // Navigation for drilling down
   const currentFolder = folderPath.length > 0 ? folderPath[folderPath.length - 1] : null;
-  
-  // To ensure UI updates when localData changes (even for deep items), we need to find the currentFolder in the new localData
-  // because folderPath holds stale references.
   const resolvedCurrentFolder = useMemo(() => {
       if (!currentFolder) return null;
-      // Find currentFolder.id in localData
+
       const findItem = (items: (Category|LinkItem)[], id: string): LinkItem | null => {
           for (const item of items) {
              if (item.id === id && 'type' in item) return item as LinkItem;
@@ -478,7 +449,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       return findItem(localData.categories, currentFolder.id);
   }, [localData, currentFolder]);
 
-  // If resolvedCurrentFolder is null but we had one, it means it was deleted. Go back.
+
   if (currentFolder && !resolvedCurrentFolder) {
       setFolderPath([]);
   }
@@ -506,7 +477,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
         <div className="flex-1 border rounded-xl bg-muted/10 overflow-y-auto min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40">
             <div className="space-y-1 p-2 pb-10">
                 {!currentFolder ? (
-                    // Root View: List of Categories
+
                     <SortableContext items={localData.categories.map(c => c.id)} strategy={verticalListSortingStrategy}>
                         {localData.categories.map((cat) => {
                             const isCollapsed = collapsedCats.has(cat.id);
@@ -552,7 +523,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
                         })}
                     </SortableContext>
                 ) : (
-                    // Folder View: Inside a folder
+
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 p-2 pb-4 border-b border-border/20">
                             <Button 

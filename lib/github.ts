@@ -28,7 +28,7 @@ export async function loadDataFromGithub(config: GithubConfig): Promise<DataSche
     
     if ('content' in response.data) {
       const content = atob(response.data.content);
-      const json = JSON.parse(decodeURIComponent(escape(content))); // Handle UTF-8
+      const json = JSON.parse(decodeURIComponent(escape(content))); 
       return json as DataSchema;
     }
     
@@ -58,9 +58,7 @@ export async function saveDataToGithub(config: GithubConfig, data: DataSchema, m
         sha = currentFile.sha;
       }
     } catch (e: any) {
-      // If the file doesn't exist (404), we can proceed to create it (sha will be undefined).
-      // For other errors, we should log them, but maybe we can still try to create/update if it's a permission issue that allows writing but not reading? 
-      // Safest is to only ignore 404.
+
       if (e.status !== 404) {
         console.warn("Error checking for existing file:", e);
       }

@@ -5,15 +5,12 @@ import { createClient, WebDAVClient } from "webdav";
 import { parseNetscapeBookmarks } from "./bookmark-parser";
 
 export const STORAGE_CONFIG_KEY = "clean-nav-storage-config";
-
 export interface StorageConfig {
   type: 'github' | 's3' | 'webdav' | 'gist';
-  // Specific configs strictly typed
   github?: GithubRepoSettings;
   s3?: S3Settings;
   webdav?: WebDavSettings;
   gist?: GistSettings;
-  // Legacy support
   settings?: any;
 }
 
@@ -24,7 +21,6 @@ export interface StorageAdapter {
   uploadFile?(file: File, filename: string): Promise<string>;
 }
 
-// GitHub Repository Adapter
 export interface GithubRepoSettings {
   token: string;
   owner: string;
@@ -33,14 +29,12 @@ export interface GithubRepoSettings {
   path: string;
 }
 
-// GitHub Gist Adapter
 export interface GistSettings {
   token: string;
   gistId: string;
   filename: string;
 }
 
-// S3 / R2 Adapter
 export interface S3Settings {
   endpoint: string;
   region: string;
@@ -51,7 +45,6 @@ export interface S3Settings {
   publicUrl?: string;
 }
 
-// WebDAV Adapter
 export interface WebDavSettings {
   url: string;
   username?: string;
@@ -70,7 +63,6 @@ export class S3Adapter implements StorageAdapter {
         accessKeyId: config.accessKeyId,
         secretAccessKey: config.secretAccessKey,
       },
-      // Important for R2/Custom S3 providers
       forcePathStyle: true,
     });
   }
@@ -80,7 +72,6 @@ export class S3Adapter implements StorageAdapter {
       const command = new HeadBucketCommand({ Bucket: this.config.bucket });
       await this.client.send(command);
     } catch (error: any) {
-      // 404 means bucket not found, 403 means forbidden (but connected)
       if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
         throw new Error(`Bucket "${this.config.bucket}" 不存在`);
       }
@@ -144,19 +135,13 @@ export class S3Adapter implements StorageAdapter {
       });
       await this.client.send(command);
 
-      // Construct Public URL
       let baseUrl = this.config.publicUrl || this.config.endpoint;
       if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
-      
-      // If using publicUrl (e.g. custom domain), format is usually baseUrl/key
-      // If using endpoint (e.g. MinIO), format might be baseUrl/bucket/key
-      // For R2, endpoint is API only, publicUrl is required for access.
-      // We'll assume the standard path style if no publicUrl is provided, but append bucket.
       
       if (this.config.publicUrl) {
           return `${baseUrl}/${key}`;
       } else {
-          // Fallback: assume path style access on endpoint
+
           return `${baseUrl}/${this.config.bucket}/${key}`;
       }
     } catch (error) {
@@ -174,7 +159,7 @@ export class GithubRepoAdapter implements StorageAdapter {
     if (!token || !owner || !repo) throw new Error("请先填写完整的配置信息");
 
     const octokit = new Octokit({ auth: token });
-    // Check if repo exists and we have access
+
     await octokit.repos.get({ owner, repo });
   }
 
@@ -308,7 +293,7 @@ export class WebDavAdapter implements StorageAdapter {
   }
 
   async testConnection(): Promise<void> {
-     // Try to list the directory of the path or root
+
      try {
          await this.client.getDirectoryContents("/");
      } catch (e: any) {
@@ -324,11 +309,11 @@ export class WebDavAdapter implements StorageAdapter {
         }
         const content = await this.client.getFileContents(this.config.path, { format: "text" });
         if (typeof content === 'string') {
-            // 1. Try JSON
+
             try {
                 return JSON.parse(content) as DataSchema;
             } catch (e) {
-                // 2. Not JSON, try Netscape HTML
+
                 const parsed = parseNetscapeBookmarks(content);
                 if (parsed) {
                     console.log("Successfully parsed WebDAV file as Netscape HTML bookmarks");
@@ -348,10 +333,8 @@ export class WebDavAdapter implements StorageAdapter {
   async save(data: DataSchema): Promise<boolean> {
     if (!this.config.url) return false;
     
-    // Safety check: Don't overwrite HTML bookmarks with JSON
     if (this.config.path.endsWith('.html') || this.config.path.endsWith('.htm')) {
-        // Since the interface returns boolean, we can't easily throw a user-visible error here without changing the interface
-        // But throwing an error is better than corrupting data. UI should handle the try-catch of save().
+
         throw new Error("无法将 JSON 数据保存到 HTML 文件。请在设置中更改文件扩展名为 .json");
     }
 

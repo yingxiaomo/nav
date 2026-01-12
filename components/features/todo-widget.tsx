@@ -19,11 +19,9 @@ export function TodoWidget({ todos = [], onUpdate }: TodoWidgetProps) {
   const addTodo = () => {
     if (!newTodo.trim()) return
     const newItem: Todo = {
-      // eslint-disable-next-line react-hooks/purity
       id: Date.now().toString(),
       text: newTodo.trim(),
       completed: false,
-      // eslint-disable-next-line react-hooks/purity
       createdAt: Date.now(),
     }
     onUpdate([newItem, ...todos])

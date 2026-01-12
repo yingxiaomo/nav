@@ -42,7 +42,7 @@ export function ResizablePanel({
       const isMobile = window.innerWidth < 768;
       
       if (isMobile) {
-        const w = window.innerWidth - 32; // 16px padding on each side
+        const w = window.innerWidth - 32; 
         const h = Math.min(defaultHeight, window.innerHeight * 0.6);
         setRect({
           x: 16,

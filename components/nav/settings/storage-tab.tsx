@@ -1,6 +1,6 @@
 "use client";
 
-import { StorageConfig, GithubRepoSettings, S3Settings, GithubRepoAdapter, S3Adapter } from "@/lib/storage";
+import { StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter } from "@/lib/storage";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ interface StorageTabProps {
 
 const DEFAULT_GITHUB: GithubRepoSettings = { token: "", owner: "", repo: "", branch: "main", path: "public/data.json" };
 const DEFAULT_S3: S3Settings = { endpoint: "", region: "auto", accessKeyId: "", secretAccessKey: "", bucket: "", key: "data.json" };
+const DEFAULT_WEBDAV: WebDavSettings = { url: "", username: "", password: "", path: "/data.json" };
+const DEFAULT_GIST: GistSettings = { token: "", gistId: "", filename: "nav-data.json" };
 
 export function StorageTab({ config, setConfig }: StorageTabProps) {
   const [isTesting, setIsTesting] = useState(false);
@@ -42,25 +44,39 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
     setConfig({ ...config, s3: { ...current, ...fields } });
   };
 
+  const updateWebDav = (fields: Partial<WebDavSettings>) => {
+    const current = config.webdav || DEFAULT_WEBDAV;
+    setConfig({ ...config, webdav: { ...current, ...fields } });
+  };
+
+  const updateGist = (fields: Partial<GistSettings>) => {
+    const current = config.gist || DEFAULT_GIST;
+    setConfig({ ...config, gist: { ...current, ...fields } });
+  };
+
   const handleTestConnection = async () => {
     setIsTesting(true);
     try {
       if (config.type === 'github') {
         const settings = config.github || DEFAULT_GITHUB;
         const adapter = new GithubRepoAdapter(settings);
-        if (adapter.testConnection) {
-            await adapter.testConnection();
-            toast.success("GitHub 连接成功！", { description: "配置正确，有权访问该仓库。" });
-        }
+        if (adapter.testConnection) await adapter.testConnection();
+        toast.success("GitHub 连接成功！");
       } else if (config.type === 's3') {
         const settings = config.s3 || DEFAULT_S3;
         const adapter = new S3Adapter(settings);
-        if (adapter.testConnection) {
-            await adapter.testConnection();
-            toast.success("S3/R2 连接成功！", { description: "Bucket 可访问且配置正确。" });
-        }
-      } else {
-        toast.info("当前存储类型暂不支持连接测试");
+        if (adapter.testConnection) await adapter.testConnection();
+        toast.success("S3/R2 连接成功！");
+      } else if (config.type === 'webdav') {
+        const settings = config.webdav || DEFAULT_WEBDAV;
+        const adapter = new WebDavAdapter(settings);
+        if (adapter.testConnection) await adapter.testConnection();
+        toast.success("WebDAV 连接成功！");
+      } else if (config.type === 'gist') {
+        const settings = config.gist || DEFAULT_GIST;
+        const adapter = new GistAdapter(settings);
+        if (adapter.testConnection) await adapter.testConnection();
+        toast.success("Gist 连接成功！");
       }
     } catch (error: any) {
       console.error("Test connection failed:", error);
@@ -70,10 +86,10 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
     }
   };
 
-  // Safe accessors with fallback to legacy settings if necessary (though migration usually handles it)
-  // But for UI rendering, we rely on the specific fields + defaults
-  const githubCfg = config.github || (config.type === 'github' ? config.settings : undefined) || DEFAULT_GITHUB;
-  const s3Cfg = config.s3 || (config.type === 's3' ? config.settings : undefined) || DEFAULT_S3;
+  const githubCfg = config.github || DEFAULT_GITHUB;
+  const s3Cfg = config.s3 || DEFAULT_S3;
+  const webdavCfg = config.webdav || DEFAULT_WEBDAV;
+  const gistCfg = config.gist || DEFAULT_GIST;
 
   return (
     <div className="space-y-4 py-4 overflow-y-auto h-full px-1 custom-scrollbar">
@@ -86,6 +102,8 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
           <SelectContent>
             <SelectItem value="github">GitHub 仓库</SelectItem>
             <SelectItem value="s3">S3 / Cloudflare R2</SelectItem>
+            <SelectItem value="webdav">WebDAV</SelectItem>
+            <SelectItem value="gist">GitHub Gist</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -94,7 +112,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
         {config.type === 'github' && (
           <>
             <div className="space-y-2">
-              <Label>Token</Label>
+              <Label>Token (需要 repo 权限)</Label>
               <Input 
                 type="password" 
                 value={githubCfg.token || ""} 
@@ -109,7 +127,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
                 <Input 
                   value={githubCfg.owner || ""} 
                   onChange={e => updateGithub({ owner: e.target.value })} 
-                  placeholder="GitHub Username" 
+                  placeholder="Username" 
                   className="h-9" 
                 />
               </div>
@@ -118,7 +136,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
                 <Input 
                   value={githubCfg.repo || ""} 
                   onChange={e => updateGithub({ repo: e.target.value })} 
-                  placeholder="Repository Name" 
+                  placeholder="Repo Name" 
                   className="h-9" 
                 />
               </div>
@@ -149,74 +167,148 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
         {config.type === 's3' && (
           <>
             <div className="space-y-2">
-              <Label>Endpoint (服务地址/端点)</Label>
+              <Label>Endpoint (服务地址)</Label>
               <Input 
                 value={s3Cfg.endpoint || ""} 
                 onChange={e => updateS3({ endpoint: e.target.value })} 
-                placeholder="例如: https://...r2.cloudflarestorage.com" 
+                placeholder="https://..." 
                 className="h-9" 
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Access Key ID (访问密钥 ID)</Label>
+                <Label>Access Key ID</Label>
                 <Input 
                   value={s3Cfg.accessKeyId || ""} 
                   onChange={e => updateS3({ accessKeyId: e.target.value })} 
-                  placeholder="Access Key" 
                   className="h-9" 
                 />
               </div>
               <div className="space-y-2">
-                <Label>Secret Access Key (私有访问密钥)</Label>
+                <Label>Secret Access Key</Label>
                 <Input 
                   type="password"
                   value={s3Cfg.secretAccessKey || ""} 
                   onChange={e => updateS3({ secretAccessKey: e.target.value })} 
-                  placeholder="Secret Key" 
                   className="h-9" 
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Bucket (桶名称)</Label>
+                <Label>Bucket</Label>
                 <Input 
                   value={s3Cfg.bucket || ""} 
                   onChange={e => updateS3({ bucket: e.target.value })} 
-                  placeholder="例如: my-nav-data" 
                   className="h-9" 
                 />
               </div>
               <div className="space-y-2">
-                <Label>Region (区域)</Label>
+                <Label>文件路径</Label>
                 <Input 
-                  value={s3Cfg.region || ""} 
-                  onChange={e => updateS3({ region: e.target.value })} 
-                  placeholder="默认 auto" 
+                  value={s3Cfg.key || ""} 
+                  onChange={e => updateS3({ key: e.target.value })} 
+                  placeholder="data.json" 
                   className="h-9" 
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>File Path (存储文件路径)</Label>
-              <Input 
-                value={s3Cfg.key || ""} 
-                onChange={e => updateS3({ key: e.target.value })} 
-                placeholder="例如: data.json" 
-                className="h-9" 
-              />
-            </div>
-            
             <div className="rounded-md bg-yellow-500/10 p-3 mt-4 border border-yellow-500/20">
               <div className="flex items-start gap-2 text-yellow-500 mb-2">
                 <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                 <span className="text-xs font-medium">必须配置 CORS 策略</span>
               </div>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                由于浏览器安全限制，你必须在 S3/R2 后台配置 CORS 规则，允许你自己的域名访问。具体配置请参考 docs/storage-guide.md 文档。
+                请确保 S3/R2 允许跨域访问。
               </p>
             </div>
+          </>
+        )}
+
+        {config.type === 'webdav' && (
+          <>
+            <div className="space-y-2">
+              <Label>WebDAV URL</Label>
+              <Input 
+                value={webdavCfg.url || ""} 
+                onChange={e => updateWebDav({ url: e.target.value })} 
+                placeholder="https://dav.jianguoyun.com/dav/" 
+                className="h-9" 
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>用户名</Label>
+                <Input 
+                  value={webdavCfg.username || ""} 
+                  onChange={e => updateWebDav({ username: e.target.value })} 
+                  className="h-9" 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>密码</Label>
+                <Input 
+                  type="password"
+                  value={webdavCfg.password || ""} 
+                  onChange={e => updateWebDav({ password: e.target.value })} 
+                  className="h-9" 
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>文件路径</Label>
+              <Input 
+                value={webdavCfg.path || ""} 
+                onChange={e => updateWebDav({ path: e.target.value })} 
+                placeholder="/nav/data.json" 
+                className="h-9" 
+              />
+            </div>
+            <div className="rounded-md bg-yellow-500/10 p-3 mt-4 border border-yellow-500/20">
+              <div className="flex items-start gap-2 text-yellow-500 mb-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span className="text-xs font-medium">WebDAV CORS 警告</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                浏览器安全策略要求 WebDAV 服务器允许跨域访问（CORS）。很多私有云盘或 NAS 默认未开启 CORS，可能导致连接失败。
+              </p>
+            </div>
+          </>
+        )}
+
+        {config.type === 'gist' && (
+          <>
+            <div className="space-y-2">
+              <Label>Token (需要 gist 权限)</Label>
+              <Input 
+                type="password" 
+                value={gistCfg.token || ""} 
+                onChange={e => updateGist({ token: e.target.value })} 
+                placeholder="ghp_..." 
+                className="h-9" 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Gist ID</Label>
+              <Input 
+                value={gistCfg.gistId || ""} 
+                onChange={e => updateGist({ gistId: e.target.value })} 
+                placeholder="32位 Gist ID" 
+                className="h-9" 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>文件名</Label>
+              <Input 
+                value={gistCfg.filename || ""} 
+                onChange={e => updateGist({ filename: e.target.value })} 
+                placeholder="nav-data.json" 
+                className="h-9" 
+              />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              请创建一个私有或公开的 Gist，并填入其 ID 和文件名。
+            </p>
           </>
         )}
       </div>
@@ -224,12 +316,10 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
       <div className="rounded-md bg-red-500/10 p-3 border border-red-500/20 mt-4">
           <div className="flex items-center gap-2 text-red-500 mb-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
-            <span className="text-xs font-bold">同步机制与延迟警告</span>
+            <span className="text-xs font-bold">同步机制</span>
           </div>
           <div className="text-[11px] text-red-400/90 space-y-1.5 leading-relaxed">
-            <p><span className="font-bold text-red-400">刷新页面：</span>从云端拉取数据（智能合并本地新增）。</p>
-            <p><span className="font-bold text-red-400">点击保存：</span>将本地数据推送到云端（覆盖云端旧数据）。</p>
-            <p><span className="font-bold text-red-400">CDN 延迟：</span>保存后可能需 <strong>1-5 分钟</strong>生效，请勿频繁操作！</p>
+            <p>保存配置后，点击下方的“测试连接”以验证。成功后点击底部的“保存”按钮生效。</p>
           </div>
       </div>
 

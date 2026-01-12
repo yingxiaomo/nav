@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { DataSchema, DEFAULT_DATA, Category, Todo, Note } from "./types";
 import { GITHUB_CONFIG_KEY } from "./github";
-import { StorageAdapter, GithubRepoAdapter, S3Adapter, STORAGE_CONFIG_KEY, StorageConfig } from "./storage";
+import { StorageAdapter, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, STORAGE_CONFIG_KEY, StorageConfig } from "./storage";
 import { toast } from "sonner";
 
 export function useLocalStorage<T>(key: string, initialValue: T | (() => T)) {
@@ -130,6 +130,14 @@ export function useNavData(initialWallpapers: string[]) {
     if (config.type === 's3') {
         const settings = config.s3 || config.settings;
         return settings ? new S3Adapter(settings) : null;
+    }
+    if (config.type === 'webdav') {
+        const settings = config.webdav || config.settings;
+        return settings ? new WebDavAdapter(settings) : null;
+    }
+    if (config.type === 'gist') {
+        const settings = config.gist || config.settings;
+        return settings ? new GistAdapter(settings) : null;
     }
     return null;
   }, []);

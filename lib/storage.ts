@@ -1,6 +1,7 @@
 import { DataSchema } from "./types";
 import { Octokit } from "@octokit/rest";
 import { S3Client, GetObjectCommand, PutObjectCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
+import { createClient, WebDAVClient } from "webdav";
 
 export const STORAGE_CONFIG_KEY = "clean-nav-storage-config";
 
@@ -9,6 +10,8 @@ export interface StorageConfig {
   // Specific configs strictly typed
   github?: GithubRepoSettings;
   s3?: S3Settings;
+  webdav?: WebDavSettings;
+  gist?: GistSettings;
   // Legacy support
   settings?: any;
 }
@@ -28,6 +31,13 @@ export interface GithubRepoSettings {
   path: string;
 }
 
+// GitHub Gist Adapter
+export interface GistSettings {
+  token: string;
+  gistId: string;
+  filename: string;
+}
+
 // S3 / R2 Adapter
 export interface S3Settings {
   endpoint: string;
@@ -36,6 +46,14 @@ export interface S3Settings {
   secretAccessKey: string;
   bucket: string;
   key: string;
+}
+
+// WebDAV Adapter
+export interface WebDavSettings {
+  url: string;
+  username?: string;
+  password?: string;
+  path: string;
 }
 
 export class S3Adapter implements StorageAdapter {
@@ -180,6 +198,107 @@ export class GithubRepoAdapter implements StorageAdapter {
     } catch (error) {
       console.error("Github save error:", error);
       return false;
+    }
+  }
+}
+
+export class GistAdapter implements StorageAdapter {
+  constructor(private config: GistSettings) {}
+
+  async testConnection(): Promise<void> {
+    const { token, gistId } = this.config;
+    if (!token || !gistId) throw new Error("请先填写完整的配置信息");
+
+    const octokit = new Octokit({ auth: token });
+    await octokit.gists.get({ gist_id: gistId });
+  }
+
+  async load(): Promise<DataSchema | null> {
+    const { token, gistId, filename } = this.config;
+    if (!token || !gistId) return null;
+
+    try {
+      const octokit = new Octokit({ auth: token });
+      const response = await octokit.gists.get({ gist_id: gistId });
+      
+      const file = response.data.files?.[filename || Object.keys(response.data.files || {})[0]];
+      
+      if (file && file.content) {
+          return JSON.parse(file.content) as DataSchema;
+      }
+      return null;
+    } catch (error) {
+      console.error("Gist load error:", error);
+      return null;
+    }
+  }
+
+  async save(data: DataSchema): Promise<boolean> {
+    const { token, gistId, filename } = this.config;
+    if (!token || !gistId) return false;
+
+    try {
+      const octokit = new Octokit({ auth: token });
+      await octokit.gists.update({
+        gist_id: gistId,
+        files: {
+            [filename]: {
+                content: JSON.stringify(data, null, 2)
+            }
+        }
+      });
+      return true;
+    } catch (error) {
+      console.error("Gist save error:", error);
+      return false;
+    }
+  }
+}
+
+export class WebDavAdapter implements StorageAdapter {
+  private client: WebDAVClient;
+
+  constructor(private config: WebDavSettings) {
+    this.client = createClient(config.url, {
+        username: config.username,
+        password: config.password
+    });
+  }
+
+  async testConnection(): Promise<void> {
+     // Try to list the directory of the path or root
+     try {
+         await this.client.getDirectoryContents("/");
+     } catch (e: any) {
+         throw new Error(`WebDAV 连接失败: ${e.message}`);
+     }
+  }
+
+  async load(): Promise<DataSchema | null> {
+    if (!this.config.url) return null;
+    try {
+        if (await this.client.exists(this.config.path) === false) {
+            return null;
+        }
+        const content = await this.client.getFileContents(this.config.path, { format: "text" });
+        if (typeof content === 'string') {
+            return JSON.parse(content) as DataSchema;
+        }
+        return null;
+    } catch (error) {
+        console.error("WebDAV load error:", error);
+        return null;
+    }
+  }
+
+  async save(data: DataSchema): Promise<boolean> {
+    if (!this.config.url) return false;
+    try {
+        await this.client.putFileContents(this.config.path, JSON.stringify(data, null, 2));
+        return true;
+    } catch (error) {
+        console.error("WebDAV save error:", error);
+        return false;
     }
   }
 }

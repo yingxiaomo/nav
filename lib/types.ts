@@ -6,6 +6,7 @@ export interface LinkItem {
   description?: string;
   type?: 'link' | 'folder';
   children?: LinkItem[];
+  updatedAt?: number;
 }
 
 export interface Category {
@@ -13,6 +14,7 @@ export interface Category {
   title: string;
   icon?: string; 
   links: LinkItem[];
+  updatedAt?: number;
 }
 
 export interface Todo {

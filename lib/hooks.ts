@@ -219,27 +219,24 @@ export function useNavData(initialWallpapers: string[]) {
                 const localCategories = currentData.categories || [];
 
                 // Smart Merge Logic
-                const mergeCategories = (remoteCats: Category[], localCats: Category[]): Category[] => {
-                    const merged = [...remoteCats];
-                    const remoteCatMap = new Map(remoteCats.map(c => [c.id, c]));
+                const mergeItems = <T extends { id: string, updatedAt?: number }>(remoteItems: T[] = [], localItems: T[] = []): T[] => {
+                    const merged = [...remoteItems];
+                    const remoteMap = new Map(remoteItems.map(i => [i.id, i]));
                     
-                    for (const localCat of localCats) {
-                        if (!remoteCatMap.has(localCat.id)) {
-                            // New local category -> Add
-                            merged.push(localCat);
+                    for (const localItem of localItems) {
+                        const remoteItem = remoteMap.get(localItem.id);
+                        if (!remoteItem) {
+                            // New local item -> Add
+                            merged.push(localItem);
                         } else {
-                            // Existing category -> Merge links
-                            const remoteCat = remoteCatMap.get(localCat.id)!;
-                            const remoteLinkIds = new Set(remoteCat.links.map(l => l.id));
-                            const newLocalLinks = localCat.links.filter(l => !remoteLinkIds.has(l.id));
-                            
-                            if (newLocalLinks.length > 0) {
-                                const index = merged.findIndex(c => c.id === localCat.id);
+                            // Conflict -> Check timestamps
+                            const localTime = localItem.updatedAt || 0;
+                            const remoteTime = remoteItem.updatedAt || 0;
+                            if (localTime > remoteTime) {
+                                // Local is newer -> Replace
+                                const index = merged.findIndex(i => i.id === localItem.id);
                                 if (index !== -1) {
-                                    merged[index] = {
-                                        ...merged[index],
-                                        links: [...merged[index].links, ...newLocalLinks]
-                                    };
+                                    merged[index] = localItem;
                                 }
                             }
                         }
@@ -247,12 +244,67 @@ export function useNavData(initialWallpapers: string[]) {
                     return merged;
                 };
 
-                const mergeItems = <T extends { id: string }>(remoteItems: T[] = [], localItems: T[] = []): T[] => {
-                    const merged = [...remoteItems];
-                    const remoteIds = new Set(remoteItems.map(i => i.id));
-                    for (const item of localItems) {
-                        if (!remoteIds.has(item.id)) {
-                            merged.push(item);
+                const mergeLinks = (remoteLinks: any[], localLinks: any[]): any[] => {
+                    const merged = [...remoteLinks];
+                    const remoteMap = new Map(remoteLinks.map(l => [l.id, l]));
+
+                    for (const localLink of localLinks) {
+                        const remoteLink = remoteMap.get(localLink.id);
+                        if (!remoteLink) {
+                            // New local link -> Add
+                            merged.push(localLink);
+                        } else {
+                            // Existing link -> Merge recursively or replace based on time
+                            const localTime = localLink.updatedAt || 0;
+                            const remoteTime = remoteLink.updatedAt || 0;
+                            
+                            // If it's a folder, we might need to merge children regardless of folder timestamp
+                            // But usually folder timestamp updates when content updates if we implemented it right.
+                            // Let's do a mix: if local is newer, take local props. Then merge children.
+                            
+                            let baseLink = (localTime > remoteTime) ? localLink : remoteLink;
+                            
+                            // If both have children, merge them
+                            if (localLink.children || remoteLink.children) {
+                                const mergedChildren = mergeLinks(remoteLink.children || [], localLink.children || []);
+                                baseLink = { ...baseLink, children: mergedChildren };
+                            }
+                            
+                            const index = merged.findIndex(l => l.id === localLink.id);
+                            if (index !== -1) {
+                                merged[index] = baseLink;
+                            }
+                        }
+                    }
+                    return merged;
+                };
+
+                const mergeCategories = (remoteCats: Category[], localCats: Category[]): Category[] => {
+                    const merged = [...remoteCats];
+                    const remoteCatMap = new Map(remoteCats.map(c => [c.id, c]));
+                    
+                    for (const localCat of localCats) {
+                        const remoteCat = remoteCatMap.get(localCat.id);
+                        if (!remoteCat) {
+                            // New local category -> Add
+                            merged.push(localCat);
+                        } else {
+                            // Existing category -> Merge
+                            const localTime = localCat.updatedAt || 0;
+                            const remoteTime = remoteCat.updatedAt || 0;
+                            
+                            let baseCat = (localTime > remoteTime) ? localCat : remoteCat;
+                            
+                            // Always merge links
+                            const mergedLinks = mergeLinks(remoteCat.links, localCat.links);
+                            
+                            const index = merged.findIndex(c => c.id === localCat.id);
+                            if (index !== -1) {
+                                merged[index] = {
+                                    ...baseCat,
+                                    links: mergedLinks
+                                };
+                            }
                         }
                     }
                     return merged;

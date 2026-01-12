@@ -58,7 +58,7 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
     if (open) {
       setLocalData(data);
     }
-  }, [open, data]);
+  }, [open]);
 
   const handleSave = async () => {
     const finalData = {

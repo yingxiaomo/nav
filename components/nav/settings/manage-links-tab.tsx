@@ -112,6 +112,8 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
           return;
       }
 
+      const updatedLink = { ...editingLink, updatedAt: Date.now() };
+
       setLocalData((prev) => {
           const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
           
@@ -119,11 +121,12 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
               for (const item of items) {
                   const children = getChildren(item);
                   if (children) {
-                      const idx = children.findIndex(l => l.id === editingLink.id);
+                      const idx = children.findIndex(l => l.id === updatedLink.id);
                       if (idx !== -1) {
-                          children[idx] = editingLink;
+                          children[idx] = updatedLink;
                           if ('links' in item) (item as Category).links = children;
                           else (item as LinkItem).children = children;
+                          // Also update parent folder timestamp if needed? Ideally yes, but let's stick to item level first.
                           return true;
                       }
                       if (updateRecursive(children)) return true;
@@ -410,6 +413,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
     const catIndex = newData.categories.findIndex(c => c.id === catId);
     if (catIndex !== -1) {
         newData.categories[catIndex].icon = icon;
+        newData.categories[catIndex].updatedAt = Date.now();
         setLocalData(newData);
     }
   };
@@ -420,6 +424,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
         const index = newData.categories.findIndex(c => c.id === id);
         if (index !== -1) {
             newData.categories[index].title = title;
+            newData.categories[index].updatedAt = Date.now();
         }
         return newData;
     });

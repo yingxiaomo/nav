@@ -421,10 +421,12 @@ export function useNavData(initialWallpapers: string[]) {
         setSyncError(true);
         toast.error("同步失败 (已暂存到本地)");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
       setSyncError(true);
-      toast.error("保存时发生错误");
+      toast.error("保存时发生错误", {
+        description: error.message || "请检查网络或配置"
+      });
     } finally {
       setSaving(false);
     }

@@ -237,13 +237,15 @@ export class GistAdapter implements StorageAdapter {
   async save(data: DataSchema): Promise<boolean> {
     const { token, gistId, filename } = this.config;
     if (!token || !gistId) return false;
+    
+    const targetFilename = filename || "nav-data.json";
 
     try {
       const octokit = new Octokit({ auth: token });
       await octokit.gists.update({
         gist_id: gistId,
         files: {
-            [filename]: {
+            [targetFilename]: {
                 content: JSON.stringify(data, null, 2)
             }
         }
@@ -306,13 +308,15 @@ export class WebDavAdapter implements StorageAdapter {
 
   async save(data: DataSchema): Promise<boolean> {
     if (!this.config.url) return false;
+    
+    // Safety check: Don't overwrite HTML bookmarks with JSON
+    if (this.config.path.endsWith('.html') || this.config.path.endsWith('.htm')) {
+        // Since the interface returns boolean, we can't easily throw a user-visible error here without changing the interface
+        // But throwing an error is better than corrupting data. UI should handle the try-catch of save().
+        throw new Error("无法将 JSON 数据保存到 HTML 文件。请在设置中更改文件扩展名为 .json");
+    }
+
     try {
-        // Warning: We currently always save as JSON. 
-        // If the user loaded an HTML file, this will OVERWRITE it with JSON.
-        // This is risky if they expect to keep syncing with other tools.
-        // But implementing HTML serialization is out of scope for now.
-        // We assume users using this tool want to migrate to it or use a separate file.
-        
         await this.client.putFileContents(this.config.path, JSON.stringify(data, null, 2));
         return true;
     } catch (error) {

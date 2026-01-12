@@ -2,6 +2,7 @@ import { DataSchema } from "./types";
 import { Octokit } from "@octokit/rest";
 import { S3Client, GetObjectCommand, PutObjectCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
 import { createClient, WebDAVClient } from "webdav";
+import { parseNetscapeBookmarks } from "./bookmark-parser";
 
 export const STORAGE_CONFIG_KEY = "clean-nav-storage-config";
 
@@ -282,7 +283,19 @@ export class WebDavAdapter implements StorageAdapter {
         }
         const content = await this.client.getFileContents(this.config.path, { format: "text" });
         if (typeof content === 'string') {
-            return JSON.parse(content) as DataSchema;
+            // 1. Try JSON
+            try {
+                return JSON.parse(content) as DataSchema;
+            } catch (e) {
+                // 2. Not JSON, try Netscape HTML
+                const parsed = parseNetscapeBookmarks(content);
+                if (parsed) {
+                    console.log("Successfully parsed WebDAV file as Netscape HTML bookmarks");
+                    return parsed;
+                }
+                console.warn("File content is neither JSON nor valid HTML Bookmarks");
+                return null;
+            }
         }
         return null;
     } catch (error) {
@@ -294,6 +307,12 @@ export class WebDavAdapter implements StorageAdapter {
   async save(data: DataSchema): Promise<boolean> {
     if (!this.config.url) return false;
     try {
+        // Warning: We currently always save as JSON. 
+        // If the user loaded an HTML file, this will OVERWRITE it with JSON.
+        // This is risky if they expect to keep syncing with other tools.
+        // But implementing HTML serialization is out of scope for now.
+        // We assume users using this tool want to migrate to it or use a separate file.
+        
         await this.client.putFileContents(this.config.path, JSON.stringify(data, null, 2));
         return true;
     } catch (error) {

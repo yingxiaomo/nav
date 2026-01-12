@@ -21,6 +21,7 @@ export interface StorageAdapter {
   load(): Promise<DataSchema | null>;
   save(data: DataSchema): Promise<boolean>;
   testConnection?(): Promise<void>;
+  uploadFile?(file: File, filename: string): Promise<string>;
 }
 
 // GitHub Repository Adapter
@@ -47,6 +48,7 @@ export interface S3Settings {
   secretAccessKey: string;
   bucket: string;
   key: string;
+  publicUrl?: string;
 }
 
 // WebDAV Adapter
@@ -123,6 +125,43 @@ export class S3Adapter implements StorageAdapter {
     } catch (error) {
       console.error("S3 save error:", error);
       return false;
+    }
+  }
+
+  async uploadFile(file: File, filename: string): Promise<string> {
+    try {
+      const uniqueFilename = `${Date.now()}-${filename}`;
+      const key = `wallpapers/${uniqueFilename}`;
+      
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+
+      const command = new PutObjectCommand({
+        Bucket: this.config.bucket,
+        Key: key,
+        Body: uint8Array,
+        ContentType: file.type,
+      });
+      await this.client.send(command);
+
+      // Construct Public URL
+      let baseUrl = this.config.publicUrl || this.config.endpoint;
+      if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+      
+      // If using publicUrl (e.g. custom domain), format is usually baseUrl/key
+      // If using endpoint (e.g. MinIO), format might be baseUrl/bucket/key
+      // For R2, endpoint is API only, publicUrl is required for access.
+      // We'll assume the standard path style if no publicUrl is provided, but append bucket.
+      
+      if (this.config.publicUrl) {
+          return `${baseUrl}/${key}`;
+      } else {
+          // Fallback: assume path style access on endpoint
+          return `${baseUrl}/${this.config.bucket}/${key}`;
+      }
+    } catch (error) {
+      console.error("S3 upload error:", error);
+      throw error;
     }
   }
 }

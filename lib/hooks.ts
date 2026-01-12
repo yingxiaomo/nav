@@ -442,6 +442,18 @@ export function useNavData(initialWallpapers: string[]) {
     updateLocalAndState({ ...data, notes: newNotes });
   };
 
+  const uploadWallpaper = async (file: File): Promise<string> => {
+      const config = getEffectiveConfig();
+      if (!config) throw new Error("未配置存储，无法上传");
+      
+      const adapter = getAdapter(config);
+      if (!adapter || !adapter.uploadFile) {
+          throw new Error("当前存储方式不支持文件上传");
+      }
+      
+      return await adapter.uploadFile(file, file.name);
+  };
+
   return {
     data,
     isReady,
@@ -452,6 +464,7 @@ export function useNavData(initialWallpapers: string[]) {
     handleReorder,
     handleTodosUpdate,
     handleNotesUpdate,
+    uploadWallpaper,
     setData
   };
 }

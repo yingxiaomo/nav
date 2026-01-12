@@ -30,9 +30,10 @@ interface SettingsDialogProps {
   hasUnsavedChanges?: boolean;
   onRefreshWallpaper?: () => void;
   syncError?: boolean;
+  uploadWallpaper: (file: File) => Promise<string>;
 }
 
-export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRefreshWallpaper, syncError }: SettingsDialogProps) {
+export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRefreshWallpaper, syncError, uploadWallpaper }: SettingsDialogProps) {
   const [open, setOpen] = useState(false);
   const [localData, setLocalData] = useState<DataSchema>(data);
 
@@ -105,7 +106,13 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
           </TabsContent>
 
           <TabsContent value="general" className="flex-1 flex flex-col min-h-0 data-[state=active]:flex">
-             <GeneralTab localData={localData} setLocalData={setLocalData} onRefreshWallpaper={onRefreshWallpaper} onSave={onSave} />
+             <GeneralTab 
+                localData={localData} 
+                setLocalData={setLocalData} 
+                onRefreshWallpaper={onRefreshWallpaper} 
+                onSave={onSave}
+                uploadWallpaper={uploadWallpaper}
+             />
           </TabsContent>
 
           <TabsContent value="storage" className="flex-1 flex flex-col min-h-0 data-[state=active]:flex">

@@ -3,16 +3,62 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch"; 
-import { ImageIcon, Shuffle, Layers } from "lucide-react"; 
+import { ImageIcon, Shuffle, Layers, Upload, Loader2 } from "lucide-react"; 
+import { useState, useRef } from "react";
+import { toast } from "sonner";
 
 interface GeneralTabProps {
   localData: DataSchema;
   setLocalData: React.Dispatch<React.SetStateAction<DataSchema>>;
   onRefreshWallpaper?: () => void;
   onSave?: (data: DataSchema) => Promise<void>; 
+  uploadWallpaper?: (file: File) => Promise<string>;
 }
 
-export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave }: GeneralTabProps) {
+export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave, uploadWallpaper }: GeneralTabProps) {
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!uploadWallpaper) {
+      toast.error("当前存储配置不支持上传");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const url = await uploadWallpaper(file);
+      const newData = {
+        ...localData,
+        settings: {
+          ...localData.settings,
+          wallpaperType: 'url' as const,
+          wallpaper: url
+        }
+      };
+      setLocalData(newData);
+      
+      if (onSave) {
+        await onSave(newData);
+      }
+      
+      toast.success("壁纸上传成功！");
+    } catch (error: any) {
+      console.error(error);
+      toast.error("上传失败", { description: error.message });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   return (
     <div className="space-y-6 py-4 overflow-y-auto h-full [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40">
       
@@ -117,13 +163,38 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
 
         {localData.settings.wallpaperType === 'url' && (
           <div className="space-y-2 animate-in fade-in">
-              <Label>图片链接</Label>
+              <div className="flex items-center justify-between">
+                <Label>图片链接</Label>
+                {/* Upload Button */}
+                <div className="">
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        accept="image/*"
+                        onChange={handleFileChange}
+                    />
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 text-xs gap-1 px-2" 
+                        onClick={handleUploadClick}
+                        disabled={isUploading}
+                    >
+                        {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                        {isUploading ? "上传中..." : "上传到 S3"}
+                    </Button>
+                </div>
+              </div>
               <Input 
                   value={localData.settings.wallpaper} 
                   onChange={e => setLocalData({...localData, settings: {...localData.settings, wallpaper: e.target.value}})} 
                   placeholder="请输入图片直链 (例如: https://example.com/bg.jpg)"
                   className="h-9"
               />
+              <p className="text-[10px] text-muted-foreground">
+                支持上传图片到配置的 S3/R2 存储桶，并自动填入链接。需先在“云同步”中配置 S3。
+              </p>
           </div>
         )}
 

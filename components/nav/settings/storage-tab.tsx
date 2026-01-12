@@ -204,6 +204,15 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
                 />
               </div>
               <div className="space-y-2">
+                <Label>Public URL (公开访问域名)</Label>
+                <Input 
+                  value={s3Cfg.publicUrl || ""} 
+                  onChange={e => updateS3({ publicUrl: e.target.value })} 
+                  placeholder="可选: https://pub-xxx.r2.dev (用于壁纸直链)" 
+                  className="h-9" 
+                />
+              </div>
+              <div className="space-y-2">
                 <Label>文件路径</Label>
                 <Input 
                   value={s3Cfg.key || ""} 

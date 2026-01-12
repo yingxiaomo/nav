@@ -25,6 +25,7 @@ export default function HomeClient({ initialWallpapers }: HomeClientProps) {
     handleReorder,
     handleTodosUpdate,
     handleNotesUpdate,
+    uploadWallpaper
   } = useNavData(initialWallpapers);
 
   const {
@@ -83,6 +84,7 @@ export default function HomeClient({ initialWallpapers }: HomeClientProps) {
           hasUnsavedChanges={hasUnsavedChanges}
           syncError={syncError}
           onRefreshWallpaper={() => initWallpaper(data)}
+          uploadWallpaper={uploadWallpaper}
         />
       </div>
 

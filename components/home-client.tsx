@@ -1,16 +1,11 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { ClockWidget } from "./nav/clock";
-import { SearchBar } from "./nav/search-bar";
-import { LinkGrid } from "./nav/link-grid";
-import { SettingsDialog } from "./nav/settings-dialog";
-import { FeaturesLauncher } from "./features/features-launcher";
-import { ThemeProvider } from "./ui/theme-provider";
-import { Toaster } from "./ui/sonner";
+import { ClockWidget, SearchBar, LinkGrid, SettingsDialog } from "@/components";
+import { FeaturesLauncher } from "@/components";
+import { ThemeProvider, Toaster } from "@/components";
 
-import { useWallpaper, useNavData } from "../lib/hooks";
-import { useKeyboardShortcuts } from "../lib/hooks/use-keyboard-shortcuts";
+import { useWallpaper, useNavData, useKeyboardShortcuts } from "@/lib";
 
 interface HomeClientProps {
   initialWallpapers: string[]; 

@@ -80,9 +80,9 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       }
 
       setEditingLink({ ...editingLink, url: processedUrl, icon: iconUrl, title: title });
-      toast.success("已尝试自动识别信息");
+      toast.success("已尝试自动识别信息", { description: "已从 URL 中提取标题和图标" });
     } catch {
-       toast.error("URL 格式不正确");
+       toast.error("URL 格式不正确", { description: "请输入有效的 URL 地址，如 https://example.com" });
     }
   }, [editingLink]);
 
@@ -91,7 +91,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       
       const isFolder = editingLink.type === 'folder';
       if (!editingLink.title || (!isFolder && !editingLink.url)) {
-          toast.error("标题不能为空，普通链接必须填写URL");
+          toast.error("标题不能为空，普通链接必须填写URL", { description: "请检查并填写完整的链接信息" });
           return;
       }
 

@@ -23,7 +23,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
   const existingCategories = Array.from(new Set(localData.categories.map(c => c.title)));
   const handleSmartIdentify = (rawUrl: string, isAuto: boolean = false) => {
     if (!rawUrl) {
-      if (!isAuto) toast.error("请先输入 URL");
+      if (!isAuto) toast.error("请先输入 URL", { description: "请输入要添加的链接地址" });
       return;
     }
 
@@ -46,29 +46,29 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
           setNewTitle(name);
       }
       
-      if (!isAuto) toast.success("已刷新标题和图标");
+      if (!isAuto) toast.success("已刷新标题和图标", { description: "已从 URL 中提取并更新标题和图标" });
 
     } catch { 
-        if (!isAuto) toast.error("URL 格式不正确"); 
+        if (!isAuto) toast.error("URL 格式不正确", { description: "请输入有效的 URL 地址，如 https://example.com" }); 
     }
   };
 
   const handleConfirmCreateFolder = () => {
-    if (!newFolderName.trim()) return toast.error("请输入文件夹名称");
+    if (!newFolderName.trim()) return toast.error("请输入文件夹名称", { description: "文件夹名称不能为空" });
     const newData = { ...localData };
     if (newData.categories.some(c => c.title === newFolderName)) {
-        return toast.error("该文件夹已存在");
+        return toast.error("该文件夹已存在", { description: "请使用不同的文件夹名称" });
     }
     newData.categories.push({ id: `c-${Date.now()}`, title: newFolderName, icon: "FolderOpen", links: [] });
     setLocalData(newData);
     setNewCategory(newFolderName); 
     setIsCreatingFolder(false);
     setNewFolderName("");
-    toast.success("文件夹创建成功");
+    toast.success("文件夹创建成功", { description: `已创建文件夹: ${newFolderName}` });
   };
 
   const handleAddLink = () => {
-    if (!newUrl || !newTitle || !newCategory) return toast.error("请填写完整信息");
+    if (!newUrl || !newTitle || !newCategory) return toast.error("请填写完整信息", { description: "请填写URL、标题和选择分类" });
     const newData = { ...localData };
     let categoryIndex = newData.categories.findIndex(c => c.title === newCategory);
     if (categoryIndex === -1) {
@@ -80,7 +80,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
     newData.categories[categoryIndex].links.push({ id: `l-${Date.now()}`, title: newTitle, url: finalUrl, icon: newIcon });
     setLocalData(newData);
     setNewUrl(""); setNewTitle(""); setNewIcon("Link");
-    toast.success("链接添加成功");
+    toast.success("链接添加成功", { description: `已将 "${newTitle}" 添加到 "${newCategory}" 分类` });
   };
 
   const handleBookmarkImport = (event: ChangeEvent<HTMLInputElement>) => {
@@ -91,7 +91,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
     reader.onload = (e) => {
         const content = e.target?.result as string;
         if (!content) {
-            toast.error("无法读取文件内容");
+            toast.error("无法读取文件内容", { description: "请确保文件格式正确且可以正常读取" });
             return;
         }
         try {
@@ -196,7 +196,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
             }
         } catch (error) {
             console.error(error);
-            toast.error("解析书签文件失败，请确保是正确的 HTML 文件。");
+            toast.error("解析书签文件失败", { description: "请确保是浏览器导出的 HTML 格式书签文件" });
         }
     };
     reader.readAsText(file);

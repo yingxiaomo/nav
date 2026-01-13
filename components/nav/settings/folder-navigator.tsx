@@ -5,13 +5,11 @@ import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface FolderNavigatorProps {
-  folderPath: LinkItem[];
   onBack: () => void;
   resolvedCurrentFolder: LinkItem | null;
 }
 
 export const FolderNavigator: React.FC<FolderNavigatorProps> = ({
-  folderPath,
   onBack,
   resolvedCurrentFolder
 }) => {

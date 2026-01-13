@@ -132,7 +132,7 @@ export const mergeObjects = <T>(oldObj: T, newObj: Partial<T>): T => {
  * @param delay 延迟时间，单位毫秒
  * @returns 防抖处理后的函数
  */
-export const debounce = <T extends (...args: any[]) => any>(
+export const debounce = <T extends (...args: unknown[]) => unknown>(
   func: T,
   delay: number
 ): ((...args: Parameters<T>) => void) => {
@@ -149,7 +149,7 @@ export const debounce = <T extends (...args: any[]) => any>(
  * @param limit 时间限制，单位毫秒
  * @returns 节流处理后的函数
  */
-export const throttle = <T extends (...args: any[]) => any>(
+export const throttle = <T extends (...args: unknown[]) => unknown>(
   func: T,
   limit: number
 ): ((...args: Parameters<T>) => void) => {
@@ -264,7 +264,7 @@ export const formatFileSize = (bytes: number): string => {
  * @param obj 要处理的对象
  * @returns 处理后的对象，不包含空值属性
  */
-export const removeEmptyValues = <T extends Record<string, any>>(obj: T): Partial<T> => {
+export const removeEmptyValues = <T extends Record<string, unknown>>(obj: T): Partial<T> => {
   const result = { ...obj };
   for (const key in result) {
     if (result[key] === null || result[key] === undefined || result[key] === '') {
@@ -279,7 +279,7 @@ export const removeEmptyValues = <T extends Record<string, any>>(obj: T): Partia
  * @param obj 要检查的对象
  * @returns 布尔值，表示对象是否为空
  */
-export const isEmptyObject = (obj: Record<string, any>): boolean => {
+export const isEmptyObject = (obj: Record<string, unknown>): boolean => {
   return Object.keys(obj).length === 0;
 };
 
@@ -347,18 +347,19 @@ export const isTempId = (id: string): boolean => {
  * @param defaultValue 默认值
  * @returns 属性值或默认值
  */
-export const getSafe = <T>(obj: any, path: string, defaultValue?: T): T | undefined => {
+export const getSafe = <T>(obj: unknown, path: string, defaultValue?: T): T | undefined => {
   if (!obj || typeof obj !== 'object') return defaultValue;
   
   const keys = path.split('.');
-  let result = obj;
+  let result: unknown = obj;
   
   for (const key of keys) {
     if (result === null || result === undefined) return defaultValue;
-    result = result[key];
+    if (typeof result !== 'object') return defaultValue;
+    result = (result as Record<string, unknown>)[key];
   }
   
-  return result === undefined ? defaultValue : result;
+  return (result === undefined ? defaultValue : result) as T;
 };
 
 /**
@@ -368,20 +369,20 @@ export const getSafe = <T>(obj: any, path: string, defaultValue?: T): T | undefi
  * @param value 属性值
  * @returns 更新后的对象
  */
-export const setSafe = (obj: Record<string, any>, path: string, value: any): Record<string, any> => {
+export const setSafe = <T extends Record<string, unknown>>(obj: T, path: string, value: unknown): Record<string, unknown> => {
   if (!obj || typeof obj !== 'object') return obj;
   
   const keys = path.split('.');
   const result = { ...obj };
-  let current = result;
+  let current = result as Record<string, unknown>;
   
   for (let i = 0; i < keys.length - 1; i++) {
     const key = keys[i];
     if (!current[key] || typeof current[key] !== 'object') {
       current[key] = {};
     }
-    current[key] = { ...current[key] };
-    current = current[key] as Record<string, any>;
+    current[key] = { ...(current[key] as Record<string, unknown>) };
+    current = current[key] as Record<string, unknown>;
   }
   
   current[keys[keys.length - 1]] = value;
@@ -550,9 +551,9 @@ export const paginateArray = <T>(array: T[], page: number = 1, pageSize: number 
  * @param childrenKey 子节点键
  * @returns 树形结构数组
  */
-export const arrayToTree = <T extends Record<string, any>>(array: T[], idKey: string = 'id', parentIdKey: string = 'parentId', childrenKey: string = 'children'): T[] => {
-  const map = new Map();
-  const result: T[] = [];
+export const arrayToTree = <T extends Record<string, unknown>>(array: T[], idKey: string = 'id', parentIdKey: string = 'parentId', childrenKey: string = 'children'): (T & Record<string, T[]>)[] => {
+  const map = new Map<unknown, T & Record<string, T[]>>();
+  const result: (T & Record<string, T[]>)[] = [];
   
   // 创建映射
   for (const item of array) {
@@ -564,10 +565,10 @@ export const arrayToTree = <T extends Record<string, any>>(array: T[], idKey: st
     const current = map.get(item[idKey]);
     if (item[parentIdKey]) {
       const parent = map.get(item[parentIdKey]);
-      if (parent) {
+      if (parent && current) {
         parent[childrenKey].push(current);
       }
-    } else {
+    } else if (current) {
       result.push(current);
     }
   }
@@ -581,15 +582,15 @@ export const arrayToTree = <T extends Record<string, any>>(array: T[], idKey: st
  * @param childrenKey 子节点键
  * @returns 数组
  */
-export const treeToArray = <T extends Record<string, any>>(tree: T[], childrenKey: string = 'children'): T[] => {
-  const result: T[] = [];
+export const treeToArray = <T extends Record<string, unknown>>(tree: T[], childrenKey: string = 'children'): Omit<T, string>[] => {
+  const result: Omit<T, string>[] = [];
   
   const traverse = (node: T) => {
     const { [childrenKey]: children, ...rest } = node;
-    result.push(rest as T);
-    if (children && children.length > 0) {
+    result.push(rest as Omit<T, string>);
+    if (children && Array.isArray(children) && children.length > 0) {
       for (const child of children) {
-        traverse(child);
+        traverse(child as T);
       }
     }
   };
@@ -607,11 +608,12 @@ export const treeToArray = <T extends Record<string, any>>(tree: T[], childrenKe
  * @param callback 回调函数
  * @param childrenKey 子节点键
  */
-export const traverseTree = <T extends Record<string, any>>(tree: T[], callback: (node: T, level: number) => void, childrenKey: string = 'children', level: number = 0): void => {
+export const traverseTree = <T extends Record<string, unknown>>(tree: T[], callback: (node: T, level: number) => void, childrenKey: string = 'children', level: number = 0): void => {
   for (const node of tree) {
     callback(node, level);
-    if (node[childrenKey] && node[childrenKey].length > 0) {
-      traverseTree(node[childrenKey], callback, childrenKey, level + 1);
+    const children = node[childrenKey];
+    if (children && Array.isArray(children) && children.length > 0) {
+      traverseTree(children as T[], callback, childrenKey, level + 1);
     }
   }
 };
@@ -623,13 +625,14 @@ export const traverseTree = <T extends Record<string, any>>(tree: T[], callback:
  * @param childrenKey 子节点键
  * @returns 查找结果
  */
-export const findInTree = <T extends Record<string, any>>(tree: T[], condition: (node: T) => boolean, childrenKey: string = 'children'): T | undefined => {
+export const findInTree = <T extends Record<string, unknown>>(tree: T[], condition: (node: T) => boolean, childrenKey: string = 'children'): T | undefined => {
   for (const node of tree) {
     if (condition(node)) {
       return node;
     }
-    if (node[childrenKey] && node[childrenKey].length > 0) {
-      const result = findInTree(node[childrenKey], condition, childrenKey);
+    const children = node[childrenKey];
+    if (children && Array.isArray(children) && children.length > 0) {
+      const result = findInTree(children as T[], condition, childrenKey);
       if (result) {
         return result;
       }
@@ -646,12 +649,13 @@ export const findInTree = <T extends Record<string, any>>(tree: T[], condition: 
  * @param childrenKey 子节点键
  * @returns 更新后的树形结构数组
  */
-export const updateInTree = <T extends Record<string, any>>(tree: T[], condition: (node: T) => boolean, update: (node: T) => T, childrenKey: string = 'children'): T[] => {
+export const updateInTree = <T extends Record<string, unknown>>(tree: T[], condition: (node: T) => boolean, update: (node: T) => T, childrenKey: string = 'children'): T[] => {
   return tree.map(node => {
+    const children = node[childrenKey] as T[] || [];
     if (condition(node)) {
-      return { ...update(node), [childrenKey]: updateInTree(node[childrenKey] || [], condition, update, childrenKey) };
+      return { ...update(node), [childrenKey]: updateInTree(children, condition, update, childrenKey) };
     }
-    return { ...node, [childrenKey]: updateInTree(node[childrenKey] || [], condition, update, childrenKey) };
+    return { ...node, [childrenKey]: updateInTree(children, condition, update, childrenKey) };
   });
 };
 
@@ -662,11 +666,11 @@ export const updateInTree = <T extends Record<string, any>>(tree: T[], condition
  * @param childrenKey 子节点键
  * @returns 删除后的树形结构数组
  */
-export const deleteInTree = <T extends Record<string, any>>(tree: T[], condition: (node: T) => boolean, childrenKey: string = 'children'): T[] => {
+export const deleteInTree = <T extends Record<string, unknown>>(tree: T[], condition: (node: T) => boolean, childrenKey: string = 'children'): T[] => {
   return tree
     .filter(node => !condition(node))
     .map(node => ({
       ...node,
-      [childrenKey]: deleteInTree(node[childrenKey] || [], condition, childrenKey)
+      [childrenKey]: deleteInTree((node[childrenKey] as T[]) || [], condition, childrenKey)
     }));
 };

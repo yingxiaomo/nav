@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { DataSchema, Category, LinkItem } from "@/lib/types";
 import {
   DndContext,
@@ -202,7 +202,10 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       return options;
   }, [localData.categories, movingLink]);
 
-  const findContainer = (id: string, items: (Category | LinkItem)[]): string | undefined => {
+  // 使用 useRef 来处理递归函数
+  const findContainerRef = useRef<(id: string, items: (Category | LinkItem)[]) => string | undefined>(undefined);
+  
+  const findContainer = useCallback((id: string, items: (Category | LinkItem)[]): string | undefined => {
       if (items.find(i => i.id === id)) return id; 
   
       for (const item of items) {
@@ -211,12 +214,18 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
               if (children.find(c => c.id === id)) {
                   return item.id;
               }
-              const found = findContainer(id, children);
+              // 使用 ref 中的函数引用进行递归调用
+              const found = findContainerRef.current?.(id, children);
               if (found) return found;
           }
       }
       return undefined;
-  };
+  }, []);
+  
+  // 使用 useEffect 将函数赋值给 ref，避免在渲染期间更新 ref
+  useEffect(() => {
+    findContainerRef.current = findContainer;
+  }, [findContainer]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event;
@@ -285,7 +294,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
         return newData;
     });
-  }, [localData.categories, setLocalData]);
+  }, [localData.categories, setLocalData, findContainer]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
@@ -342,7 +351,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
     setActiveLink(null);
     setActiveCategory(null);
-  }, [localData.categories, setLocalData]);
+  }, [localData.categories, setLocalData, findContainer]);
 
   const handleDeleteLink = useCallback((parentId: string, linkId: string) => {
     setLocalData((prev) => {
@@ -510,8 +519,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
                     <div className="space-y-4">
                         <FolderNavigator
-                            folderPath={folderPath}
-                            onBack={() => setFolderPath(prev => prev.slice(0, -1))}
+                            onBack={() => setFolderPath(prev => prev.slice(0, -1))}    
                             resolvedCurrentFolder={resolvedCurrentFolder}
                         />
 

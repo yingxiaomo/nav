@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { DataSchema, DEFAULT_DATA, Category, Todo, Note } from "./types";
 import { GITHUB_CONFIG_KEY } from "./github";

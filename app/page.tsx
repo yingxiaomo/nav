@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import HomeClient from '@/components/home-client';
-import { DEFAULT_DATA } from '@/lib/types';
+import HomeClient from '../components/home-client';
+import { DEFAULT_DATA } from '../lib';
 
 export default function Page() {
   let wallpapersBase64: string[] = [];

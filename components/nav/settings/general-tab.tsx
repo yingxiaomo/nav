@@ -232,11 +232,22 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
         )}
 
         {localData.settings.wallpaperType === 'url' && (
-          <div className="space-y-2 animate-in fade-in">
-              <div className="flex items-center justify-between">
-                <Label>图片链接</Label>
-                {}
-                <div className="flex flex-col gap-2 w-full">
+          <div className="space-y-3 animate-in fade-in">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <Label>图片链接</Label>
+                </div>
+                
+                {/* 上传按钮区域 - 移到输入框上方，更显眼 */}
+                <div className="bg-accent/10 border border-accent/20 rounded-lg p-3">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-accent">上传图片</span>
+                      <span className="text-xs text-muted-foreground">支持 S3/R2、GitHub、WebDAV</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      上传图片后，系统会自动生成链接并填充到下方输入框
+                    </p>
                     <input 
                         type="file" 
                         ref={fileInputRef} 
@@ -245,19 +256,19 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
                         onChange={handleFileChange}
                     />
                     <Button 
-                        variant="ghost" 
+                        variant="default" 
                         size="sm" 
-                        className="h-6 text-xs gap-1 px-2 w-full justify-start"
+                        className="w-full gap-2"
                         onClick={handleUploadClick}
                         disabled={isUploading}
                     >
-                        {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
-                        {isUploading ? "上传中..." : "上传到 S3"}
+                        {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                        {isUploading ? "上传中..." : "选择图片上传"}
                     </Button>
                     
                     {isUploading && (
                         <div className="w-full space-y-1">
-                            <div className="flex justify-between items-center text-[10px] text-muted-foreground">
+                            <div className="flex justify-between items-center text-xs text-muted-foreground">
                                 <span>{uploadStatus}</span>
                                 <span>{Math.round(uploadProgress)}%</span>
                             </div>
@@ -270,17 +281,23 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
                             </div>
                         </div>
                     )}
+                  </div>
+                </div>
+                
+                {/* 图片链接输入框 */}
+                <div className="space-y-1">
+                  <Label className="text-sm">图片直链</Label>
+                  <Input 
+                      value={localData.settings.wallpaper} 
+                      onChange={e => setLocalData({...localData, settings: {...localData.settings, wallpaper: e.target.value}})} 
+                      placeholder="请输入图片直链 (例如: https://example.com/bg.jpg)"
+                      className="h-9"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    支持直接输入图片链接，或使用上方上传功能自动生成
+                  </p>
                 </div>
               </div>
-              <Input 
-                  value={localData.settings.wallpaper} 
-                  onChange={e => setLocalData({...localData, settings: {...localData.settings, wallpaper: e.target.value}})} 
-                  placeholder="请输入图片直链 (例如: https://example.com/bg.jpg)"
-                  className="h-9"
-              />
-              <p className="text-[10px] text-muted-foreground">
-                支持上传图片到配置的 S3/R2 存储桶，并自动填入链接。需先在“云同步”中配置 S3。
-              </p>
           </div>
         )}
 

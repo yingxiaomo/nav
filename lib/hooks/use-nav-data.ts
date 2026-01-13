@@ -6,7 +6,6 @@ import { DataSchema, DEFAULT_DATA, Category, Todo, Note } from "../types/types";
 import { GITHUB_CONFIG_KEY } from "../adapters/github";
 import { StorageAdapter, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, STORAGE_CONFIG_KEY, StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings } from "../adapters/storage";
 import { toast } from "sonner";
-import { useLocalStorage } from "./use-local-storage";
 
 const LOCAL_DATA_KEY = "clean-nav-local-data";
 
@@ -132,7 +131,6 @@ export function useNavData(initialWallpapers: string[]) {
   useEffect(() => {
     async function initData() {
       try {
-        let currentData = dataRef.current;
         let loadedFromStorage = false;
 
         if (typeof window !== 'undefined') {
@@ -145,7 +143,6 @@ export function useNavData(initialWallpapers: string[]) {
                   localData.settings.wallpaperList = [...initialWallpapers];
                 }
               }
-              currentData = localData;
               setData(localData);
               loadedFromStorage = true;
             } catch (e) {

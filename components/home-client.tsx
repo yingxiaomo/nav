@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ClockWidget } from "@/components/nav/clock";
 import { SearchBar } from "@/components/nav/search-bar";
 import { LinkGrid } from "@/components/nav/link-grid";
-import { SettingsDialog } from "@/components/nav/settings-dialog";
+import { SettingsDialog } from "@/components/nav/settings";
 import { FeaturesLauncher } from "@/components/features/features-launcher";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { Toaster } from "@/components/ui/sonner";

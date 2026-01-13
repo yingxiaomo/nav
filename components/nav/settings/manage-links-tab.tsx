@@ -353,7 +353,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
     setActiveCategory(null);
   }, [localData.categories, setLocalData, findContainer]);
 
-  const handleDeleteLink = useCallback((parentId: string, linkId: string) => {
+  const handleDeleteLink = useCallback((_parentId: string, linkId: string) => {
     setLocalData((prev) => {
         const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
         const deleteRecursive = (items: (Category|LinkItem)[]) => {

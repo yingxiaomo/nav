@@ -8,5 +8,6 @@ export * from './github-tab';
 export * from './link-editor';
 export * from './link-item';
 export * from './manage-links-tab';
+export * from './settings-dialog';
 export * from './shared';
 export * from './storage-tab';

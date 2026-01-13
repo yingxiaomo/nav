@@ -18,10 +18,10 @@ import { STORAGE_CONFIG_KEY, StorageConfig } from "@/lib/adapters/storage";
 import { GITHUB_CONFIG_KEY } from "@/lib/adapters/github";
 import { useLocalStorage } from "@/lib/hooks";
 
-import { AddLinkTab } from "./settings/add-link-tab";
-import { ManageLinksTab } from "./settings/manage-links-tab";
-import { GeneralTab } from "./settings/general-tab";
-import { StorageTab } from "./settings/storage-tab";
+import { AddLinkTab } from "./add-link-tab";
+import { ManageLinksTab } from "./manage-links-tab";
+import { GeneralTab } from "./general-tab";
+import { StorageTab } from "./storage-tab";
 
 interface SettingsDialogProps {
   data: DataSchema;

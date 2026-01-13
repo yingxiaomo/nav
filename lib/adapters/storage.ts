@@ -230,6 +230,42 @@ export class GithubRepoAdapter implements StorageAdapter {
       return false;
     }
   }
+
+  async uploadFile(file: File, filename: string, onProgress?: (progress: number) => void): Promise<string> {
+    const { token, owner, repo, branch } = this.config;
+    if (!token || !owner || !repo) throw new Error("GitHub 配置不完整");
+
+    try {
+      const octokit = new Octokit({ auth: token });
+      
+      // 生成唯一文件名
+      const uniqueFilename = `${Date.now()}-${filename}`;
+      const base64Filename = `base64-uploads/${uniqueFilename}.b64`;
+      
+      // 将文件转换为 Base64
+      onProgress?.(10);
+      const arrayBuffer = await file.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      onProgress?.(50);
+      
+      // 保存 Base64 内容到 GitHub
+      await octokit.repos.createOrUpdateFileContents({
+        owner,
+        repo,
+        path: base64Filename,
+        message: `Upload file: ${uniqueFilename} (Base64 encoded)`,
+        content: base64,
+        branch,
+      });
+      onProgress?.(100);
+      
+      // 返回文件的访问路径
+      return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${base64Filename}`;
+    } catch (error) {
+      console.error("GitHub upload error:", error);
+      throw error;
+    }
+  }
 }
 
 export class GistAdapter implements StorageAdapter {

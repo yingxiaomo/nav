@@ -1,35 +1,27 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { DataSchema, DEFAULT_DATA, Category, Todo, Note } from "./types";
 import { GITHUB_CONFIG_KEY } from "./github";
-import { StorageAdapter, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, STORAGE_CONFIG_KEY, StorageConfig } from "./storage";
+import { StorageAdapter, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, STORAGE_CONFIG_KEY, StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings } from "./storage";
 import { toast } from "sonner";
 
 export function useLocalStorage<T>(key: string, initialValue: T | (() => T)) {
 
   const [storedValue, setStoredValue] = useState<T>(() => {
-    return initialValue instanceof Function ? initialValue() : initialValue;
-  });
-
-  const [initialized, setInitialized] = useState(false);
-
-  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return initialValue instanceof Function ? initialValue() : initialValue;
+    }
     try {
       const item = window.localStorage.getItem(key);
       if (item) {
-        setStoredValue(JSON.parse(item));
-      } else {
-
-        if (initialValue instanceof Function) {
-            const clientValue = initialValue();
-
-            setStoredValue(clientValue);
-        }
+        return JSON.parse(item);
       }
     } catch (error) {
       console.error(error);
     }
-    setInitialized(true);
-  }, [key]);
+    return initialValue instanceof Function ? initialValue() : initialValue;
+  });
+
+  const initialized = true;
 
   const setValue = useCallback((value: T | ((val: T) => T)) => {
     try {
@@ -62,7 +54,7 @@ export function useWallpaper(initialWallpapers: string[], initialData: DataSchem
   const [currentWallpaper, setCurrentWallpaper] = useState(() => getInitialWallpaper(initialData));
   const [imgLoaded, setImgLoaded] = useState(true);
 
-  const initWallpaper = useCallback(async (cfg: DataSchema) => {
+  const initWallpaper = useCallback((cfg: DataSchema) => {
     const { wallpaperType, wallpaper, wallpaperList } = cfg.settings;
     if (wallpaperType === 'local') {
       const list = (initialWallpapers.length > 0) ? initialWallpapers : wallpaperList;
@@ -71,25 +63,30 @@ export function useWallpaper(initialWallpapers: string[], initialData: DataSchem
         setCurrentWallpaper(randomImg);
       }
     } else if (wallpaperType === 'bing') {
-      setCurrentWallpaper(`https://bing.img.run/1920x1080.php?t=${new Date().getTime()}`);
+      const bingWallpaper = `https://bing.img.run/1920x1080.php?t=${new Date().getTime()}`;
+      setCurrentWallpaper(bingWallpaper);
     } else {
       setCurrentWallpaper(wallpaper);
     }
   }, [initialWallpapers]);
 
-  useEffect(() => {
-    if (!currentWallpaper) return;
-    if (initialWallpapers.includes(currentWallpaper)) {
+  const handleWallpaperChange = useCallback((newWallpaper: string) => {
+    setCurrentWallpaper(newWallpaper);
+    if (!newWallpaper) {
+      setImgLoaded(true);
+      return;
+    }
+    if (initialWallpapers.includes(newWallpaper)) {
       setImgLoaded(true);
       return;
     }
     setImgLoaded(false);
     const img = new Image();
-    img.src = currentWallpaper;
+    img.src = newWallpaper;
     img.onload = () => setImgLoaded(true);
-  }, [currentWallpaper, initialWallpapers]);
+  }, [initialWallpapers]);
 
-  return { currentWallpaper, imgLoaded, initWallpaper, setCurrentWallpaper };
+  return { currentWallpaper, imgLoaded, initWallpaper, setCurrentWallpaper: handleWallpaperChange };
 }
 
 const LOCAL_DATA_KEY = "clean-nav-local-data";
@@ -122,20 +119,19 @@ export function useNavData(initialWallpapers: string[]) {
 
   const getAdapter = useCallback((config: StorageConfig): StorageAdapter | null => {
     if (config.type === 'github') {
-
-        const settings = config.github || config.settings;
+        const settings = config.github;
         return settings ? new GithubRepoAdapter(settings) : null;
     }
     if (config.type === 's3') {
-        const settings = config.s3 || config.settings;
+        const settings = config.s3;
         return settings ? new S3Adapter(settings) : null;
     }
     if (config.type === 'webdav') {
-        const settings = config.webdav || config.settings;
+        const settings = config.webdav;
         return settings ? new WebDavAdapter(settings) : null;
     }
     if (config.type === 'gist') {
-        const settings = config.gist || config.settings;
+        const settings = config.gist;
         return settings ? new GistAdapter(settings) : null;
     }
     return null;
@@ -153,11 +149,19 @@ export function useNavData(initialWallpapers: string[]) {
             
             if (config.settings && Object.keys(config.settings).length > 0) {
                 if (config.type === 'github' && !config.github) {
-                    config.github = config.settings;
+                    config.github = config.settings as GithubRepoSettings;
                     delete config.settings;
                     hasChanges = true;
                 } else if (config.type === 's3' && !config.s3) {
-                    config.s3 = config.settings;
+                    config.s3 = config.settings as S3Settings;
+                    delete config.settings;
+                    hasChanges = true;
+                } else if (config.type === 'webdav' && !config.webdav) {
+                    config.webdav = config.settings as WebDavSettings;
+                    delete config.settings;
+                    hasChanges = true;
+                } else if (config.type === 'gist' && !config.gist) {
+                    config.gist = config.settings as GistSettings;
                     delete config.settings;
                     hasChanges = true;
                 }
@@ -223,21 +227,19 @@ export function useNavData(initialWallpapers: string[]) {
                 const localTodos = currentData.todos || [];
                 const localNotes = currentData.notes || [];
                 const localCategories = currentData.categories || [];
-                const mergeItems = <T extends { id: string, updatedAt?: number }>(remoteItems: T[] = [], localItems: T[] = []): T[] => {
+                
+                const mergeItems = <T extends { id: string; updatedAt?: number }>(remoteItems: T[] = [], localItems: T[] = []): T[] => {
                     const merged = [...remoteItems];
                     const remoteMap = new Map(remoteItems.map(i => [i.id, i]));
                     
                     for (const localItem of localItems) {
                         const remoteItem = remoteMap.get(localItem.id);
                         if (!remoteItem) {
-
                             merged.push(localItem);
                         } else {
-
                             const localTime = localItem.updatedAt || 0;
                             const remoteTime = remoteItem.updatedAt || 0;
                             if (localTime > remoteTime) {
-
                                 const index = merged.findIndex(i => i.id === localItem.id);
                                 if (index !== -1) {
                                     merged[index] = localItem;
@@ -248,37 +250,7 @@ export function useNavData(initialWallpapers: string[]) {
                     return merged;
                 };
 
-                const mergeLinks = (remoteLinks: any[], localLinks: any[]): any[] => {
-                    const merged = [...remoteLinks];
-                    const remoteMap = new Map(remoteLinks.map(l => [l.id, l]));
-
-                    for (const localLink of localLinks) {
-                        const remoteLink = remoteMap.get(localLink.id);
-                        if (!remoteLink) {
-
-                            merged.push(localLink);
-                        } else {
-
-                            const localTime = localLink.updatedAt || 0;
-                            const remoteTime = remoteLink.updatedAt || 0;
-                                                        
-                            let baseLink = (localTime > remoteTime) ? localLink : remoteLink;
-                            
-
-                            if (localLink.children || remoteLink.children) {
-                                const mergedChildren = mergeLinks(remoteLink.children || [], localLink.children || []);
-                                baseLink = { ...baseLink, children: mergedChildren };
-                            }
-                            
-                            const index = merged.findIndex(l => l.id === localLink.id);
-                            if (index !== -1) {
-                                merged[index] = baseLink;
-                            }
-                        }
-                    }
-                    return merged;
-                };
-
+                
                 const mergeCategories = (remoteCats: Category[], localCats: Category[]): Category[] => {
                     const merged = [...remoteCats];
                     const remoteCatMap = new Map(remoteCats.map(c => [c.id, c]));
@@ -286,23 +258,47 @@ export function useNavData(initialWallpapers: string[]) {
                     for (const localCat of localCats) {
                         const remoteCat = remoteCatMap.get(localCat.id);
                         if (!remoteCat) {
-
                             merged.push(localCat);
                         } else {
-
                             const localTime = localCat.updatedAt || 0;
                             const remoteTime = remoteCat.updatedAt || 0;
                             
-                            let baseCat = (localTime > remoteTime) ? localCat : remoteCat;
-                            
-                            const mergedLinks = mergeLinks(remoteCat.links, localCat.links);
-                            
-                            const index = merged.findIndex(c => c.id === localCat.id);
-                            if (index !== -1) {
-                                merged[index] = {
-                                    ...baseCat,
-                                    links: mergedLinks
-                                };
+                            if (localTime > remoteTime) {
+                                
+                                const index = merged.findIndex(c => c.id === localCat.id);
+                                if (index !== -1) {
+                                    merged[index] = localCat;
+                                }
+                            } else {
+                                
+                                const mergedLinksMap = new Map<string, typeof remoteCat.links[0]>();
+                                
+                                
+                                remoteCat.links.forEach(link => mergedLinksMap.set(link.id, link));
+                                
+                                
+                                localCat.links.forEach(localLink => {
+                                    const remoteLink = mergedLinksMap.get(localLink.id);
+                                    if (!remoteLink) {
+                                        mergedLinksMap.set(localLink.id, localLink);
+                                    } else {
+                                        const localLinkTime = localLink.updatedAt || 0;
+                                        const remoteLinkTime = remoteLink.updatedAt || 0;
+                                        if (localLinkTime > remoteLinkTime) {
+                                            mergedLinksMap.set(localLink.id, localLink);
+                                        }
+                                    }
+                                });
+                                
+                                const mergedLinks = Array.from(mergedLinksMap.values());
+                                
+                                const index = merged.findIndex(c => c.id === localCat.id);
+                                if (index !== -1) {
+                                    merged[index] = {
+                                        ...remoteCat,
+                                        links: mergedLinks
+                                    };
+                                }
                             }
                         }
                     }
@@ -411,11 +407,11 @@ export function useNavData(initialWallpapers: string[]) {
         setSyncError(true);
         toast.error("同步失败 (已暂存到本地)");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
       setSyncError(true);
       toast.error("保存时发生错误", {
-        description: error.message || "请检查网络或配置"
+        description: typeof error === 'object' && error !== null && 'message' in error ? (error.message as string) : "请检查网络或配置"
       });
     } finally {
       setSaving(false);

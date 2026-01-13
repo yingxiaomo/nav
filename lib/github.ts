@@ -57,9 +57,9 @@ export async function saveDataToGithub(config: GithubConfig, data: DataSchema, m
       if (!Array.isArray(currentFile) && 'sha' in currentFile) {
         sha = currentFile.sha;
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
 
-      if (e.status !== 404) {
+      if (typeof e === 'object' && e !== null && 'status' in e && e.status !== 404) {
         console.warn("Error checking for existing file:", e);
       }
     }

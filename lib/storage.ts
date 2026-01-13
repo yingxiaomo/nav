@@ -11,7 +11,7 @@ export interface StorageConfig {
   s3?: S3Settings;
   webdav?: WebDavSettings;
   gist?: GistSettings;
-  settings?: any;
+  settings?: GithubRepoSettings | S3Settings | WebDavSettings | GistSettings;
 }
 
 export interface StorageAdapter {
@@ -71,11 +71,12 @@ export class S3Adapter implements StorageAdapter {
     try {
       const command = new HeadBucketCommand({ Bucket: this.config.bucket });
       await this.client.send(command);
-    } catch (error: any) {
-      if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+    } catch (error: unknown) {
+      const s3Error = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+      if (s3Error.name === 'NotFound' || (s3Error.$metadata && s3Error.$metadata.httpStatusCode === 404)) {
         throw new Error(`Bucket "${this.config.bucket}" 不存在`);
       }
-      if (error.$metadata?.httpStatusCode === 403) {
+      if (s3Error.$metadata && s3Error.$metadata.httpStatusCode === 403) {
         throw new Error(`没有访问 Bucket "${this.config.bucket}" 的权限 (403)`);
       }
       throw error;
@@ -96,8 +97,10 @@ export class S3Adapter implements StorageAdapter {
         return JSON.parse(content) as DataSchema;
       }
       return null;
-    } catch (error: any) {
-      if (error.name === 'NoSuchKey') return null;
+    } catch (error: unknown) {
+      if (typeof error === 'object' && error !== null && 'name' in error && error.name === 'NoSuchKey') {
+        return null;
+      }
       console.error("S3 load error:", error);
       return null;
     }
@@ -204,9 +207,11 @@ export class GithubRepoAdapter implements StorageAdapter {
         if (!Array.isArray(currentFile) && 'sha' in currentFile) {
           sha = currentFile.sha;
         }
-      } catch (e: any) {
-        if (e.status !== 404) console.warn("Error checking file:", e);
-      }
+      } catch (e: unknown) {
+        if (typeof e === 'object' && e !== null && 'status' in e && e.status !== 404) {
+            console.warn("Error checking file:", e);
+        }
+    }
 
       const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
 
@@ -293,11 +298,11 @@ export class WebDavAdapter implements StorageAdapter {
   }
 
   async testConnection(): Promise<void> {
-
      try {
          await this.client.getDirectoryContents("/");
-     } catch (e: any) {
-         throw new Error(`WebDAV 连接失败: ${e.message}`);
+     } catch (e: unknown) {
+         const errorMessage = typeof e === 'object' && e !== null && 'message' in e ? e.message as string : "未知错误";
+         throw new Error(`WebDAV 连接失败: ${errorMessage}`);
      }
   }
 

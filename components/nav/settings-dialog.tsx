@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Settings, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,7 +37,6 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
   const [open, setOpen] = useState(false);
   const [localData, setLocalData] = useState<DataSchema>(data);
   const [storageConfig, setStorageConfig] = useLocalStorage<StorageConfig>(STORAGE_CONFIG_KEY, () => {
-
     if (typeof window !== 'undefined') {
         const oldGithub = localStorage.getItem(GITHUB_CONFIG_KEY);
         if (oldGithub) {
@@ -54,11 +53,12 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
     };
   });
 
-  useEffect(() => {
-    if (open) {
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (isOpen) {
       setLocalData(data);
     }
-  }, [open]);
+  };
 
   const handleSave = async () => {
     const finalData = {
@@ -73,7 +73,7 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="fixed bottom-4 right-4 z-50 rounded-full text-white/80 hover:text-white hover:bg-white/10 shadow-lg backdrop-blur-sm">
           <Settings className="h-5 w-5" />

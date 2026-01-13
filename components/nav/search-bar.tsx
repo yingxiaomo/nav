@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Search, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -32,10 +32,6 @@ interface SearchBarProps {
 export function SearchBar({ onLocalSearch }: SearchBarProps) {
   const [query, setQuery] = useState("");
   const [engine, setEngine] = useState(ENGINES[0]);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const handleEngineChange = (newEngine: typeof ENGINES[0]) => {
     setEngine(newEngine);
@@ -68,47 +64,36 @@ export function SearchBar({ onLocalSearch }: SearchBarProps) {
         className="relative flex items-center group"
       >
         <div className="absolute left-2 z-50">
-          {mounted ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className="h-8 px-2 text-white/80 hover:text-white hover:bg-white/10 rounded-md transition-colors gap-1"
-                >
-                  {engine.name}
-                  <ChevronDown className="h-3 w-3 opacity-50" />
-                </Button>
-              </DropdownMenuTrigger>
-              
-              <DropdownMenuContent 
-                align="start" 
-                className="w-40 bg-black/60 backdrop-blur-xl border-white/20 text-white p-0 overflow-hidden" 
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="h-8 px-2 text-white/80 hover:text-white hover:bg-white/10 rounded-md transition-colors gap-1"
               >
-
-                <div className="h-64 overflow-y-auto p-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/40">
-                  {ENGINES.map((e) => (
-                    <DropdownMenuItem 
-                      key={e.name} 
-                      onClick={() => handleEngineChange(e)}
-                      className="focus:bg-white/20 focus:text-white cursor-pointer"
-                    >
-                      {e.name}
-                    </DropdownMenuItem>
-                  ))}
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-             <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className="h-8 px-2 text-white/80 hover:text-white hover:bg-white/10 rounded-md transition-colors gap-1"
-                >
-                  {engine.name}
-                  <ChevronDown className="h-3 w-3 opacity-50" />
+                {engine.name}
+                <ChevronDown className="h-3 w-3 opacity-50" />
               </Button>
-          )}
+            </DropdownMenuTrigger>
+            
+            <DropdownMenuContent 
+              align="start" 
+              className="w-40 bg-black/60 backdrop-blur-xl border-white/20 text-white p-0 overflow-hidden" 
+            >
+
+              <div className="h-64 overflow-y-auto p-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/40">
+                {ENGINES.map((e) => (
+                  <DropdownMenuItem 
+                    key={e.name} 
+                    onClick={() => handleEngineChange(e)}
+                    className="focus:bg-white/20 focus:text-white cursor-pointer"
+                  >
+                    {e.name}
+                  </DropdownMenuItem>
+                ))}
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <Input

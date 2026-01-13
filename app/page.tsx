@@ -32,15 +32,10 @@ export default function Page() {
         ['.jpg', '.jpeg', '.png', '.webp', '.svg'].includes(path.extname(file).toLowerCase())
       );
 
-      // Randomly select wallpapers using Fisher-Yates shuffle
-      for (let i = imageFiles.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [imageFiles[i], imageFiles[j]] = [imageFiles[j], imageFiles[i]];
-      }
       
       const selected = imageFiles.slice(0, maxWallpapers);
 
-      // Return paths instead of base64 content
+      
       wallpapersBase64 = selected.map(file => `/wallpapers/${file}`);
       
       console.log(`已索引 ${wallpapersBase64.length} 张壁纸路径`);

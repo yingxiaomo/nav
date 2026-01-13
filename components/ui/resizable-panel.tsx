@@ -30,36 +30,42 @@ export function ResizablePanel({
   zIndex = 100,
   onFocus
 }: ResizablePanelProps) {
-  const [rect, setRect] = useState<{x: number, y: number, w: number, h: number} | null>(null);
+  const [rect, setRect] = useState<{x: number, y: number, w: number, h: number}>(() => {
+    if (typeof window === "undefined") {
+      
+      return {
+        x: 0,
+        y: 0,
+        w: defaultWidth,
+        h: defaultHeight,
+      };
+    }
+    
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+      const w = window.innerWidth - 32;
+      const h = Math.min(defaultHeight, window.innerHeight * 0.6);
+      return {
+        x: 16,
+        y: (window.innerHeight - h) / 2,
+        w,
+        h
+      };
+    } else {
+      return {
+        x: Math.max(0, (window.innerWidth - defaultWidth) / 2),
+        y: Math.max(0, (window.innerHeight - defaultHeight) / 2),
+        w: defaultWidth,
+        h: defaultHeight,
+      };
+    }
+  });
+  
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   
   const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && rect === null) {
-      const isMobile = window.innerWidth < 768;
-      
-      if (isMobile) {
-        const w = window.innerWidth - 32; 
-        const h = Math.min(defaultHeight, window.innerHeight * 0.6);
-        setRect({
-          x: 16,
-          y: (window.innerHeight - h) / 2,
-          w,
-          h
-        });
-      } else {
-        setRect({
-          x: Math.max(0, (window.innerWidth - defaultWidth) / 2),
-          y: Math.max(0, (window.innerHeight - defaultHeight) / 2),
-          w: defaultWidth,
-          h: defaultHeight,
-        });
-      }
-    }
-  }, [defaultWidth, defaultHeight, rect]);
 
   const dragRef = useRef({
     startX: 0,

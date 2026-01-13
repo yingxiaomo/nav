@@ -77,9 +77,10 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
         if (adapter.testConnection) await adapter.testConnection();
         toast.success("Gist 连接成功！");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Test connection failed:", error);
-      toast.error("连接失败", { description: error.message || "请检查配置信息" });
+      const errorMessage = typeof error === 'object' && error !== null && 'message' in error ? (error.message as string) : "请检查配置信息";
+      toast.error("连接失败", { description: errorMessage });
     } finally {
       setIsTesting(false);
     }

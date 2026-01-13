@@ -50,9 +50,10 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
       }
       
       toast.success("壁纸上传成功！");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error("上传失败", { description: error.message });
+      const errorMessage = typeof error === 'object' && error !== null && 'message' in error ? (error.message as string) : "未知错误";
+      toast.error("上传失败", { description: errorMessage });
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -165,7 +166,7 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
           <div className="space-y-2 animate-in fade-in">
               <div className="flex items-center justify-between">
                 <Label>图片链接</Label>
-                {/* Upload Button */}
+                {}
                 <div className="">
                     <input 
                         type="file" 

@@ -2,7 +2,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { LinkItem } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Trash2, Settings2, FolderInput, Pencil, MoreVertical } from "lucide-react";
+import { Trash2, FolderInput, Pencil, MoreVertical } from "lucide-react";
 import { IconRender } from "./shared";
 import {
   DropdownMenu,

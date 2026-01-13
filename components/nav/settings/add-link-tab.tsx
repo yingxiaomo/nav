@@ -27,7 +27,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
       return;
     }
 
-    let processedUrl = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
+    const processedUrl = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
     
     if (!isAuto) {
         setNewUrl(processedUrl);

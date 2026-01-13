@@ -1,10 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useId, memo } from "react";
+import React, { useState, useEffect, useId } from "react";
 import { Category, LinkItem } from "@/lib/types";
-import { X, FolderOpen, ChevronLeft, ChevronDown } from "lucide-react";
-import * as Icons from "lucide-react";
-import { LucideIcon } from "lucide-react";
+import { X, ChevronLeft, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   DndContext,
@@ -23,6 +21,7 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { IconRender } from "@/components/nav/settings/shared";
 
 interface LinkGridProps {
   categories: Category[];
@@ -31,35 +30,7 @@ interface LinkGridProps {
   displayMode?: 'folder' | 'list';
 }
 
-const IconRender = memo(({ name, className }: { name: string; className?: string }) => {
-  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    setError(false);
-  }, [name]);
-
-  if ((name?.startsWith("http") || name?.startsWith("/")) && !error) {
-    return (
-      <img 
-        src={name} 
-        alt="icon" 
-        className={`${className} object-contain rounded-sm`} 
-        style={{ width: '100%', height: '100%' }} 
-        loading="lazy" 
-        onError={() => setError(true)}
-      />
-    );
-  }
-
-  const iconName = name as keyof typeof Icons;
-  const isValidIcon = name && !error && /^[A-Z]/.test(name) && Boolean(Icons[iconName]);
-  
-  const IconComponent = isValidIcon ? Icons[iconName] : Icons.FolderOpen;
-  const Icon = IconComponent as LucideIcon;
-  
-  return <Icon className={className} />;
-});
-IconRender.displayName = "IconRender";
 
 const CardContent = ({ category }: { category: Category }) => (
   <motion.div layoutId={category.id} className="flex flex-col items-center justify-center text-center gap-1">
@@ -204,10 +175,7 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
   const [navStack, setNavStack] = useState<LinkItem[]>([]); 
   const [allCollapsedState, setAllCollapsedState] = useState<Record<string, boolean>>({}); 
 
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = true;
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -220,21 +188,23 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
     }
   };
 
+  
   useEffect(() => {
     if (selectedId) {
       document.body.style.overflow = "hidden";
       onOpenChange?.(true);
-
     } else {
       document.body.style.overflow = "auto";
       onOpenChange?.(false);
-      setNavStack([]);
     }
     return () => { 
       document.body.style.overflow = "auto";
       onOpenChange?.(false);
     };
   }, [selectedId, onOpenChange]);
+
+  
+  
 
 
   const modalCurrentItems = navStack.length > 0 

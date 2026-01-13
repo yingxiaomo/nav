@@ -5,26 +5,12 @@ import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 
 export function ClockWidget() {
-  const [time, setTime] = useState<Date | null>(null);
+  const [time, setTime] = useState<Date>(new Date());
 
   useEffect(() => {
-    setTime(new Date());
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-
-  if (!time) {
-    return (
-      <div className="text-center text-white mb-8">
-        <div className="text-6xl md:text-8xl font-light tracking-tighter invisible">
-          00:00
-        </div>
-        <div className="text-xl md:text-2xl mt-2 font-medium opacity-90 invisible">
-          2025年12月08日 星期一
-        </div>
-      </div>
-    );
-  } 
 
   return (
     <div className="text-center text-white mb-8">

@@ -77,7 +77,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   const handleSmartIdentifyForEdit = (rawUrl: string) => {
     if (!rawUrl || !editingLink) return;
     
-    let processedUrl = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
+    const processedUrl = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
     
     try {
       const urlObj = new URL(processedUrl);
@@ -86,7 +86,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       
       let title = editingLink.title;
       if (!title) {
-          let name = hostname.replace(/^www\./, "").split(".")[0];
+          const name = hostname.replace(/^www\./, "").split(".")[0];
           if (name) {
               title = name.charAt(0).toUpperCase() + name.slice(1);
           }
@@ -94,7 +94,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
       setEditingLink({ ...editingLink, url: processedUrl, icon: iconUrl, title: title });
       toast.success("已尝试自动识别信息");
-    } catch (e) {
+    } catch (error) {
        toast.error("URL 格式不正确");
     }
   };

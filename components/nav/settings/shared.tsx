@@ -1,6 +1,5 @@
 import * as Icons from "lucide-react";
 import { Link as LinkIcon, LucideIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 export const PRESET_ICONS = [
   "Bot", "Brain", "Sparkles", "Cpu", "Microchip", "CircuitBoard", "Binary", "Network", "Workflow", "Radio", "Radar", "Rocket", "Telescope", "Atom",

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { DataSchema, Category, LinkItem } from "@/lib/types";
 import {
   DndContext,
@@ -61,7 +61,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const handleSmartIdentifyForEdit = (rawUrl: string) => {
+  const handleSmartIdentifyForEdit = useCallback((rawUrl: string) => {
     if (!rawUrl || !editingLink) return;
     
     const processedUrl = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
@@ -84,9 +84,9 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
     } catch {
        toast.error("URL 格式不正确");
     }
-  };
+  }, [editingLink]);
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = useCallback(() => {
       if (!editingLink) return;
       
       const isFolder = editingLink.type === 'folder';
@@ -123,9 +123,9 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       });
       setEditingLink(null);
       toast.success("修改已保存");
-  };
+  }, [editingLink, setLocalData]);
 
-  const handleMoveConfirm = (targetId: string) => {
+  const handleMoveConfirm = useCallback((targetId: string) => {
       if (!movingLink) return;
       
       setLocalData((prev) => {
@@ -151,7 +151,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
           };
           removeRecursive(newData.categories);
 
-          if (!movedItem) return prev; 
+          if (!movedItem) return prev;
 
           const addRecursive = (items: (Category|LinkItem)[]) => {
               for (const item of items) {
@@ -178,7 +178,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       
       setMovingLink(null);
       toast.success("移动成功");
-  };
+  }, [movingLink, setLocalData]);
 
   const moveOptions = useMemo(() => {
       if (!movingLink) return [];
@@ -218,7 +218,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       return undefined;
   };
 
-  const handleDragStart = (event: DragStartEvent) => {
+  const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event;
     const { data } = active;
 
@@ -229,9 +229,9 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       setActiveCategory(data.current.cat);
       setActiveLink(null);
     }
-  };
+  }, []);
 
-  const handleDragOver = (event: DragOverEvent) => {
+  const handleDragOver = useCallback((event: DragOverEvent) => {
     const { active, over } = event;
     const overId = over?.id;
 
@@ -247,7 +247,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
     }
 
     setLocalData((prev) => {
-     
+        
         const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
         const findParentContainerAndList = (items: (Category|LinkItem)[], id: string): [Category|LinkItem, LinkItem[]] | null => {
             for (const item of items) {
@@ -285,9 +285,9 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
         return newData;
     });
-  };
+  }, [localData.categories, setLocalData]);
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     const activeType = active.data.current?.type;
     const overId = over?.id;
@@ -342,9 +342,9 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
     setActiveLink(null);
     setActiveCategory(null);
-  };
+  }, [localData.categories, setLocalData]);
 
-  const handleDeleteLink = (parentId: string, linkId: string) => {
+  const handleDeleteLink = useCallback((parentId: string, linkId: string) => {
     setLocalData((prev) => {
         const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
         const deleteRecursive = (items: (Category|LinkItem)[]) => {
@@ -365,9 +365,9 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
         deleteRecursive(newData.categories);
         return newData;
     });
-  };
+  }, [setLocalData]);
 
-  const handleCategoryIconChange = (catId: string, icon: string) => {
+  const handleCategoryIconChange = useCallback((catId: string, icon: string) => {
     const newData = { ...localData };
     const catIndex = newData.categories.findIndex(c => c.id === catId);
     if (catIndex !== -1) {
@@ -375,9 +375,9 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
         newData.categories[catIndex].updatedAt = Date.now();
         setLocalData(newData);
     }
-  };
+  }, [localData, setLocalData]);
 
-  const handleRenameCategory = (id: string, title: string) => {
+  const handleRenameCategory = useCallback((id: string, title: string) => {
     setLocalData(prev => {
         const newData = { ...prev };
         const index = newData.categories.findIndex(c => c.id === id);
@@ -387,9 +387,9 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
         }
         return newData;
     });
-  };
+  }, [setLocalData]);
 
-  const handleDeleteCategory = (catId: string) => {
+  const handleDeleteCategory = useCallback((catId: string) => {
     const newData = { ...localData };
     const catIndex = newData.categories.findIndex(c => c.id === catId);
     if (catIndex === -1) return;
@@ -398,14 +398,14 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
     }
     newData.categories.splice(catIndex, 1);
     setLocalData(newData);
-  };
+  }, [localData, setLocalData]);
 
-  const toggleCollapse = (catId: string) => {
+  const toggleCollapse = useCallback((catId: string) => {
     const newSet = new Set(collapsedCats);
     if (newSet.has(catId)) newSet.delete(catId);
     else newSet.add(catId);
     setCollapsedCats(newSet);
-  };
+  }, [collapsedCats]);
 
   const dropAnimation: DropAnimation = {
     sideEffects: defaultDropAnimationSideEffects({

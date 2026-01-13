@@ -22,7 +22,7 @@ interface SortableLinkItemProps {
   onMove: (link: LinkItem) => void;
 }
 
-export const SortableLinkItem = React.memo(function SortableLinkItem({ link, catId, handleDeleteLink, onEditFolder, onEdit, onMove }: SortableLinkItemProps) {
+const SortableLinkItemComponent = ({ link, catId, handleDeleteLink, onEditFolder, onEdit, onMove }: SortableLinkItemProps) => {
   const {
     attributes,
     listeners,
@@ -116,4 +116,6 @@ export const SortableLinkItem = React.memo(function SortableLinkItem({ link, cat
       </div>
     </div>
   );
-}
+};
+
+export const SortableLinkItem = React.memo(SortableLinkItemComponent);

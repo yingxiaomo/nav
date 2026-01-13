@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Category } from "@/lib/types";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -18,7 +18,7 @@ interface SortableCategoryItemProps {
   handleRenameCategory: (id: string, title: string) => void;
 }
 
-export const SortableCategoryItem = React.memo(function SortableCategoryItem({ 
+const SortableCategoryItemComponent = ({ 
   cat, 
   isCollapsed, 
   toggleCollapse, 
@@ -26,7 +26,7 @@ export const SortableCategoryItem = React.memo(function SortableCategoryItem({
   handleCategoryIconChange, 
   handleDeleteCategory,
   handleRenameCategory
-}: SortableCategoryItemProps) {
+}: SortableCategoryItemProps) => {
   const {
     attributes,
     listeners,
@@ -184,4 +184,6 @@ export const SortableCategoryItem = React.memo(function SortableCategoryItem({
       {children}
     </div>
   );
-}
+};
+
+export const SortableCategoryItem = React.memo(SortableCategoryItemComponent);

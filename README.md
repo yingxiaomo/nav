@@ -214,6 +214,62 @@ docker build -t clean-nav .
 docker run -d -p 20261:20261 --name clean-nav clean-nav
 ```
 
+### 4. 自动构建镜像脚本
+
+您可以创建一个自动构建脚本，方便快速构建和部署镜像：
+
+```bash
+#!/bin/bash
+
+# 定义变量
+IMAGE_NAME="clean-nav"
+IMAGE_TAG="latest"
+CONTAINER_NAME="clean-nav"
+PORT=20261
+
+# 停止并删除旧容器
+docker stop $CONTAINER_NAME 2>/dev/null || true
+docker rm $CONTAINER_NAME 2>/dev/null || true
+
+# 构建新镜像
+docker build -t $IMAGE_NAME:$IMAGE_TAG .
+
+# 运行新容器
+docker run -d \
+  -p $PORT:$PORT \
+  --name $CONTAINER_NAME \
+  --restart always \
+  $IMAGE_NAME:$IMAGE_TAG
+
+# 查看容器状态
+docker ps | grep $CONTAINER_NAME
+```
+
+### 5. 环境变量
+
+在构建和运行Docker镜像时，可以使用以下环境变量：
+
+| 环境变量 | 说明 | 默认值 | 使用阶段 |
+|----------|------|--------|----------|
+| `NEXT_TELEMETRY_DISABLED` | 禁用Next.js遥测 | `1` | 构建和运行 |
+| `DOCKER_BUILD` | 标记为Docker构建 | `true` | 构建 |
+| `NODE_ENV` | 运行环境 | `production` | 运行 |
+| `PORT` | 应用监听端口 | `20261` | 运行 |
+
+**使用示例：**
+
+```bash
+# 构建时设置环境变量
+docker build --build-arg NEXT_TELEMETRY_DISABLED=1 -t clean-nav .
+
+# 运行时设置环境变量
+docker run -d \
+  -p 20261:20261 \
+  -e PORT=3000 \
+  --name clean-nav \
+  clean-nav
+```
+
 
 
 

@@ -1,3 +1,4 @@
+import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { LinkItem } from "@/lib/types";
@@ -21,7 +22,7 @@ interface SortableLinkItemProps {
   onMove: (link: LinkItem) => void;
 }
 
-export function SortableLinkItem({ link, catId, handleDeleteLink, onEditFolder, onEdit, onMove }: SortableLinkItemProps) {
+export const SortableLinkItem = React.memo(function SortableLinkItem({ link, catId, handleDeleteLink, onEditFolder, onEdit, onMove }: SortableLinkItemProps) {
   const {
     attributes,
     listeners,

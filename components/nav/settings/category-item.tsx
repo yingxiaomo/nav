@@ -18,7 +18,7 @@ interface SortableCategoryItemProps {
   handleRenameCategory: (id: string, title: string) => void;
 }
 
-export function SortableCategoryItem({ 
+export const SortableCategoryItem = React.memo(function SortableCategoryItem({ 
   cat, 
   isCollapsed, 
   toggleCollapse, 

@@ -1,4 +1,4 @@
-import { LinkItem, DataSchema, DEFAULT_DATA } from "./types";
+import { LinkItem, DataSchema, DEFAULT_DATA } from "../types/types";
 import { v4 as uuidv4 } from "uuid";
 
 export function parseNetscapeBookmarks(html: string): DataSchema | null {

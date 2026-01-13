@@ -1,4 +1,4 @@
-import { GithubConfig } from "@/lib/github";
+import { GithubConfig } from "@/lib/adapters/github";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 

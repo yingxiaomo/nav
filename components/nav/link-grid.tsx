@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useId, useRef, useMemo } from "react";
-import { Category, LinkItem } from "@/lib/types";
+import { Category, LinkItem } from "@/lib/types/types";
 import { X, ChevronLeft, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {

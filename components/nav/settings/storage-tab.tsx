@@ -1,6 +1,6 @@
 "use client";
 
-import { StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter } from "@/lib/storage";
+import { StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter } from "@/lib/adapters/storage";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";

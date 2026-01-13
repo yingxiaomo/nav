@@ -1,5 +1,5 @@
 import { Octokit } from "@octokit/rest";
-import { DataSchema } from "./types";
+import { DataSchema } from "../types/types";
 
 export interface GithubConfig {
   token: string;

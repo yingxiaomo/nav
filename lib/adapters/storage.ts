@@ -1,8 +1,8 @@
-import { DataSchema } from "./types";
+import { DataSchema } from "../types/types";
 import { Octokit } from "@octokit/rest";
 import { S3Client, GetObjectCommand, PutObjectCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
 import { createClient, WebDAVClient } from "webdav";
-import { parseNetscapeBookmarks } from "./bookmark-parser";
+import { parseNetscapeBookmarks } from "../parsers/bookmark-parser";
 
 export const STORAGE_CONFIG_KEY = "clean-nav-storage-config";
 export interface StorageConfig {

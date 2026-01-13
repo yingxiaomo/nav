@@ -14,8 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DataSchema } from "@/lib/types";
-import { STORAGE_CONFIG_KEY, StorageConfig } from "@/lib/storage";
-import { GITHUB_CONFIG_KEY } from "@/lib/github";
+import { STORAGE_CONFIG_KEY, StorageConfig } from "@/lib/adapters/storage";
+import { GITHUB_CONFIG_KEY } from "@/lib/adapters/github";
 import { useLocalStorage } from "@/lib/hooks";
 
 import { AddLinkTab } from "./settings/add-link-tab";

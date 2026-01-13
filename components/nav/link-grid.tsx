@@ -141,7 +141,7 @@ const RenderFolderContent = ({ items, onFolderClick }: {
     onFolderClick: (item: LinkItem) => void;
 }) => {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
       {items.map((item) => {
         if (item.type === 'folder') {
           return (
@@ -289,7 +289,7 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
         <DndContext id={dndContextId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <div className="w-full max-w-5xl mx-auto pb-6 px-4 relative z-30">
             <SortableContext items={categories.map(c => c.id)} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-9 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-9 gap-2 sm:gap-3">
                 {categories.map((category) => (
                   <SortableCard key={category.id} category={category} onClick={() => setSelectedId(category.id)} />
                 ))}
@@ -299,7 +299,7 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
         </DndContext>
       ) : (
         <div className="w-full max-w-5xl mx-auto pb-6 px-4 relative z-30">
-          <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-9 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-9 gap-2 sm:gap-3">
             {categories.map((category) => (
               <StaticCard key={category.id} category={category} onClick={() => setSelectedId(category.id)} />
             ))}
@@ -360,7 +360,7 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
                 transition={{ duration: 0.2 }} 
                 className="p-6 overflow-y-auto flex-1 bg-transparent [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40"
               >
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                   {modalCurrentItems.map((item) => (
                        <LinkItemCard key={item.id} item={item} onClick={handleModalFolderClick} />
                   ))}

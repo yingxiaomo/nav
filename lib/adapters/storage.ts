@@ -127,8 +127,14 @@ export class S3Adapter implements StorageAdapter {
       const uniqueFilename = `${Date.now()}-${filename}`;
       const key = `wallpapers/${uniqueFilename}`;
       
+      // 发送开始上传进度
+      onProgress?.(10);
+      
       const arrayBuffer = await file.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
+
+      // 发送读取文件完成进度
+      onProgress?.(40);
 
       const command = new PutObjectCommand({
         Bucket: this.config.bucket,
@@ -137,6 +143,9 @@ export class S3Adapter implements StorageAdapter {
         ContentType: file.type,
       });
       await this.client.send(command);
+      
+      // 发送上传完成进度
+      onProgress?.(100);
 
       let baseUrl = this.config.publicUrl || this.config.endpoint;
       if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);

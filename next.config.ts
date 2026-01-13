@@ -9,6 +9,21 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  
+  // Performance optimizations
+  experimental: {
+    optimizeCss: true,
+    optimizePackageImports: [
+      "lucide-react",
+      "@radix-ui/react-*",
+      "@dnd-kit/*",
+      "framer-motion",
+      "zustand"
+    ],
+  },
+  
+  // Build optimization
+  productionBrowserSourceMaps: false,
 };
 
 export default nextConfig;

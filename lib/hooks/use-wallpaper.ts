@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { DataSchema } from "../types/types";
 
 export function useWallpaper(initialWallpapers: string[], initialData: DataSchema) {
@@ -49,22 +49,29 @@ export function useWallpaper(initialWallpapers: string[], initialData: DataSchem
     }
     
     if (newWallpaper) {
-      setIsLoading(true);
-      setImgLoaded(false);
-      
-      // 预加载壁纸
-      preloadWallpaper(newWallpaper)
-        .then(() => {
-          setCurrentWallpaper(newWallpaper);
-          setImgLoaded(true);
-        })
-        .catch(() => {
-          setCurrentWallpaper(newWallpaper);
-          setImgLoaded(true);
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
+      // 对于本地壁纸，直接设置，不进行预加载，减少初始加载时间
+      if (initialWallpapers.includes(newWallpaper)) {
+        setCurrentWallpaper(newWallpaper);
+        setImgLoaded(true);
+        setIsLoading(false);
+      } else {
+        setIsLoading(true);
+        setImgLoaded(false);
+        
+        // 预加载壁纸
+        preloadWallpaper(newWallpaper)
+          .then(() => {
+            setCurrentWallpaper(newWallpaper);
+            setImgLoaded(true);
+          })
+          .catch(() => {
+            setCurrentWallpaper(newWallpaper);
+            setImgLoaded(true);
+          })
+          .finally(() => {
+            setIsLoading(false);
+          });
+      }
     } else {
       setCurrentWallpaper("");
       setImgLoaded(true);
@@ -114,12 +121,8 @@ export function useWallpaper(initialWallpapers: string[], initialData: DataSchem
     }
   }, [currentWallpaper, initialWallpapers, preloadWallpaper]);
   
-  // 当壁纸切换时，预加载下一张壁纸
-  useEffect(() => {
-    if (currentWallpaper && initialWallpapers.length > 1) {
-      preloadNextWallpaper();
-    }
-  }, [currentWallpaper, preloadNextWallpaper, initialWallpapers.length]);
+  // 移除自动预加载下一张壁纸，减少初始加载时间
+  // 只有在用户主动切换壁纸时才进行预加载
 
   return { 
     currentWallpaper, 

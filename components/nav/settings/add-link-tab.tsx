@@ -1,12 +1,19 @@
-import { useState, ChangeEvent } from "react";
+import React, { useState, ChangeEvent } from "react";
 import { DataSchema, Category, LinkItem } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Wand2, Plus, FolderPlus, Upload } from "lucide-react";
+import { Wand2, Plus, FolderPlus, Upload, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { IconRender, PRESET_ICONS } from "./shared";
+import {
+  isValidUrl,
+  isValidFolderName,
+  isValidImageFile,
+  isValidFileSize,
+  sanitizeText
+} from "@/lib/utils/validation";
 
 interface AddLinkTabProps {
   localData: DataSchema;
@@ -20,7 +27,10 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
   const [newIcon, setNewIcon] = useState("Link");
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [isUploadingIcon, setIsUploadingIcon] = useState(false);
+  const [iconUploadProgress, setIconUploadProgress] = useState(0);
   const existingCategories = Array.from(new Set(localData.categories.map(c => c.title)));
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const handleSmartIdentify = (rawUrl: string, isAuto: boolean = false) => {
     if (!rawUrl) {
       if (!isAuto) toast.error("请先输入 URL", { description: "请输入要添加的链接地址" });
@@ -31,6 +41,11 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
     
     if (!isAuto) {
         setNewUrl(processedUrl);
+    }
+    
+    if (!isValidUrl(processedUrl)) {
+        if (!isAuto) toast.error("URL 格式不正确", { description: "请输入有效的 URL 地址，如 https://example.com" });
+        return;
     }
     
     try {
@@ -54,33 +69,116 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
   };
 
   const handleConfirmCreateFolder = () => {
-    if (!newFolderName.trim()) return toast.error("请输入文件夹名称", { description: "文件夹名称不能为空" });
+    const sanitizedFolderName = sanitizeText(newFolderName.trim());
+    if (!isValidFolderName(sanitizedFolderName)) {
+      return toast.error("文件夹名称无效", { 
+        description: "文件夹名称不能为空，长度限制1-50字符，且不能包含特殊字符（<>:\"/\\|?*）"
+      });
+    }
     const newData = { ...localData };
-    if (newData.categories.some(c => c.title === newFolderName)) {
+    if (newData.categories.some(c => c.title === sanitizedFolderName)) {
         return toast.error("该文件夹已存在", { description: "请使用不同的文件夹名称" });
     }
-    newData.categories.push({ id: `c-${Date.now()}`, title: newFolderName, icon: "FolderOpen", links: [] });
+    newData.categories.push({ id: `c-${Date.now()}`, title: sanitizedFolderName, icon: "FolderOpen", links: [] });
     setLocalData(newData);
-    setNewCategory(newFolderName); 
+    setNewCategory(sanitizedFolderName); 
     setIsCreatingFolder(false);
     setNewFolderName("");
-    toast.success("文件夹创建成功", { description: `已创建文件夹: ${newFolderName}` });
+    toast.success("文件夹创建成功", { description: `已创建文件夹: ${sanitizedFolderName}` });
+  };
+
+  // 图标上传处理函数
+  const handleIconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 检查文件类型
+    if (!isValidImageFile(file)) {
+      return toast.error("请选择图片文件", { description: "支持的图片格式：JPG、PNG、GIF、SVG等" });
+    }
+
+    // 检查文件大小（限制为2MB）
+    if (!isValidFileSize(file, 2)) {
+      return toast.error("文件大小超过限制", { description: "图片大小不能超过2MB" });
+    }
+
+    setIsUploadingIcon(true);
+    setIconUploadProgress(0);
+
+    try {
+      // 使用 FileReader 将图片转换为 Base64 格式
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64Data = event.target?.result as string;
+        setNewIcon(base64Data);
+        setIconUploadProgress(100);
+        toast.success("图标上传成功", { description: "已设置为当前链接的图标" });
+      };
+
+      // 模拟上传进度
+      let progress = 0;
+      const progressInterval = setInterval(() => {
+        progress += 10;
+        if (progress < 90) {
+          setIconUploadProgress(progress);
+        }
+      }, 100);
+
+      reader.onloadend = () => {
+        clearInterval(progressInterval);
+        setIsUploadingIcon(false);
+      };
+
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Icon upload error:", error);
+      toast.error("图标上传失败", { description: "请重试或选择其他图标" });
+      setIsUploadingIcon(false);
+    }
   };
 
   const handleAddLink = () => {
-    if (!newUrl || !newTitle || !newCategory) return toast.error("请填写完整信息", { description: "请填写URL、标题和选择分类" });
+    // 净化和验证输入
+    const sanitizedTitle = sanitizeText(newTitle.trim());
+    const sanitizedCategory = sanitizeText(newCategory.trim());
+    const sanitizedUrl = newUrl.trim();
+    
+    if (!sanitizedUrl || !sanitizedTitle || !sanitizedCategory) {
+      return toast.error("请填写完整信息", { description: "请填写URL、标题和选择分类" });
+    }
+    
+    // 验证URL格式
+    const finalUrl = sanitizedUrl.startsWith("http") ? sanitizedUrl : `https://${sanitizedUrl}`;
+    if (!isValidUrl(finalUrl)) {
+      return toast.error("URL格式不正确", { description: "请输入有效的URL地址，如 https://example.com" });
+    }
+    
+    // 验证分类名称
+    if (!isValidFolderName(sanitizedCategory)) {
+      return toast.error("分类名称无效", { 
+        description: "分类名称不能为空，长度限制1-50字符，且不能包含特殊字符（<>:\"/\\|?*）"
+      });
+    }
+    
     const newData = { ...localData };
-    let categoryIndex = newData.categories.findIndex(c => c.title === newCategory);
+    let categoryIndex = newData.categories.findIndex(c => c.title === sanitizedCategory);
     if (categoryIndex === -1) {
-      newData.categories.push({ id: `c-${Date.now()}`, title: newCategory, icon: "FolderOpen", links: [] });
+      newData.categories.push({ id: `c-${Date.now()}`, title: sanitizedCategory, icon: "FolderOpen", links: [] });
       categoryIndex = newData.categories.length - 1;
     }
-    const finalUrl = newUrl.startsWith("http") ? newUrl : `https://${newUrl}`;
     
-    newData.categories[categoryIndex].links.push({ id: `l-${Date.now()}`, title: newTitle, url: finalUrl, icon: newIcon });
+    newData.categories[categoryIndex].links.push({ 
+      id: `l-${Date.now()}`, 
+      title: sanitizedTitle, 
+      url: finalUrl, 
+      icon: newIcon 
+    });
+    
     setLocalData(newData);
-    setNewUrl(""); setNewTitle(""); setNewIcon("Link");
-    toast.success("链接添加成功", { description: `已将 "${newTitle}" 添加到 "${newCategory}" 分类` });
+    setNewUrl(""); 
+    setNewTitle(""); 
+    setNewIcon("Link");
+    toast.success("链接添加成功", { description: `已将 "${sanitizedTitle}" 添加到 "${sanitizedCategory}" 分类` });
   };
 
   const handleBookmarkImport = (event: ChangeEvent<HTMLInputElement>) => {
@@ -237,21 +335,68 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
                     <div className="flex gap-2">
                         <Input placeholder="输入标题" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="h-10 flex-1 bg-background"/>
                         <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 overflow-hidden bg-background" title="选择图标">
-                                <IconRender name={newIcon} className="h-5 w-5" />
-                            </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-[300px] h-[300px] overflow-y-auto">
-                                <div className="grid grid-cols-6 gap-1 p-2">
-                                {PRESET_ICONS.map(iconName => (
-                                    <Button key={iconName} variant="ghost" size="icon" className="h-9 w-9" onClick={() => setNewIcon(iconName)}>
-                                    <IconRender name={iconName} className="h-5 w-5" />
-                                    </Button>
-                                ))}
-                                </div>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 overflow-hidden bg-background" title="选择图标">
+                                    <IconRender name={newIcon} className="h-5 w-5" />
+                                </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-[300px] h-[350px] overflow-y-auto">
+                                    {/* 自定义图标上传区域 */}
+                                    <div className="border-b border-border/50 p-2">
+                                      <h4 className="text-xs font-medium mb-2">自定义图标</h4>
+                                      <div className="flex flex-col gap-2">
+                                        {/* 文件上传输入 */}
+                                        <input
+                                          type="file"
+                                          ref={fileInputRef}
+                                          className="hidden"
+                                          accept="image/*"
+                                          onChange={handleIconUpload}
+                                        />
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="w-full gap-2 text-xs"
+                                          onClick={() => fileInputRef.current?.click()}
+                                          disabled={isUploadingIcon}
+                                        >
+                                          {isUploadingIcon ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                                          {isUploadingIcon ? "上传中..." : "上传自定义图标"}
+                                        </Button>
+                                        
+                                        {/* 上传进度条 */}
+                                        {isUploadingIcon && (
+                                          <div className="w-full space-y-1">
+                                            <div className="flex justify-between items-center text-[10px] text-muted-foreground">
+                                              <span>上传进度</span>
+                                              <span>{iconUploadProgress}%</span>
+                                            </div>
+                                            <div className="h-1 bg-muted rounded-full overflow-hidden">
+                                              <div
+                                                className="h-full bg-primary rounded-full transition-all duration-200 ease-out"
+                                                style={{ width: `${iconUploadProgress}%` }}
+                                              />
+                                            </div>
+                                          </div>
+                                        )}
+                                        
+                                        {/* 说明文字 */}
+                                        <p className="text-[10px] text-muted-foreground">
+                                          支持 JPG、PNG、WEBP 格式，大小不超过 2MB
+                                        </p>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* 预设图标列表 */}
+                                    <div className="grid grid-cols-6 gap-1 p-2">
+                                    {PRESET_ICONS.map(iconName => (
+                                        <Button key={iconName} variant="ghost" size="icon" className="h-9 w-9" onClick={() => setNewIcon(iconName)}>
+                                        <IconRender name={iconName} className="h-5 w-5" />
+                                        </Button>
+                                    ))}
+                                    </div>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                     </div>
                 </div>
 

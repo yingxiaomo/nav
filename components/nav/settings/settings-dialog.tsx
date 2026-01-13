@@ -36,6 +36,16 @@ interface SettingsDialogProps {
 export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRefreshWallpaper, syncError, uploadWallpaper }: SettingsDialogProps) {
   const [open, setOpen] = useState(false);
   const [localData, setLocalData] = useState<DataSchema>(data);
+  // 定义需要加密的敏感字段路径
+  const sensitiveFields = [
+    'github.token',
+    's3.accessKeyId',
+    's3.secretAccessKey',
+    'webdav.username',
+    'webdav.password',
+    'gist.token'
+  ];
+
   const [storageConfig, setStorageConfig] = useLocalStorage<StorageConfig>(STORAGE_CONFIG_KEY, () => {
     if (typeof window !== 'undefined') {
         const oldGithub = localStorage.getItem(GITHUB_CONFIG_KEY);
@@ -51,7 +61,7 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
         type: 'github',
         settings: undefined
     };
-  });
+  }, sensitiveFields);
 
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);

@@ -38,6 +38,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { isValidUrl, sanitizeText } from "@/lib/utils/validation";
 
 interface ManageLinksTabProps {
   localData: DataSchema;
@@ -90,12 +91,36 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       if (!editingLink) return;
       
       const isFolder = editingLink.type === 'folder';
-      if (!editingLink.title || (!isFolder && !editingLink.url)) {
-          toast.error("标题不能为空，普通链接必须填写URL", { description: "请检查并填写完整的链接信息" });
+      
+      // 净化和验证输入
+      const sanitizedTitle = sanitizeText(editingLink.title.trim());
+      const sanitizedUrl = editingLink.url.trim();
+      
+      if (!sanitizedTitle) {
+          toast.error("标题不能为空", { description: "请填写链接或文件夹的标题" });
           return;
       }
+      
+      if (!isFolder) {
+          if (!sanitizedUrl) {
+              toast.error("普通链接必须填写URL", { description: "请检查并填写完整的链接信息" });
+              return;
+          }
+          
+          // 验证URL格式
+          const finalUrl = sanitizedUrl.startsWith("http") ? sanitizedUrl : `https://${sanitizedUrl}`;
+          if (!isValidUrl(finalUrl)) {
+              toast.error("URL格式不正确", { description: "请输入有效的URL地址，如 https://example.com" });
+              return;
+          }
+      }
 
-      const updatedLink = { ...editingLink, updatedAt: Date.now() };
+      const updatedLink = { 
+          ...editingLink, 
+          title: sanitizedTitle,
+          url: isFolder ? editingLink.url : (sanitizedUrl.startsWith("http") ? sanitizedUrl : `https://${sanitizedUrl}`),
+          updatedAt: Date.now() 
+      };
 
       setLocalData((prev) => {
           const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;

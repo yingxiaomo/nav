@@ -10,11 +10,9 @@ interface RenderFolderContentProps {
 }
 
 export function RenderFolderContent({ items, onFolderClick }: RenderFolderContentProps) {
-  // 所有Hooks必须在组件顶部调用
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   
-  // 监听容器宽度变化，动态调整列数
   useEffect(() => {
     const updateContainerWidth = () => {
       if (containerRef.current) {
@@ -30,18 +28,15 @@ export function RenderFolderContent({ items, onFolderClick }: RenderFolderConten
     };
   }, []);
   
-  // 根据容器宽度计算列数
   const columnCount = useMemo(() => {
-    if (containerWidth >= 1024) return 4; // lg
-    if (containerWidth >= 768) return 3; // md
-    if (containerWidth >= 640) return 2; // sm
-    return 1; // xs
+    if (containerWidth >= 1024) return 4; 
+    if (containerWidth >= 768) return 3; 
+    if (containerWidth >= 640) return 2; 
+    return 1; 
   }, [containerWidth]);
   
-  // 计算行数
   const rowCount = Math.ceil(items.length / columnCount);
   
-  // 对于少量数据，直接渲染全部项
   if (items.length < 100) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -64,7 +59,6 @@ export function RenderFolderContent({ items, onFolderClick }: RenderFolderConten
     );
   }
   
-  // 虚拟行渲染，每行包含多个列
   const renderVirtualRows = () => {
     const virtualRows = [];
     for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {

@@ -151,8 +151,6 @@ export function useNavData(initialWallpapers: string[]) {
           }
         }
 
-        setIsReady(true);
-
         // 如果没有配置存储，尝试从data.json加载
         const config = getEffectiveConfig();
         if (!loadedFromStorage && !config) {
@@ -177,6 +175,8 @@ export function useNavData(initialWallpapers: string[]) {
         toast.error("初始化同步失败，请检查网络或配置", {
           duration: 4000
         });
+      } finally {
+        // 确保所有数据加载尝试完成后再标记为就绪
         setIsReady(true);
       }
     }
@@ -305,9 +305,11 @@ export function useNavData(initialWallpapers: string[]) {
       if (!config) return null;
       return fetchRemoteData(config, getAdapter);
     },
-    enabled: isReady,
-    refetchOnWindowFocus: true,
-    refetchInterval: 5 * 60 * 1000, // 每5分钟自动刷新
+    enabled: isReady && !!getEffectiveConfig(), // 只有在配置了存储时才获取远程数据
+    refetchOnWindowFocus: false, // 禁用窗口聚焦时自动刷新
+    refetchInterval: false, // 禁用自动刷新
+    staleTime: 10 * 60 * 1000, // 数据10分钟内视为新鲜
+    retry: 1, // 只重试一次，减少加载时间
   });
 
   // 处理远程数据获取成功

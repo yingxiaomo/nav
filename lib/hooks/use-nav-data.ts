@@ -394,7 +394,7 @@ export function useNavData(initialWallpapers: string[]) {
     updateLocalAndState({ ...data, notes: newNotes });
   }, [data, updateLocalAndState]);
 
-  const uploadWallpaper = useCallback(async (file: File): Promise<string> => {
+  const uploadWallpaper = useCallback(async (file: File, onProgress?: (progress: number) => void): Promise<string> => {
       const config = getEffectiveConfig();
       if (!config) throw new Error("未配置存储，无法上传");
       
@@ -403,7 +403,7 @@ export function useNavData(initialWallpapers: string[]) {
           throw new Error("当前存储方式不支持文件上传");
       }
       
-      return await adapter.uploadFile(file, file.name);
+      return await adapter.uploadFile(file, file.name, onProgress);
   }, [getAdapter, getEffectiveConfig]);
 
   return {

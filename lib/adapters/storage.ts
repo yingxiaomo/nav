@@ -18,7 +18,7 @@ export interface StorageAdapter {
   load(): Promise<DataSchema | null>;
   save(data: DataSchema): Promise<boolean>;
   testConnection?(): Promise<void>;
-  uploadFile?(file: File, filename: string): Promise<string>;
+  uploadFile?(file: File, filename: string, onProgress?: (progress: number) => void): Promise<string>;
 }
 
 export interface GithubRepoSettings {
@@ -122,7 +122,7 @@ export class S3Adapter implements StorageAdapter {
     }
   }
 
-  async uploadFile(file: File, filename: string): Promise<string> {
+  async uploadFile(file: File, filename: string, onProgress?: (progress: number) => void): Promise<string> {
     try {
       const uniqueFilename = `${Date.now()}-${filename}`;
       const key = `wallpapers/${uniqueFilename}`;

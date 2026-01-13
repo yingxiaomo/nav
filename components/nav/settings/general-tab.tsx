@@ -2,10 +2,11 @@ import { DataSchema } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch"; 
+import { Switch } from "@/components/ui/switch" 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ImageIcon, Shuffle, Layers, Upload, Loader2, Sun, Moon, Monitor } from "lucide-react"; 
 import { useState, useRef } from "react";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 
 interface GeneralTabProps {
@@ -13,11 +14,13 @@ interface GeneralTabProps {
   setLocalData: React.Dispatch<React.SetStateAction<DataSchema>>;
   onRefreshWallpaper?: () => void;
   onSave?: (data: DataSchema) => Promise<void>; 
-  uploadWallpaper?: (file: File) => Promise<string>;
+  uploadWallpaper?: (file: File, onProgress?: (progress: number) => void) => Promise<string>;
 }
 
 export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave, uploadWallpaper }: GeneralTabProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleUploadClick = () => {
@@ -37,8 +40,24 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
     }
 
     setIsUploading(true);
+    setUploadProgress(0);
+    setUploadStatus("正在准备上传...");
+    
     try {
-      const url = await uploadWallpaper(file);
+      const url = await uploadWallpaper(file, (progress) => {
+        setUploadProgress(progress);
+        if (progress < 5) {
+          setUploadStatus("正在初始化连接...");
+        } else if (progress < 95) {
+          setUploadStatus(`正在上传文件... ${Math.round(progress)}%`);
+        } else {
+          setUploadStatus("正在处理文件...");
+        }
+      });
+      
+      setUploadProgress(100);
+      setUploadStatus("上传成功！");
+      
       const newData = {
         ...localData,
         settings: {
@@ -50,16 +69,23 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
       setLocalData(newData);
       
       if (onSave) {
+        setUploadStatus("正在同步配置...");
         await onSave(newData);
+        setUploadStatus("配置同步完成！");
       }
       
       toast.success("壁纸上传成功！");
     } catch (error: unknown) {
       console.error(error);
       const errorMessage = typeof error === 'object' && error !== null && 'message' in error ? (error.message as string) : "未知错误";
+      setUploadStatus(`上传失败: ${errorMessage}`);
       toast.error("上传失败", { description: errorMessage });
     } finally {
-      setIsUploading(false);
+      setTimeout(() => {
+        setIsUploading(false);
+        setUploadProgress(0);
+        setUploadStatus("");
+      }, 1000);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
@@ -210,7 +236,7 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
               <div className="flex items-center justify-between">
                 <Label>图片链接</Label>
                 {}
-                <div className="">
+                <div className="flex flex-col gap-2 w-full">
                     <input 
                         type="file" 
                         ref={fileInputRef} 
@@ -221,13 +247,29 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
                     <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="h-6 text-xs gap-1 px-2" 
+                        className="h-6 text-xs gap-1 px-2 w-full justify-start"
                         onClick={handleUploadClick}
                         disabled={isUploading}
                     >
                         {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
                         {isUploading ? "上传中..." : "上传到 S3"}
                     </Button>
+                    
+                    {isUploading && (
+                        <div className="w-full space-y-1">
+                            <div className="flex justify-between items-center text-[10px] text-muted-foreground">
+                                <span>{uploadStatus}</span>
+                                <span>{Math.round(uploadProgress)}%</span>
+                            </div>
+                            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                <motion.div 
+                                    className="h-full bg-primary rounded-full transition-all duration-300 ease-out"
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${uploadProgress}%` }}
+                                />
+                            </div>
+                        </div>
+                    )}
                 </div>
               </div>
               <Input 

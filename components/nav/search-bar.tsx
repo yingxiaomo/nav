@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { Search, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -27,9 +27,10 @@ const ENGINES = [
 
 interface SearchBarProps {
   onLocalSearch?: (query: string) => void;
+  ref?: React.RefObject<HTMLInputElement>;
 }
 
-export function SearchBar({ onLocalSearch }: SearchBarProps) {
+export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(({ onLocalSearch }, ref) => {
   const [query, setQuery] = useState("");
   const [engine, setEngine] = useState(ENGINES[0]);
 
@@ -97,6 +98,7 @@ export function SearchBar({ onLocalSearch }: SearchBarProps) {
         </div>
 
         <Input
+          ref={ref}
           type="text"
           value={query}
           onChange={(e) => handleInputChange(e.target.value)}
@@ -116,4 +118,6 @@ export function SearchBar({ onLocalSearch }: SearchBarProps) {
       </form>
     </div>
   );
-}
+});
+
+SearchBar.displayName = "SearchBar";

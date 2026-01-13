@@ -83,7 +83,7 @@ const SortableCategoryItemComponent = ({
         className={`
             flex items-center gap-1 px-2 py-3 rounded-md select-none group sticky top-0 z-10 border transition-all
             ${isDragging ? 'shadow-lg ring-1 ring-primary cursor-grabbing' : 'hover:border-border/50 cursor-grab'}
-            bg-zinc-100 dark:bg-zinc-800 border-transparent touch-none min-h-[44px] 
+            bg-card border-transparent touch-none min-h-[44px] 
         `}
       >
         <div 

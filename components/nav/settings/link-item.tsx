@@ -65,7 +65,7 @@ const SortableLinkItemComponent = ({ link, catId, handleDeleteLink, onEditFolder
             }
         }}
       >
-        <div className={`p-1.5 rounded-md shrink-0 flex items-center justify-center pointer-events-none ${isFolder ? 'bg-yellow-500/10 text-yellow-600' : 'bg-muted/50 text-foreground/70'}`}>
+        <div className={`p-1.5 rounded-md shrink-0 flex items-center justify-center pointer-events-none ${isFolder ? 'bg-yellow-500/10 text-yellow-500' : 'bg-muted/50 text-foreground/70'}`}>
           <IconRender name={link.icon || (isFolder ? "FolderOpen" : "Link")} className="h-4 w-4" />
         </div>
         

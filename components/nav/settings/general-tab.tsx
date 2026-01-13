@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch"; 
-import { ImageIcon, Shuffle, Layers, Upload, Loader2 } from "lucide-react"; 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ImageIcon, Shuffle, Layers, Upload, Loader2, Sun, Moon, Monitor } from "lucide-react"; 
 import { useState, useRef } from "react";
 import { toast } from "sonner";
 
@@ -132,6 +133,45 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
             }
           }}
         />
+      </div>
+
+      <div className="space-y-3 border border-border/50 p-4 rounded-xl bg-muted/30">
+        <Label>主题模式</Label>
+        <Select
+          value={localData.settings.theme || "system"}
+          onValueChange={(value) => {
+            const newData = {
+              ...localData,
+              settings: { ...localData.settings, theme: value as "light" | "dark" | "system" },
+            };
+            setLocalData(newData);
+            if (onSave) onSave(newData);
+          }}
+        >
+          <SelectTrigger className="h-9">
+            <SelectValue placeholder="选择主题" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="light">
+              <div className="flex items-center gap-2">
+                <Sun className="h-4 w-4" />
+                <span>浅色模式</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="dark">
+              <div className="flex items-center gap-2">
+                <Moon className="h-4 w-4" />
+                <span>深色模式</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="system">
+              <div className="flex items-center gap-2">
+                <Monitor className="h-4 w-4" />
+                <span>跟随系统</span>
+              </div>
+            </SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-3 border border-border/50 p-4 rounded-xl bg-muted/30">

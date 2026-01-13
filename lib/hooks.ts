@@ -228,7 +228,11 @@ export function useNavData(initialWallpapers: string[]) {
                 const localNotes = currentData.notes || [];
                 const localCategories = currentData.categories || [];
                 
-                const mergeItems = <T extends { id: string; updatedAt?: number }>(remoteItems: T[] = [], localItems: T[] = []): T[] => {
+                const mergeItems = <T extends { id: string; updatedAt?: number }>(
+                    remoteItems: T[] = [], 
+                    localItems: T[] = [], 
+                    nestedMergeFn?: (remoteItem: T, localItem: T) => T
+                ): T[] => {
                     const merged = [...remoteItems];
                     const remoteMap = new Map(remoteItems.map(i => [i.id, i]));
                     
@@ -239,11 +243,17 @@ export function useNavData(initialWallpapers: string[]) {
                         } else {
                             const localTime = localItem.updatedAt || 0;
                             const remoteTime = remoteItem.updatedAt || 0;
+                            
+                            let updatedItem = remoteItem;
                             if (localTime > remoteTime) {
-                                const index = merged.findIndex(i => i.id === localItem.id);
-                                if (index !== -1) {
-                                    merged[index] = localItem;
-                                }
+                                updatedItem = localItem;
+                            } else if (nestedMergeFn) {
+                                updatedItem = nestedMergeFn(remoteItem, localItem);
+                            }
+                            
+                            const index = merged.findIndex(i => i.id === localItem.id);
+                            if (index !== -1) {
+                                merged[index] = updatedItem;
                             }
                         }
                     }
@@ -252,57 +262,15 @@ export function useNavData(initialWallpapers: string[]) {
 
                 
                 const mergeCategories = (remoteCats: Category[], localCats: Category[]): Category[] => {
-                    const merged = [...remoteCats];
-                    const remoteCatMap = new Map(remoteCats.map(c => [c.id, c]));
+                    const mergeCategoryLinks = (remoteCat: Category, localCat: Category): Category => {
+                        const mergedLinks = mergeItems(remoteCat.links, localCat.links);
+                        return {
+                            ...remoteCat,
+                            links: mergedLinks
+                        };
+                    };
                     
-                    for (const localCat of localCats) {
-                        const remoteCat = remoteCatMap.get(localCat.id);
-                        if (!remoteCat) {
-                            merged.push(localCat);
-                        } else {
-                            const localTime = localCat.updatedAt || 0;
-                            const remoteTime = remoteCat.updatedAt || 0;
-                            
-                            if (localTime > remoteTime) {
-                                
-                                const index = merged.findIndex(c => c.id === localCat.id);
-                                if (index !== -1) {
-                                    merged[index] = localCat;
-                                }
-                            } else {
-                                
-                                const mergedLinksMap = new Map<string, typeof remoteCat.links[0]>();
-                                
-                                
-                                remoteCat.links.forEach(link => mergedLinksMap.set(link.id, link));
-                                
-                                
-                                localCat.links.forEach(localLink => {
-                                    const remoteLink = mergedLinksMap.get(localLink.id);
-                                    if (!remoteLink) {
-                                        mergedLinksMap.set(localLink.id, localLink);
-                                    } else {
-                                        const localLinkTime = localLink.updatedAt || 0;
-                                        const remoteLinkTime = remoteLink.updatedAt || 0;
-                                        if (localLinkTime > remoteLinkTime) {
-                                            mergedLinksMap.set(localLink.id, localLink);
-                                        }
-                                    }
-                                });
-                                
-                                const mergedLinks = Array.from(mergedLinksMap.values());
-                                
-                                const index = merged.findIndex(c => c.id === localCat.id);
-                                if (index !== -1) {
-                                    merged[index] = {
-                                        ...remoteCat,
-                                        links: mergedLinks
-                                    };
-                                }
-                            }
-                        }
-                    }
-                    return merged;
+                    return mergeItems(remoteCats, localCats, mergeCategoryLinks);
                 };
 
                 const mergedCategories = mergeCategories(remoteData.categories || [], localCategories);

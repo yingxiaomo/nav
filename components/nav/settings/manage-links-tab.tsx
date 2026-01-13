@@ -24,9 +24,11 @@ import {
 import { createPortal } from "react-dom";
 import { SortableCategoryItem } from "./category-item";
 import { SortableLinkItem } from "./link-item";
-import { IconRender, PRESET_ICONS } from "./shared";
+import { IconRender } from "./shared";
+import { LinkEditor } from "./link-editor";
+import { FolderNavigator } from "./folder-navigator";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, Wand2, Folder } from "lucide-react";
+import { Folder } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -35,13 +37,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 
 interface ManageLinksTabProps {
@@ -514,20 +509,11 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
                 ) : (
 
                     <div className="space-y-4">
-                        <div className="flex items-center gap-2 p-2 pb-4 border-b border-border/20">
-                            <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => setFolderPath(prev => prev.slice(0, -1))}
-                                className="h-8 gap-1"
-                            >
-                                <ChevronLeft className="h-4 w-4" /> 返回
-                            </Button>
-                            <div className="flex items-center gap-2 font-medium text-sm text-foreground/80">
-                                <IconRender name={resolvedCurrentFolder?.icon || "FolderOpen"} className="h-4 w-4" />
-                                <span>{resolvedCurrentFolder?.title}</span>
-                            </div>
-                        </div>
+                        <FolderNavigator
+                            folderPath={folderPath}
+                            onBack={() => setFolderPath(prev => prev.slice(0, -1))}
+                            resolvedCurrentFolder={resolvedCurrentFolder}
+                        />
 
                         <SortableContext 
                             id={resolvedCurrentFolder!.id} 
@@ -564,66 +550,11 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
                 <DialogTitle>编辑链接</DialogTitle>
                 <DialogDescription>修改链接的标题、URL 或图标。</DialogDescription>
             </DialogHeader>
-            {editingLink && (
-                <div className="grid gap-4 py-4">
-                    {editingLink.type !== 'folder' && (
-                    <div className="grid gap-2">
-                        <Label>URL</Label>
-                        <div className="flex gap-2">
-                            <Input 
-                                value={editingLink.url} 
-                                onChange={(e) => setEditingLink({ ...editingLink, url: e.target.value })} 
-                                placeholder="https://example.com"
-                            />
-                            <Button size="icon" variant="outline" onClick={() => handleSmartIdentifyForEdit(editingLink.url)} title="自动识别">
-                                <Wand2 className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    </div>
-                    )}
-                    <div className="grid gap-2">
-                        <Label>标题</Label>
-                        <Input 
-                            value={editingLink.title} 
-                            onChange={(e) => setEditingLink({ ...editingLink, title: e.target.value })} 
-                            placeholder="输入标题"
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label>图标</Label>
-                        <div className="flex gap-2">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="icon" className="shrink-0" title="选择内置图标">
-                                        <IconRender name={editingLink.icon || "Link"} className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent className="w-[300px] h-[300px] overflow-y-auto" align="start">
-                                    <div className="grid grid-cols-6 gap-1 p-2">
-                                        {PRESET_ICONS.map((iconName) => (
-                                            <Button
-                                                key={iconName}
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-9 w-9"
-                                                onClick={() => setEditingLink({ ...editingLink, icon: iconName })}
-                                            >
-                                                <IconRender name={iconName} className="h-5 w-5" />
-                                            </Button>
-                                        ))}
-                                    </div>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                            <Input 
-                                value={editingLink.icon} 
-                                onChange={(e) => setEditingLink({ ...editingLink, icon: e.target.value })} 
-                                placeholder="输入图标 URL 或选择内置图标"
-                                className="flex-1"
-                            />
-                        </div>
-                    </div>
-                </div>
-            )}
+            <LinkEditor
+                editingLink={editingLink}
+                onUpdate={setEditingLink}
+                onSmartIdentify={handleSmartIdentifyForEdit}
+            />
             <DialogFooter>
                 <Button variant="outline" onClick={() => setEditingLink(null)}>取消</Button>
                 <Button onClick={handleSaveEdit}>保存修改</Button>

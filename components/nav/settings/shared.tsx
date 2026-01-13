@@ -1,3 +1,4 @@
+import { useState } from "react";
 import * as Icons from "lucide-react";
 import { Link as LinkIcon, LucideIcon } from "lucide-react";
 import Image from 'next/image';
@@ -14,8 +15,24 @@ export const PRESET_ICONS = [
 ];
 
 export const IconRender = ({ name, className }: { name: string; className?: string }) => {
-  if (name?.startsWith("http") || name?.startsWith("/")) {
-    return <Image src={name} alt="icon" width={32} height={32} className={`${className} object-contain rounded-sm`} loading="lazy" />;
+  const [error, setError] = useState(false);
+
+  const handleError = () => {
+    setError(true);
+  };
+
+  if ((name?.startsWith("http") || name?.startsWith("/")) && !error) {
+    return (
+      <Image 
+        src={name} 
+        alt="icon" 
+        width={32} 
+        height={32} 
+        className={`${className} object-contain rounded-sm`} 
+        loading="lazy"
+        onError={handleError}
+      />
+    );
   }
   
   const iconName = name as keyof typeof Icons;

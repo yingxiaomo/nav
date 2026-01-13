@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Image from 'next/image';
 import * as Icons from "lucide-react";
 import { Link as LinkIcon, LucideIcon } from "lucide-react";
 
@@ -16,9 +17,11 @@ export const IconRender = ({ name, className }: IconRenderProps) => {
 
   if ((name?.startsWith("http") || name?.startsWith("/")) && !error) {
     return (
-      <img 
+      <Image 
         src={name} 
         alt="icon" 
+        width={32} 
+        height={32} 
         className={`${className} object-contain rounded-sm`} 
         loading="lazy"
         onError={handleError}

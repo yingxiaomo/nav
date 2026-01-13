@@ -226,7 +226,6 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const { data } = active;
-    setActiveId(active.id as string);
 
     if (data.current?.type === "Link") {
       setActiveLink(data.current.link);
@@ -299,7 +298,6 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
     const overId = over?.id;
 
     if (!overId || active.id === overId) {
-        setActiveId(null);
         setActiveLink(null);
         setActiveCategory(null);
         return;
@@ -347,7 +345,6 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
         }
     }
 
-    setActiveId(null);
     setActiveLink(null);
     setActiveCategory(null);
   };

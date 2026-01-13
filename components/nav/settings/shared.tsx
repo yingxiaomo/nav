@@ -1,5 +1,6 @@
 import * as Icons from "lucide-react";
 import { Link as LinkIcon, LucideIcon } from "lucide-react";
+import Image from 'next/image';
 
 export const PRESET_ICONS = [
   "Bot", "Brain", "Sparkles", "Cpu", "Microchip", "CircuitBoard", "Binary", "Network", "Workflow", "Radio", "Radar", "Rocket", "Telescope", "Atom",
@@ -14,7 +15,7 @@ export const PRESET_ICONS = [
 
 export const IconRender = ({ name, className }: { name: string; className?: string }) => {
   if (name?.startsWith("http") || name?.startsWith("/")) {
-    return <img src={name} alt="icon" className={`${className} object-contain rounded-sm`} loading="lazy" />;
+    return <Image src={name} alt="icon" width={32} height={32} className={`${className} object-contain rounded-sm`} loading="lazy" />;
   }
   
   const iconName = name as keyof typeof Icons;

@@ -20,7 +20,7 @@ export default function Page() {
         if (jsonData.settings && typeof jsonData.settings.maxPackedWallpapers === 'number') {
             maxWallpapers = jsonData.settings.maxPackedWallpapers;
         }
-      } catch (e) {
+      } catch {
         console.error('[Build] 读取 data.json 配置失败，使用默认值');
       }
     }

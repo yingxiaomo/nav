@@ -53,16 +53,8 @@ const getChildren = (item: Category | LinkItem): LinkItem[] | undefined => {
     return (item as Category).links || (item as LinkItem).children;
 };
 
-const setChildren = (item: Category | LinkItem, newChildren: LinkItem[]): Category | LinkItem => {
-    if ('links' in item) {
-        return { ...item, links: newChildren } as Category;
-    }
-    return { ...item, children: newChildren } as LinkItem;
-};
-
 export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps) {
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [activeLink, setActiveLink] = useState<LinkItem | null>(null);
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [folderPath, setFolderPath] = useState<LinkItem[]>([]);
@@ -94,7 +86,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
       setEditingLink({ ...editingLink, url: processedUrl, icon: iconUrl, title: title });
       toast.success("已尝试自动识别信息");
-    } catch (error) {
+    } catch {
        toast.error("URL 格式不正确");
     }
   };
@@ -280,8 +272,8 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
         if (!activeRes || !overRes) return prev;
 
-        const [activeParent, activeList] = activeRes;
-        const [overParent, overList] = overRes;
+        const [, activeList] = activeRes;
+        const [, overList] = overRes;
         const activeIndex = activeList.findIndex(l => l.id === active.id);
         const overIndex = overList.findIndex(l => l.id === overId);
 

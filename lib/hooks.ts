@@ -351,7 +351,7 @@ export function useNavData(initialWallpapers: string[]) {
               if (initialWallpapers.length > 0) finalData.settings.wallpaperList = [...initialWallpapers];
               setData(finalData);
             }
-          } catch (e) {
+          } catch {
             console.log("No deployed data.json found.");
           }
         }

@@ -317,7 +317,7 @@ export class WebDavAdapter implements StorageAdapter {
 
             try {
                 return JSON.parse(content) as DataSchema;
-            } catch (e) {
+            } catch {
 
                 const parsed = parseNetscapeBookmarks(content);
                 if (parsed) {

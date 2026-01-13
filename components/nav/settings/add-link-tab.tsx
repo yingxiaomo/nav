@@ -48,7 +48,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
       
       if (!isAuto) toast.success("已刷新标题和图标");
 
-    } catch (e) { 
+    } catch { 
         if (!isAuto) toast.error("URL 格式不正确"); 
     }
   };

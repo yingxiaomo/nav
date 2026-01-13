@@ -135,7 +135,7 @@ export function SortableCategoryItem({
             ) : (
                 <div 
                     className="flex items-center gap-2 flex-1 min-w-0 h-full py-1 cursor-pointer" 
-                    onClick={(e) => {
+                    onClick={() => {
                         toggleCollapse(cat.id);
                     }}
                     onDoubleClick={(e) => {

@@ -56,7 +56,8 @@
     "tailwind-merge": "^3.4.0",
     "uuid": "^13.0.0",
     "vaul": "^1.1.2",
-    "webdav": "^5.8.0"
+    "webdav": "^5.8.0",
+    "zustand": "^5.0.10"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

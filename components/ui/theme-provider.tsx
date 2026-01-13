@@ -1,56 +1,40 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState } from "react"
+import { useEffect } from "react"
+import { useThemeStore } from "@/lib/stores/theme-store"
 
 interface ThemeProviderProps {
   children: React.ReactNode
   initialTheme?: "light" | "dark" | "system"
 }
 
-interface ThemeContextType {
-  theme: "light" | "dark" | "system"
-  setTheme: (theme: "light" | "dark" | "system") => void
-}
-
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
-
 export function ThemeProvider({ children, initialTheme = "system" }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<"light" | "dark" | "system">(initialTheme)
+  const { setTheme, updateTheme } = useThemeStore()
 
+  // 初始化主题
   useEffect(() => {
-    const root = window.document.documentElement
-
-    const updateTheme = () => {
-      const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches)
-      
-      root.classList.remove("light", "dark")
-      root.classList.add(isDark ? "dark" : "light")
-      
-      // 设置 data-theme 属性以支持 Tailwind 的深色模式
-      root.setAttribute("data-theme", isDark ? "dark" : "light")
-    }
-
+    setTheme(initialTheme)
     updateTheme()
+  }, [initialTheme, setTheme, updateTheme])
 
+  // 监听系统主题变化
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
-    mediaQuery.addEventListener("change", updateTheme)
-
+    const handleChange = () => updateTheme()
+    
+    mediaQuery.addEventListener("change", handleChange)
+    
     return () => {
-      mediaQuery.removeEventListener("change", updateTheme)
+      mediaQuery.removeEventListener("change", handleChange)
     }
-  }, [theme])
+  }, [updateTheme])
 
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  )
+  return <>{children}</>
 }
 
 export function useTheme() {
-  const context = useContext(ThemeContext)
-  if (context === undefined) {
-    throw new Error("useTheme must be used within a ThemeProvider")
-  }
-  return context
+  const { theme, setTheme } = useThemeStore()
+  return { theme, setTheme }
 }

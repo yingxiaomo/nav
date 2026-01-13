@@ -152,6 +152,13 @@ export function useWallpaper(initialWallpapers: string[], initialData: DataSchem
       preloadWallpaper(list[nextIndex]);
     }
   }, [currentWallpaper, initialWallpapers, preloadWallpaper]);
+  
+  // 当壁纸切换时，预加载下一张壁纸
+  useEffect(() => {
+    if (currentWallpaper && initialWallpapers.length > 1) {
+      preloadNextWallpaper();
+    }
+  }, [currentWallpaper, preloadNextWallpaper, initialWallpapers.length]);
 
   return { 
     currentWallpaper, 

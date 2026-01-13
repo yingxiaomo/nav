@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Search, ChevronDown } from "lucide-react";
+import { motion } from "framer-motion";
 import { Input, Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui";
 
 
@@ -52,7 +53,12 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(({ o
   };
 
   return (
-    <div className="relative w-full max-w-2xl mx-auto mb-12 z-40">
+    <motion.div 
+      className="relative w-full max-w-2xl mx-auto mb-12 z-40"
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: "easeOut" }}
+    >
       <form 
         onSubmit={handleSearch}
         className="relative flex items-center group"
@@ -63,7 +69,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(({ o
               <Button 
                 variant="ghost" 
                 size="sm"
-                className="h-8 px-2 text-white/80 hover:text-white hover:bg-white/10 rounded-md transition-colors gap-1"
+                className="h-8 px-2 text-white/80 hover:text-white hover:bg-white/10 rounded-md transition-all duration-200 hover:scale-105 active:scale-98 gap-1"
               >
                 {engine.name}
                 <ChevronDown className="h-3 w-3 opacity-50" />
@@ -72,7 +78,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(({ o
             
             <DropdownMenuContent 
               align="start" 
-              className="w-40 bg-black/60 backdrop-blur-xl border-white/20 text-white p-0 overflow-hidden" 
+              className="w-40 bg-black/60 backdrop-blur-xl border-white/20 text-white p-0 overflow-hidden"
             >
 
               <div className="h-64 overflow-y-auto p-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/40">
@@ -80,7 +86,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(({ o
                   <DropdownMenuItem 
                     key={e.name} 
                     onClick={() => handleEngineChange(e)}
-                    className="focus:bg-white/20 focus:text-white cursor-pointer"
+                    className="focus:bg-white/20 focus:text-white cursor-pointer transition-all duration-200 hover:bg-white/10 hover:scale-102 active:scale-98"
                   >
                     {e.name}
                   </DropdownMenuItem>
@@ -90,26 +96,32 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(({ o
           </DropdownMenu>
         </div>
 
-        <Input
-          ref={ref}
-          type="text"
-          value={query}
-          onChange={(e) => handleInputChange(e.target.value)}
-          placeholder={engine.url === 'local' ? "筛选我的链接..." : `在 ${engine.name} 中搜索...`}
-          className="h-14 pl-32 pr-14 rounded-2xl border-white/20 bg-white/10 dark:bg-black/20 backdrop-blur-xl text-white placeholder:text-white/50 focus-visible:ring-2 focus-visible:ring-white/30 shadow-xl transition-all hover:bg-white/15 text-lg"
-        />
+        <motion.div
+          whileHover={{ scale: 1.01 }}
+          transition={{ duration: 0.2 }}
+          className="flex-1"
+        >
+          <Input
+            ref={ref}
+            type="text"
+            value={query}
+            onChange={(e) => handleInputChange(e.target.value)}
+            placeholder={engine.url === 'local' ? "筛选我的链接..." : `在 ${engine.name} 中搜索...`}
+            className="h-14 pl-32 pr-14 rounded-2xl border-white/20 bg-white/10 dark:bg-black/20 backdrop-blur-xl text-white placeholder:text-white/50 focus-visible:ring-2 focus-visible:ring-white/30 shadow-xl transition-all hover:bg-white/15 text-lg"
+          />
+        </motion.div>
         
-        <Button 
+        <Button
           type="submit" 
           size="icon" 
           variant="ghost" 
           onClick={() => handleSearch()}
-          className="absolute right-2 top-2 h-10 w-10 text-white/80 hover:text-white hover:bg-white/10 rounded-xl"
+          className="absolute right-2 top-2 h-10 w-10 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-110 hover:rotate-15 active:scale-95 active:rotate-0"
         >
           <Search className="h-5 w-5" />
         </Button>
       </form>
-    </div>
+    </motion.div>
   );
 });
 

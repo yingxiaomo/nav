@@ -29,7 +29,10 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
     if (!file) return;
 
     if (!uploadWallpaper) {
-      toast.error("当前存储配置不支持上传");
+      toast.error("当前存储配置不支持上传", {
+        description: "请先配置支持上传的存储方式",
+        duration: 4000
+      });
       return;
     }
 

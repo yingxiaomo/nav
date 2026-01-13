@@ -174,7 +174,9 @@ export function useNavData(initialWallpapers: string[]) {
       } catch (err) {
         console.error("Initialization error", err);
         setSyncError(true);
-        toast.error("初始化同步失败，请检查网络或配置");
+        toast.error("初始化同步失败，请检查网络或配置", {
+          duration: 4000
+        });
         setIsReady(true);
       }
     }
@@ -266,7 +268,10 @@ export function useNavData(initialWallpapers: string[]) {
           setData(mutationVariables.newData);
         }, 0);
       } else {
-        toast.error("同步失败 (已暂存到本地)");
+        toast.error("同步失败 (已暂存到本地)", {
+          description: "请检查网络连接或云端配置，稍后重试",
+          duration: 4000
+        });
         setTimeout(() => {
           setSyncError(true);
           setData(mutationVariables.newData);
@@ -281,7 +286,8 @@ export function useNavData(initialWallpapers: string[]) {
     if (isError && mutationVariables) {
       console.error("Save error", error);
       toast.error("保存时发生错误", {
-        description: typeof error === 'object' && error !== null && 'message' in error ? (error.message as string) : "请检查网络或配置"
+        description: typeof error === 'object' && error !== null && 'message' in error ? (error.message as string) : "请检查网络或配置",
+        duration: 4000
       });
       setTimeout(() => {
         setSyncError(true);

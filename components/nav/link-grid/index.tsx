@@ -159,7 +159,7 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
         <DndContext id={dndContextId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <div className="w-full max-w-5xl mx-auto pb-6 px-4 relative z-30">
             <SortableContext items={categories.map(c => c.id)} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-9 gap-2 sm:gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-9 gap-2 sm:gap-3">
                 {categories.map((category) => (
                   <SortableCard key={category.id} category={category} onClick={() => setSelectedId(category.id)} />
                 ))}
@@ -169,7 +169,7 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
         </DndContext>
       ) : (
         <div className="w-full max-w-5xl mx-auto pb-6 px-4 relative z-30">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-9 gap-2 sm:gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-9 gap-2 sm:gap-3">
             {categories.map((category) => (
               <StaticCard key={category.id} category={category} onClick={() => setSelectedId(category.id)} />
             ))}
@@ -184,7 +184,7 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
 
       <AnimatePresence>
         {selectedId && selectedCategory && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-10">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -197,7 +197,7 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
             <motion.div
               layoutId={selectedId}
               transition={{ type: "spring", stiffness: 400, damping: 30 }}
-              className="dark w-full max-w-5xl max-h-[85vh] bg-white/10 dark:bg-black/20 text-foreground backdrop-blur-xl border border-white/20 rounded-[1.5rem] shadow-lg overflow-hidden flex flex-col relative z-10 will-change-transform"
+              className="dark w-full max-w-[95vw] max-h-[90vh] bg-white/10 dark:bg-black/20 text-foreground backdrop-blur-xl border border-white/20 rounded-[1rem] sm:rounded-[1.5rem] shadow-lg overflow-hidden flex flex-col relative z-10 will-change-transform"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-4 py-2 border-b border-border/20 shrink-0 bg-transparent">

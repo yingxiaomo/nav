@@ -60,22 +60,34 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
         const settings = config.github || DEFAULT_GITHUB;
         const adapter = new GithubRepoAdapter(settings);
         if (adapter.testConnection) await adapter.testConnection();
-        toast.success("GitHub 连接成功！");
+        toast.success("GitHub 连接成功！", {
+          description: "已成功连接到 GitHub 仓库",
+          duration: 3000
+        });
       } else if (config.type === 's3') {
         const settings = config.s3 || DEFAULT_S3;
         const adapter = new S3Adapter(settings);
         if (adapter.testConnection) await adapter.testConnection();
-        toast.success("S3/R2 连接成功！");
+        toast.success("S3/R2 连接成功！", {
+          description: "已成功连接到 S3/R2 存储",
+          duration: 3000
+        });
       } else if (config.type === 'webdav') {
         const settings = config.webdav || DEFAULT_WEBDAV;
         const adapter = new WebDavAdapter(settings);
         if (adapter.testConnection) await adapter.testConnection();
-        toast.success("WebDAV 连接成功！");
+        toast.success("WebDAV 连接成功！", {
+          description: "已成功连接到 WebDAV 服务器",
+          duration: 3000
+        });
       } else if (config.type === 'gist') {
         const settings = config.gist || DEFAULT_GIST;
         const adapter = new GistAdapter(settings);
         if (adapter.testConnection) await adapter.testConnection();
-        toast.success("Gist 连接成功！");
+        toast.success("Gist 连接成功！", {
+          description: "已成功连接到 GitHub Gist",
+          duration: 3000
+        });
       }
     } catch (error: unknown) {
       console.error("Test connection failed:", error);

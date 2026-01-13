@@ -122,7 +122,10 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
           return newData;
       });
       setEditingLink(null);
-      toast.success("修改已保存");
+      toast.success("修改已保存", {
+        description: "链接信息已更新",
+        duration: 3000
+      });
   }, [editingLink, setLocalData]);
 
   const handleMoveConfirm = useCallback((targetId: string) => {
@@ -177,7 +180,10 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       });
       
       setMovingLink(null);
-      toast.success("移动成功");
+      toast.success("移动成功", {
+        description: "链接已成功移动到新位置",
+        duration: 3000
+      });
   }, [movingLink, setLocalData]);
 
   const moveOptions = useMemo(() => {

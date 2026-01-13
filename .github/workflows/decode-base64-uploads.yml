@@ -61,13 +61,13 @@ jobs:
             echo "No changes to commit"
           fi
 
-      - name: Clean up Base64 files (optional)
+      - name: Clean up Base64 files
         run: |
-          # Optional: Remove all Base64 files after decoding
-          # rm -f base64-uploads/*.b64
-          # 
-          # if git status --porcelain | grep -q .; then
-          #   git add base64-uploads/
-          #   git commit -m "Clean up Base64 uploads"
-          #   git push origin $GITHUB_REF_NAME
-          # fi
+          # Remove all Base64 files after decoding
+          rm -f base64-uploads/*.b64
+          
+          if git status --porcelain | grep -q .; then
+            git add base64-uploads/
+            git commit -m "Clean up Base64 uploads"
+            git push origin $GITHUB_REF_NAME
+          fi

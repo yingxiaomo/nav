@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { ClockWidget, SearchBar, LinkGrid, SettingsDialog } from "@/components";
-import { FeaturesLauncher } from "@/components";
-import { ThemeProvider, Toaster } from "@/components";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ClockWidget } from "@/components/nav/clock";
+import { SearchBar } from "@/components/nav/search-bar";
+import { LinkGrid } from "@/components/nav/link-grid";
+import { SettingsDialog } from "@/components/nav/settings-dialog";
+import { FeaturesLauncher } from "@/components/features/features-launcher";
+import { ThemeProvider } from "@/components/ui/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
 
 import { useWallpaper, useNavData, useKeyboardShortcuts } from "@/lib";
 
@@ -12,10 +17,29 @@ interface HomeClientProps {
 }
 
 export default function HomeClient({ initialWallpapers }: HomeClientProps) {
+  // 创建 QueryClient 实例
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 5 * 60 * 1000, // 5分钟后数据过期
+        retry: 2, // 重试次数
+        refetchOnWindowFocus: true, // 窗口获取焦点时重新获取数据
+      },
+    },
+  });
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <HomeContent initialWallpapers={initialWallpapers} />
+    </QueryClientProvider>
+  );
+}
+
+function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
   const {
     data,
     isReady,
-    saving,
+    isSaving,
     hasUnsavedChanges,
     syncError,
     handleSave,
@@ -103,7 +127,7 @@ export default function HomeClient({ initialWallpapers }: HomeClientProps) {
           <SettingsDialog 
             data={data} 
             onSave={(newData) => handleSave(newData, initWallpaper)} 
-            isSaving={saving}
+            isSaving={isSaving}
             hasUnsavedChanges={hasUnsavedChanges}
             syncError={syncError}
             onRefreshWallpaper={() => initWallpaper(data)}

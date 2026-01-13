@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { DataSchema, DEFAULT_DATA, Category, Todo, Note } from "./types";
 import { GITHUB_CONFIG_KEY } from "./github";
 import { StorageAdapter, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, STORAGE_CONFIG_KEY, StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings } from "./storage";
@@ -172,9 +173,27 @@ export function useWallpaper(initialWallpapers: string[], initialData: DataSchem
 
 const LOCAL_DATA_KEY = "clean-nav-local-data";
 
+// 获取远程数据的函数，用于React Query
+const fetchRemoteData = async (config: StorageConfig, getAdapter: (config: StorageConfig) => StorageAdapter | null): Promise<DataSchema | null> => {
+  const adapter = getAdapter(config);
+  if (!adapter) return null;
+  return await adapter.load();
+};
+
+// 保存数据的函数，用于React Query Mutation
+const saveData = async (params: {
+  data: DataSchema;
+  config: StorageConfig;
+  getAdapter: (config: StorageConfig) => StorageAdapter | null;
+}): Promise<boolean> => {
+  const { data, config, getAdapter } = params;
+  const adapter = getAdapter(config);
+  if (!adapter) return false;
+  return await adapter.save(data);
+};
+
 export function useNavData(initialWallpapers: string[]) {
   const [isReady, setIsReady] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [syncError, setSyncError] = useState(false);
   const [data, setData] = useState<DataSchema>(() => {
@@ -272,6 +291,7 @@ export function useNavData(initialWallpapers: string[]) {
     return null;
   }, []);
 
+  // 初始化数据
   useEffect(() => {
     async function initData() {
       try {
@@ -299,98 +319,8 @@ export function useNavData(initialWallpapers: string[]) {
 
         setIsReady(true);
 
+        // 如果没有配置存储，尝试从data.json加载
         const config = getEffectiveConfig();
-        if (config) {
-          const adapter = getAdapter(config);
-          if (adapter) {
-            adapter.load().then(remoteData => {
-              if (remoteData) {
-                const localTodos = currentData.todos || [];
-                const localNotes = currentData.notes || [];
-                const localCategories = currentData.categories || [];
-                
-                const mergeItems = <T extends { id: string; updatedAt?: number }>(
-                    remoteItems: T[] = [], 
-                    localItems: T[] = [], 
-                    nestedMergeFn?: (remoteItem: T, localItem: T) => T
-                ): T[] => {
-                    const merged = [...remoteItems];
-                    const remoteMap = new Map(remoteItems.map(i => [i.id, i]));
-                    
-                    for (const localItem of localItems) {
-                        const remoteItem = remoteMap.get(localItem.id);
-                        if (!remoteItem) {
-                            merged.push(localItem);
-                        } else {
-                            const localTime = localItem.updatedAt || 0;
-                            const remoteTime = remoteItem.updatedAt || 0;
-                            
-                            let updatedItem = remoteItem;
-                            if (localTime > remoteTime) {
-                                updatedItem = localItem;
-                            } else if (nestedMergeFn) {
-                                updatedItem = nestedMergeFn(remoteItem, localItem);
-                            }
-                            
-                            const index = merged.findIndex(i => i.id === localItem.id);
-                            if (index !== -1) {
-                                merged[index] = updatedItem;
-                            }
-                        }
-                    }
-                    return merged;
-                };
-
-                
-                const mergeCategories = (remoteCats: Category[], localCats: Category[]): Category[] => {
-                    const mergeCategoryLinks = (remoteCat: Category, localCat: Category): Category => {
-                        const mergedLinks = mergeItems(remoteCat.links, localCat.links);
-                        return {
-                            ...remoteCat,
-                            links: mergedLinks
-                        };
-                    };
-                    
-                    return mergeItems(remoteCats, localCats, mergeCategoryLinks);
-                };
-
-                const mergedCategories = mergeCategories(remoteData.categories || [], localCategories);
-                const mergedTodos = mergeItems(remoteData.todos, localTodos);
-                const mergedNotes = mergeItems(remoteData.notes, localNotes);
-                
-                const finalData = { 
-                  ...remoteData, 
-                  categories: mergedCategories,
-                  todos: mergedTodos, 
-                  notes: mergedNotes 
-                };
-
-                if (JSON.stringify(finalData) !== JSON.stringify(currentData)) {
-                  if (initialWallpapers.length > 0) {
-                    finalData.settings.wallpaperList = [...initialWallpapers];
-                  }
-                  setData(finalData);
-                  if (typeof window !== 'undefined') {
-                    localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(finalData));
-                  }
-
-                  const isEffectiveDifferent =
-                    JSON.stringify(mergedCategories) !== JSON.stringify(remoteData.categories) ||
-                    JSON.stringify(mergedTodos) !== JSON.stringify(remoteData.todos) ||
-                    JSON.stringify(mergedNotes) !== JSON.stringify(remoteData.notes);
-
-                  if (isEffectiveDifferent) {
-                    setHasUnsavedChanges(true);
-                    toast.info("已合并云端数据，本地新增内容已保留 (请点击保存以同步到云端)");
-                  } else {
-                    toast.success("已从云端同步最新数据");
-                  }
-                }
-              }
-            });
-          }
-        }
-
         if (!loadedFromStorage && !config) {
           try {
             const res = await fetch("/data.json");
@@ -399,6 +329,9 @@ export function useNavData(initialWallpapers: string[]) {
               const finalData = { ...fetchedData, todos: [], notes: [] };
               if (initialWallpapers.length > 0) finalData.settings.wallpaperList = [...initialWallpapers];
               setData(finalData);
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(finalData));
+              }
             }
           } catch {
             console.log("No deployed data.json found.");
@@ -413,71 +346,215 @@ export function useNavData(initialWallpapers: string[]) {
     }
 
     initData();
-  }, [initialWallpapers, getAdapter, getEffectiveConfig]);
+  }, [initialWallpapers, getEffectiveConfig]);
 
-  const handleSave = async (newData: DataSchema, onWallpaperUpdate?: (cfg: DataSchema) => void) => {
-    setSaving(true);
-    setSyncError(false);
-    try {
-      const oldData = data;
-      setData(newData);
+  // 数据合并函数
+  const mergeItems = useCallback(<T extends { id: string; updatedAt?: number }>(
+      remoteItems: T[] = [], 
+      localItems: T[] = [], 
+      nestedMergeFn?: (remoteItem: T, localItem: T) => T
+  ): T[] => {
+      const merged = [...remoteItems];
+      const remoteMap = new Map(remoteItems.map(i => [i.id, i]));
+      
+      for (const localItem of localItems) {
+          const remoteItem = remoteMap.get(localItem.id);
+          if (!remoteItem) {
+              merged.push(localItem);
+          } else {
+              const localTime = localItem.updatedAt || 0;
+              const remoteTime = remoteItem.updatedAt || 0;
+              
+              let updatedItem = remoteItem;
+              if (localTime > remoteTime) {
+                  updatedItem = localItem;
+              } else if (nestedMergeFn) {
+                  updatedItem = nestedMergeFn(remoteItem, localItem);
+              }
+              
+              const index = merged.findIndex(i => i.id === localItem.id);
+              if (index !== -1) {
+                  merged[index] = updatedItem;
+              }
+          }
+      }
+      return merged;
+  }, []);
+
+  // 分类合并函数
+  const mergeCategories = useCallback((remoteCats: Category[], localCats: Category[]): Category[] => {
+      const mergeCategoryLinks = (remoteCat: Category, localCat: Category): Category => {
+          const mergedLinks = mergeItems(remoteCat.links, localCat.links);
+          return {
+              ...remoteCat,
+              links: mergedLinks
+          };
+      };
+      
+      return mergeItems(remoteCats, localCats, mergeCategoryLinks);
+  }, [mergeItems]);
+
+  // 使用 React Query Mutation 保存数据
+  const { mutate: saveMutate, isPending: isSaving, isSuccess, isError, error, data: mutationResult, variables: mutationVariables } = useMutation({
+    mutationFn: (params: {
+      newData: DataSchema;
+      config: StorageConfig;
+      onWallpaperUpdate?: (cfg: DataSchema) => void;
+    }) => {
+      const { newData, config, onWallpaperUpdate } = params;
+      
+      // 保存到本地
       if (typeof window !== 'undefined') {
         localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(newData));
-        setHasUnsavedChanges(true);
       }
       
-      if (onWallpaperUpdate && (newData.settings.wallpaperType !== oldData.settings.wallpaperType || newData.settings.wallpaper !== oldData.settings.wallpaper)) {
+      // 更新壁纸
+      if (onWallpaperUpdate) {
         onWallpaperUpdate(newData);
       }
-
-      const config = getEffectiveConfig();
-      if (!config) {
-        toast.success("本地已更新 (未配置云端)");
-        setSaving(false);
-        return;
-      }
-
-      const adapter = getAdapter(config);
-      if (!adapter) {
-        toast.success("本地已更新 (不支持的存储类型)");
-        setSaving(false);
-        return;
-      }
-
-      const success = await adapter.save(newData);
       
-      if (success) {
+      // 保存到云端
+      return saveData({ data: newData, config, getAdapter });
+    },
+  });
+
+  // 处理保存成功
+  useEffect(() => {
+    if (isSuccess && mutationResult && mutationVariables) {
+      if (mutationResult) {
         toast.success("同步成功！", {
           description: "云端更新可能受 CDN 缓存影响有 1-5 分钟延迟，请勿频繁刷新或重复保存。",
           duration: 5000,
         });
-        setHasUnsavedChanges(false);
+        setTimeout(() => {
+          setHasUnsavedChanges(false);
+          setSyncError(false);
+          setData(mutationVariables.newData);
+        }, 0);
       } else {
-        setSyncError(true);
         toast.error("同步失败 (已暂存到本地)");
+        setTimeout(() => {
+          setSyncError(true);
+          setData(mutationVariables.newData);
+          setHasUnsavedChanges(true);
+        }, 0);
       }
-    } catch (error: unknown) {
-      console.error(error);
-      setSyncError(true);
+    }
+  }, [isSuccess, mutationResult, mutationVariables]);
+
+  // 处理保存错误
+  useEffect(() => {
+    if (isError && mutationVariables) {
+      console.error("Save error", error);
       toast.error("保存时发生错误", {
         description: typeof error === 'object' && error !== null && 'message' in error ? (error.message as string) : "请检查网络或配置"
       });
-    } finally {
-      setSaving(false);
+      setTimeout(() => {
+        setSyncError(true);
+        setData(mutationVariables.newData);
+        setHasUnsavedChanges(true);
+      }, 0);
     }
-  };
+  }, [isError, error, mutationVariables]);
 
-  const handleReorder = (newCategories: Category[]) => {
+  // 使用 React Query 获取远程数据
+  const { data: remoteData } = useQuery({
+    queryKey: ['navData', getEffectiveConfig()],
+    queryFn: async () => {
+      const config = getEffectiveConfig();
+      if (!config) return null;
+      return fetchRemoteData(config, getAdapter);
+    },
+    enabled: isReady,
+    refetchOnWindowFocus: true,
+    refetchInterval: 5 * 60 * 1000, // 每5分钟自动刷新
+  });
+
+  // 处理远程数据获取成功
+  useEffect(() => {
+    if (remoteData) {
+      const currentData = dataRef.current;
+      const localTodos = currentData.todos || [];
+      const localNotes = currentData.notes || [];
+      const localCategories = currentData.categories || [];
+      
+      const mergedCategories = mergeCategories(remoteData.categories || [], localCategories);
+      const mergedTodos = mergeItems(remoteData.todos, localTodos);
+      const mergedNotes = mergeItems(remoteData.notes, localNotes);
+      
+      const finalData = { 
+        ...remoteData, 
+        categories: mergedCategories,
+        todos: mergedTodos, 
+        notes: mergedNotes 
+      };
+
+      if (JSON.stringify(finalData) !== JSON.stringify(currentData)) {
+        if (initialWallpapers.length > 0) {
+          finalData.settings.wallpaperList = [...initialWallpapers];
+        }
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(finalData));
+        }
+
+        const isEffectiveDifferent =
+          JSON.stringify(mergedCategories) !== JSON.stringify(remoteData.categories) ||
+          JSON.stringify(mergedTodos) !== JSON.stringify(remoteData.todos) ||
+          JSON.stringify(mergedNotes) !== JSON.stringify(remoteData.notes);
+
+        if (isEffectiveDifferent) {
+          toast.info("已合并云端数据，本地新增内容已保留 (请点击保存以同步到云端)");
+        } else {
+          toast.success("已从云端同步最新数据");
+        }
+        
+        // 使用 setTimeout 包装 setState 调用，使其异步执行
+        setTimeout(() => {
+          setData(finalData);
+          if (isEffectiveDifferent) {
+            setHasUnsavedChanges(true);
+          }
+        }, 0);
+      }
+    }
+  }, [remoteData, dataRef, initialWallpapers, mergeCategories, mergeItems]);
+
+  // 处理远程数据获取错误
+  useEffect(() => {
+    // 移除未使用的变量
+  }, []);
+
+  const handleSave = useCallback(async (newData: DataSchema, onWallpaperUpdate?: (cfg: DataSchema) => void) => {
+    setSyncError(false);
+    
+    const config = getEffectiveConfig();
+    if (!config) {
+      // 未配置云端，只保存到本地
+      updateLocalAndState(newData);
+      if (onWallpaperUpdate) {
+        onWallpaperUpdate(newData);
+      }
+      toast.success("本地已更新 (未配置云端)");
+      return;
+    }
+
+    // 调用 React Query Mutation 保存数据
+    saveMutate({ newData, config, onWallpaperUpdate });
+  }, [getEffectiveConfig, saveMutate, updateLocalAndState]);
+
+  const handleReorder = useCallback((newCategories: Category[]) => {
     updateLocalAndState({ ...data, categories: newCategories });
-  };
-  const handleTodosUpdate = (newTodos: Todo[]) => {
-    updateLocalAndState({ ...data, todos: newTodos });
-  };
-  const handleNotesUpdate = (newNotes: Note[]) => {
-    updateLocalAndState({ ...data, notes: newNotes });
-  };
+  }, [data, updateLocalAndState]);
 
-  const uploadWallpaper = async (file: File): Promise<string> => {
+  const handleTodosUpdate = useCallback((newTodos: Todo[]) => {
+    updateLocalAndState({ ...data, todos: newTodos });
+  }, [data, updateLocalAndState]);
+
+  const handleNotesUpdate = useCallback((newNotes: Note[]) => {
+    updateLocalAndState({ ...data, notes: newNotes });
+  }, [data, updateLocalAndState]);
+
+  const uploadWallpaper = useCallback(async (file: File): Promise<string> => {
       const config = getEffectiveConfig();
       if (!config) throw new Error("未配置存储，无法上传");
       
@@ -487,12 +564,12 @@ export function useNavData(initialWallpapers: string[]) {
       }
       
       return await adapter.uploadFile(file, file.name);
-  };
+  }, [getAdapter, getEffectiveConfig]);
 
   return {
     data,
     isReady,
-    saving,
+    isSaving,
     hasUnsavedChanges,
     syncError,
     handleSave,

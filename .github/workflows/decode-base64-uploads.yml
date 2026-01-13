@@ -1,0 +1,73 @@
+name: Decode Base64 Uploads
+
+on:
+  push:
+    paths:
+      - 'base64-uploads/**'
+
+jobs:
+  decode-base64-files:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Decode Base64 files
+        run: |
+          # Create wallpapers directory if it doesn't exist
+          mkdir -p wallpapers
+          
+          # Loop through all Base64 files in the directory
+          for base64_file in base64-uploads/*.b64; do
+            if [ -f "$base64_file" ]; then
+              # Get the filename without extension and timestamp prefix
+              filename=$(basename "$base64_file" .b64)
+              original_filename=${filename#*-}
+              
+              echo "Processing file: $base64_file"
+              echo "Original filename: $original_filename"
+              
+              # Decode Base64 content to binary file
+              base64 -d "$base64_file" > "wallpapers/$original_filename"
+              
+              echo "Decoded to: wallpapers/$original_filename"
+              
+              # Optional: Remove the original Base64 file
+              # rm "$base64_file"
+            fi
+          done
+
+      - name: Commit and push changes
+        run: |
+          # Configure Git user
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Check if there are any changes
+          if git status --porcelain | grep -q .; then
+            # Commit decoded files
+            git add wallpapers/
+            git commit -m "Decode Base64 uploads to wallpapers"
+            
+            # Push changes
+            git push origin $GITHUB_REF_NAME
+            echo "Changes pushed successfully"
+          else
+            echo "No changes to commit"
+          fi
+
+      - name: Clean up Base64 files (optional)
+        run: |
+          # Optional: Remove all Base64 files after decoding
+          # rm -f base64-uploads/*.b64
+          # 
+          # if git status --porcelain | grep -q .; then
+          #   git add base64-uploads/
+          #   git commit -m "Clean up Base64 uploads"
+          #   git push origin $GITHUB_REF_NAME
+          # fi

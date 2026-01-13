@@ -387,4 +387,37 @@ export class WebDavAdapter implements StorageAdapter {
         return false;
     }
   }
+
+  async uploadFile(file: File, filename: string, onProgress?: (progress: number) => void): Promise<string> {
+    if (!this.config.url) throw new Error("WebDAV 配置不完整");
+
+    try {
+      // 创建wallpapers目录（如果不存在）
+      const wallpapersDir = "/wallpapers"; // 或使用配置中的路径
+      
+      // 检查目录是否存在，如果不存在则创建
+      if (!(await this.client.exists(wallpapersDir))) {
+        await this.client.createDirectory(wallpapersDir, { recursive: true });
+      }
+      
+      // 生成唯一文件名
+      const uniqueFilename = `${Date.now()}-${filename}`;
+      const filePath = `${wallpapersDir}/${uniqueFilename}`;
+      
+      // 将File对象转换为ArrayBuffer，WebDAV客户端可以接受
+      onProgress?.(20);
+      const arrayBuffer = await file.arrayBuffer();
+      onProgress?.(50);
+      
+      // 上传文件
+      await this.client.putFileContents(filePath, Buffer.from(arrayBuffer));
+      onProgress?.(100);
+      
+      // 返回文件的访问URL
+      return `${this.config.url}${filePath}`;
+    } catch (error) {
+      console.error("WebDAV upload error:", error);
+      throw error;
+    }
+  }
 }

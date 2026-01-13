@@ -57,7 +57,7 @@ export const DEFAULT_DATA: DataSchema = {
     wallpaperType: 'local',
     wallpaperList: [],
     blurLevel: 'medium',
-    maxPackedWallpapers: 10,
+    maxPackedWallpapers: 5,
     showFeatures: true,
     homeLayout: 'folder',
     theme: 'system'

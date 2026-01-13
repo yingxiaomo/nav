@@ -6,7 +6,8 @@ import { DataSchema } from "../types/types";
 export function useWallpaper(initialWallpapers: string[], initialData: DataSchema) {
   const getInitialWallpaper = useCallback((data: DataSchema): string => {
     if (data.settings.wallpaperType === 'local' && initialWallpapers.length > 0) {
-      return initialWallpapers[0];
+      // 随机选择一张壁纸，而不是总是返回第一张
+      return initialWallpapers[Math.floor(Math.random() * initialWallpapers.length)];
     }
     if (data.settings.wallpaperType !== 'local' && data.settings.wallpaper) {
         return data.settings.wallpaper;

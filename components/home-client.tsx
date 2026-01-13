@@ -71,9 +71,18 @@ export default function HomeClient({ initialWallpapers }: HomeClientProps) {
 
   if (!isReady) {
     return (
-        <div className="min-h-screen w-full bg-black/90 flex items-center justify-center">
-            <div className="animate-pulse flex flex-col items-center gap-2">
-                <div className="h-12 w-12 rounded-full bg-white/10"></div>
+        <div className="min-h-screen w-full bg-gradient-to-br from-gray-900 via-black to-gray-900 flex flex-col items-center justify-center p-4">
+            <div className="flex flex-col items-center gap-4">
+                <div className="relative">
+                    <div className="h-16 w-16 rounded-full bg-white/10 animate-pulse flex items-center justify-center">
+                        <div className="h-12 w-12 rounded-full bg-white/20 animate-pulse"></div>
+                    </div>
+                    <div className="absolute inset-0 rounded-full border-4 border-white/30 border-t-transparent animate-spin-slow"></div>
+                </div>
+                <div className="text-center space-y-2">
+                    <h2 className="text-white text-xl font-medium animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">正在加载数据...</h2>
+                    <p className="text-white/60 text-sm animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">请稍候，我们正在为您准备最佳体验</p>
+                </div>
             </div>
         </div>
     );

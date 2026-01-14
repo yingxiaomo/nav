@@ -17,7 +17,10 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Decode Base64 files
+      - name: Install ImageMagick for image conversion
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+
+      - name: Decode Base64 files and convert to WebP
         run: |
           # Create wallpapers directory if it doesn't exist
           mkdir -p wallpapers
@@ -28,17 +31,31 @@ jobs:
               # Get the filename without extension and timestamp prefix
               filename=$(basename "$base64_file" .b64)
               original_filename=${filename#*-}
+              original_extension=${original_filename##*.}
+              base_filename=${original_filename%.*}
               
               echo "Processing file: $base64_file"
               echo "Original filename: $original_filename"
+              echo "Original extension: $original_extension"
               
-              # Decode Base64 content to binary file
-              base64 -d "$base64_file" > "wallpapers/$original_filename"
+              # Decode Base64 content to temporary binary file
+              temp_file="temp_${original_filename}"
+              base64 -d "$base64_file" > "$temp_file"
               
-              echo "Decoded to: wallpapers/$original_filename"
+              # Check if the file is a JPG or PNG and convert to WebP, otherwise keep original format
+              if [[ "$original_extension" =~ ^(jpg|jpeg|png)$ ]]; then
+                # Convert to WebP format with quality 85
+                webp_filename="${base_filename}.webp"
+                convert "$temp_file" -quality 85 "wallpapers/$webp_filename"
+                echo "Converted to WebP: wallpapers/$webp_filename"
+              else
+                # Keep original format for other file types (including already converted WebP files)
+                mv "$temp_file" "wallpapers/$original_filename"
+                echo "Kept original format: wallpapers/$original_filename"
+              fi
               
-              # Optional: Remove the original Base64 file
-              # rm "$base64_file"
+              # Clean up temporary file
+              rm -f "$temp_file"
             fi
           done
 

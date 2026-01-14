@@ -3,6 +3,8 @@ import path from 'path';
 import HomeClient from '../components/home-client';
 import { DEFAULT_DATA } from '../lib/types';
 
+/* eslint-disable react-hooks/purity */
+
 export default function Page() {
   let wallpapersBase64: string[] = [];
 
@@ -11,7 +13,7 @@ export default function Page() {
     const wallpaperDir = path.join(publicDir, 'wallpapers');
     const dataFile = path.join(publicDir, 'data.json');
     
-    let maxWallpapers = DEFAULT_DATA.settings.maxPackedWallpapers || 10; 
+    let maxWallpapers = DEFAULT_DATA.settings.maxPackedWallpapers || 5; // 默认值改为5张
     
     if (fs.existsSync(dataFile)) {
       try {
@@ -32,10 +34,10 @@ export default function Page() {
         ['.jpg', '.jpeg', '.png', '.webp', '.svg'].includes(path.extname(file).toLowerCase())
       );
 
-      
-      const selected = imageFiles.slice(0, maxWallpapers);
+      // 随机选取maxWallpapers张图片
+      const shuffled = [...imageFiles].sort(() => 0.5 - Math.random());
+      const selected = shuffled.slice(0, maxWallpapers);
 
-      
       wallpapersBase64 = selected.map(file => `/wallpapers/${file}`);
       
       console.log(`已索引 ${wallpapersBase64.length} 张壁纸路径`);

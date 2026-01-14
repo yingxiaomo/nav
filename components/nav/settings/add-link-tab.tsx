@@ -14,6 +14,7 @@ import {
   isValidFileSize,
   sanitizeText
 } from "@/lib/utils/validation";
+import { convertToWebP } from "@/lib/utils/image-utils";
 
 interface AddLinkTabProps {
   localData: DataSchema;
@@ -106,19 +107,26 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
     setIconUploadProgress(0);
 
     try {
-      // 使用 FileReader 将图片转换为 Base64 格式
+      // 先将图片转换为WebP格式，然后再转换为Base64
+      setIconUploadProgress(10);
+      
+      // 转换为WebP格式
+      const webpFile = await convertToWebP(file);
+      setIconUploadProgress(50);
+      
+      // 使用 FileReader 将WebP图片转换为 Base64 格式
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64Data = event.target?.result as string;
         setNewIcon(base64Data);
         setIconUploadProgress(100);
-        toast.success("图标上传成功", { description: "已设置为当前链接的图标" });
+        toast.success("图标上传成功", { description: "已转换为WebP格式并设置为当前链接的图标" });
       };
 
       // 模拟上传进度
-      let progress = 0;
+      let progress = 50;
       const progressInterval = setInterval(() => {
-        progress += 10;
+        progress += 5;
         if (progress < 90) {
           setIconUploadProgress(progress);
         }
@@ -129,7 +137,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
         setIsUploadingIcon(false);
       };
 
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(webpFile);
     } catch (error) {
       console.error("Icon upload error:", error);
       toast.error("图标上传失败", { description: "请重试或选择其他图标" });

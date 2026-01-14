@@ -28,7 +28,7 @@ export function useLocalStorage<T>(
 
   // 异步解密敏感数据
   useEffect(() => {
-    if (typeof window === 'undefined' || !sensitiveFields.length) {
+    if (typeof window === 'undefined' || !sensitiveFields.length || initialized) {
       setInitialized(true);
       return;
     }
@@ -47,7 +47,7 @@ export function useLocalStorage<T>(
     };
 
     loadEncryptedData();
-  }, [key, sensitiveFields]);
+  }, [key, sensitiveFields, initialized]);
 
   const setValue = useCallback((value: T | ((val: T) => T)) => {
     try {

@@ -39,6 +39,8 @@
   - GitHub Gist
   - S3 / Cloudflare R2
   - WebDAV
+  - Dropbox
+  - Google Drive
 - **扩展功能**：
   - **任务管理**：支持添加、编辑、完成和删除任务
   - **笔记功能**：支持创建和管理简单笔记
@@ -49,7 +51,7 @@
    - **图标库**：内置 400+ 精选功能性图标，支持自定义图标。
    - **智能数据合并**：多设备同步时自动合并数据，避免冲突。
    - **图片上传**：支持上传图片到配置的存储服务，自动生成访问链接。
-     - 支持 S3/R2、GitHub、WebDAV 等多种存储方式
+     - 支持 S3/R2、GitHub、WebDAV、Dropbox、Google Drive 等多种存储方式
      - 上传图片后自动填充链接到输入框
      - 提供详细的上传进度反馈
 
@@ -73,6 +75,12 @@
 ### 4. WebDAV
 支持连接到任何 WebDAV 服务器，适合自建存储或使用 Nextcloud 等服务。
 
+### 5. Dropbox
+支持使用 Dropbox 存储数据，适合已有 Dropbox 账号的用户。
+
+### 6. Google Drive
+支持使用 Google Drive 存储数据，适合已有 Google 账号的用户。
+
 ### 📘 详细配置指南
 
 请参考 [云同步配置指南](./docs/storage-guide.md) 获取完整的配置步骤和示例。
@@ -87,42 +95,6 @@
 4. **测试连接**：点击 `测试连接` 按钮确保配置正确
 5. **保存配置**：点击 `保存` 按钮保存配置
 
-### 配置说明
-
-#### GitHub 私有仓库
-| 选项         | 说明                        | 示例填写                  |
-|--------------|-----------------------------|---------------------------|
-| Token        | GitHub 访问令牌 (ghp_...)   | `ghp_AbC123...`           |
-| 用户名       | 你的 GitHub 账号名          | `your-username`           |
-| 仓库名       | 私有仓库名                  | `my-nav-data`             |
-| 分支         | 默认分支，通常是 `main`     | `main`                    |
-| 文件路径     | 存数据的文件名              | `data.json`               |
-
-#### GitHub Gist
-| 选项         | 说明                        | 示例填写                  |
-|--------------|-----------------------------|---------------------------|
-| Token        | GitHub 访问令牌 (ghp_...)   | `ghp_AbC123...`           |
-| Gist ID      | Gist 的 ID                  | `a1b2c3d4e5f6g7h8i9j0`    |
-| 文件名       | 存数据的文件名              | `nav-data.json`           |
-
-#### S3 / Cloudflare R2
-| 选项         | 说明                        | 示例填写                  |
-|--------------|-----------------------------|---------------------------|
-| 端点         | S3 服务端点                 | `https://xxx.r2.cloudflarestorage.com` |
-| 区域         | 存储区域                    | `auto`                    |
-| Access Key ID | 访问密钥 ID                | `AKIA...`                 |
-| Secret Access Key | 秘密访问密钥          | `abc123...`               |
-| Bucket       | 存储桶名称                  | `my-nav-bucket`           |
-| 文件路径     | 存数据的文件名              | `data.json`               |
-| 公共 URL     | 可选，用于直接访问文件      | `https://cdn.example.com` |
-
-#### WebDAV
-| 选项         | 说明                        | 示例填写                  |
-|--------------|-----------------------------|---------------------------|
-| URL          | WebDAV 服务器地址           | `https://example.com/webdav` |
-| 用户名       | WebDAV 用户名               | `user`                    |
-| 密码         | WebDAV 密码                 | `password`                |
-| 文件路径     | 存数据的文件名              | `data.json`               |
 
 ## 数据安全
 
@@ -156,7 +128,7 @@ npm run dev
 | 平台 | 构建命令 (Build Command)|输出目录 (Output Directory)|
 |--------------|-----------------------------|---------------------------|
 | Vercel        | npm run build  | 留空 (默认) ⚠️ 不要填 out          |
-| Cloudflare       | npm run build          | out (必须手动填写)          |
+| Cloudflare       | npm run build          | out (必须)          |
 | Netlify       | npm run build     | out            |
 
 ### 2. 启用在线编辑功能
@@ -165,7 +137,7 @@ npm run dev
 
 1. 打开部署好的导航页，点击右下角的 **设置 (⚙️)** 图标。
 2. 切换到 **云同步** 标签页。
-3. 选择你想要使用的存储类型（GitHub 仓库、GitHub Gist、S3/R2 或 WebDAV）。
+3. 选择你想要使用的存储类型。
 4. 填写相应的配置信息。
 5. 点击 **测试连接** 确保配置正确。
 6. 点击 **保存** 完成配置。
@@ -298,10 +270,18 @@ docker run -d \
 ### ⚠️ 注意事项与构建策略
 为了保证页面加载性能，构建脚本包含以下策略：
 
-- **随机采样**：如果 `public/wallpapers` 目录下的图片超过 **10张**，每次构建（`npm run build` 或 `npm run dev`）时只会自动**随机选取 10 张**打包进应用。
+- **随机采样**：如果 `public/wallpapers` 目录下的图片超过设定数量（默认5张），每次构建（`npm run build` 或 `npm run dev`）时只会自动**随机选取5张**打包进应用。
 - **推荐格式**：建议使用 `.webp` 格式，单张图片建议控制在 **2MB 以内**。
 
-如果你希望打包更多图片，可以在设置中修改。
+**自定义采样数量**：你可以在 `data.json` 文件中添加/修改 `settings.maxPackedWallpapers` 字段来调整打包的最大图片数量。
+
+```json
+{
+  "settings": {
+    "maxPackedWallpapers": 8
+  }
+}
+```
 
 
 ## 📄 License:

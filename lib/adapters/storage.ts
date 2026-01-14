@@ -6,12 +6,14 @@ import { parseNetscapeBookmarks } from "../parsers/bookmark-parser";
 
 export const STORAGE_CONFIG_KEY = "clean-nav-storage-config";
 export interface StorageConfig {
-  type: 'github' | 's3' | 'webdav' | 'gist';
+  type: 'github' | 's3' | 'webdav' | 'gist' | 'dropbox' | 'googledrive';
   github?: GithubRepoSettings;
   s3?: S3Settings;
   webdav?: WebDavSettings;
   gist?: GistSettings;
-  settings?: GithubRepoSettings | S3Settings | WebDavSettings | GistSettings;
+  dropbox?: DropboxSettings;
+  googledrive?: GoogleDriveSettings;
+  settings?: GithubRepoSettings | S3Settings | WebDavSettings | GistSettings | DropboxSettings | GoogleDriveSettings;
 }
 
 export interface StorageAdapter {
@@ -50,6 +52,17 @@ export interface WebDavSettings {
   username?: string;
   password?: string;
   path: string;
+}
+
+export interface DropboxSettings {
+  token: string;
+  path: string;
+}
+
+export interface GoogleDriveSettings {
+  token: string;
+  fileId: string;
+  filename: string;
 }
 
 export class S3Adapter implements StorageAdapter {
@@ -247,7 +260,7 @@ export class GithubRepoAdapter implements StorageAdapter {
     try {
       const octokit = new Octokit({ auth: token });
       
-      // 生成唯一文件名
+      // 生成唯一文件名，保留原始文件扩展名（客户端已转换为WebP的文件会保留.webp扩展名）
       const uniqueFilename = `${Date.now()}-${filename}`;
       const base64Filename = `base64-uploads/${uniqueFilename}.b64`;
       
@@ -428,5 +441,275 @@ export class WebDavAdapter implements StorageAdapter {
       console.error("WebDAV upload error:", error);
       throw error;
     }
+  }
+}
+
+export class DropboxAdapter implements StorageAdapter {
+  constructor(private config: DropboxSettings) {}
+
+  async testConnection(): Promise<void> {
+    try {
+      const response = await fetch("https://api.dropboxapi.com/2/users/get_current_account", {
+        headers: {
+          Authorization: `Bearer ${this.config.token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Dropbox 连接失败: ${response.statusText}`);
+      }
+    } catch (error) {
+      const errorMessage = typeof error === 'object' && error !== null && 'message' in error ? error.message as string : "未知错误";
+      throw new Error(`Dropbox 连接失败: ${errorMessage}`);
+    }
+  }
+
+  async load(): Promise<DataSchema | null> {
+    if (!this.config.token || !this.config.path) return null;
+
+    try {
+      const response = await fetch(`https://api.dropboxapi.com/2/files/download`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.config.token}`,
+          "Dropbox-API-Arg": JSON.stringify({ path: this.config.path }),
+        },
+      });
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
+        }
+        throw new Error(`Dropbox 下载失败: ${response.statusText}`);
+      }
+      
+      const content = await response.text();
+      return JSON.parse(content) as DataSchema;
+    } catch (error) {
+      console.error("Dropbox load error:", error);
+      return null;
+    }
+  }
+
+  async save(data: DataSchema): Promise<boolean> {
+    if (!this.config.token || !this.config.path) return false;
+
+    try {
+      const response = await fetch(`https://api.dropboxapi.com/2/files/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.config.token}`,
+          "Dropbox-API-Arg": JSON.stringify({
+            path: this.config.path,
+            mode: "overwrite",
+          }),
+          "Content-Type": "application/octet-stream",
+        },
+        body: JSON.stringify(data, null, 2),
+      });
+      
+      return response.ok;
+    } catch (error) {
+      console.error("Dropbox save error:", error);
+      return false;
+    }
+  }
+
+  async uploadFile(file: File, filename: string, onProgress?: (progress: number) => void): Promise<string> {
+    if (!this.config.token) throw new Error("Dropbox 配置不完整");
+
+    try {
+      // 生成唯一文件名
+      const uniqueFilename = `${Date.now()}-${filename}`;
+      const filePath = `/wallpapers/${uniqueFilename}`;
+      
+      // 读取文件
+      onProgress?.(20);
+      const arrayBuffer = await file.arrayBuffer();
+      onProgress?.(50);
+      
+      // 上传文件
+      const response = await fetch(`https://api.dropboxapi.com/2/files/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.config.token}`,
+          "Dropbox-API-Arg": JSON.stringify({
+            path: filePath,
+            mode: "add",
+          }),
+          "Content-Type": "application/octet-stream",
+        },
+        body: arrayBuffer,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Dropbox 文件上传失败: ${response.statusText}`);
+      }
+      
+      onProgress?.(100);
+      
+      // 返回可共享链接（需要额外API调用）
+      const shareResponse = await fetch(`https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.config.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          path: filePath,
+          settings: {
+            access: "viewer",
+            allow_download: true,
+          },
+        }),
+      });
+      
+      if (!shareResponse.ok) {
+        throw new Error(`Dropbox 创建共享链接失败: ${shareResponse.statusText}`);
+      }
+      
+      const shareData = await shareResponse.json();
+      return shareData.url.replace("www.dropbox.com", "dl.dropboxusercontent.com").replace("?dl=0", "?raw=1");
+    } catch (error) {
+      console.error("Dropbox upload error:", error);
+      throw error;
+    }
+  }
+}
+
+export class GoogleDriveAdapter implements StorageAdapter {
+  constructor(private config: GoogleDriveSettings) {}
+
+  async testConnection(): Promise<void> {
+    try {
+      const response = await fetch("https://www.googleapis.com/drive/v3/about?fields=user", {
+        headers: {
+          Authorization: `Bearer ${this.config.token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Google Drive 连接失败: ${response.statusText}`);
+      }
+    } catch (error) {
+      const errorMessage = typeof error === 'object' && error !== null && 'message' in error ? error.message as string : "未知错误";
+      throw new Error(`Google Drive 连接失败: ${errorMessage}`);
+    }
+  }
+
+  async load(): Promise<DataSchema | null> {
+    if (!this.config.token || !this.config.fileId) return null;
+
+    try {
+      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${this.config.fileId}?alt=media`, {
+        headers: {
+          Authorization: `Bearer ${this.config.token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
+        }
+        throw new Error(`Google Drive 下载失败: ${response.statusText}`);
+      }
+      
+      const content = await response.text();
+      return JSON.parse(content) as DataSchema;
+    } catch (error) {
+      console.error("Google Drive load error:", error);
+      return null;
+    }
+  }
+
+  async save(data: DataSchema): Promise<boolean> {
+    if (!this.config.token || !this.config.fileId || !this.config.filename) return false;
+
+    try {
+      // 检查文件是否存在，不存在则创建
+      const fileId = this.config.fileId;
+      
+      // 更新文件内容
+      const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${this.config.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data, null, 2),
+      });
+      
+      return response.ok;
+    } catch (error) {
+      console.error("Google Drive save error:", error);
+      return false;
+    }
+  }
+
+  async uploadFile(file: File, filename: string, onProgress?: (progress: number) => void): Promise<string> {
+    if (!this.config.token) throw new Error("Google Drive 配置不完整");
+
+    try {
+      // 生成唯一文件名
+      const uniqueFilename = `${Date.now()}-${filename}`;
+      
+      // 读取文件
+      onProgress?.(20);
+      const arrayBuffer = await file.arrayBuffer();
+      onProgress?.(50);
+      
+      // 上传文件到Google Drive
+      const uploadResponse = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.config.token}`,
+        },
+        body: this.createMultipartBody(uniqueFilename, arrayBuffer, file.type),
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error(`Google Drive 文件上传失败: ${uploadResponse.statusText}`);
+      }
+      
+      const fileData = await uploadResponse.json();
+      
+      // 设置文件权限为公开读取
+      await fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.config.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          role: "reader",
+          type: "anyone",
+        }),
+      });
+      
+      onProgress?.(100);
+      
+      // 返回文件的公开访问URL
+      return `https://drive.google.com/uc?export=view&id=${fileData.id}`;
+    } catch (error) {
+      console.error("Google Drive upload error:", error);
+      throw error;
+    }
+  }
+  
+  private createMultipartBody(filename: string, content: ArrayBuffer, mimeType: string): FormData {
+    const formData = new FormData();
+    
+    // 创建元数据部分
+    const metadata = {
+      name: filename,
+      mimeType: mimeType,
+      parents: ["1q_8fZpXr7Y4Z8a9b0c1d2e3f4g5h6i7j8k9l0m"], // 可选：指定父文件夹ID
+    };
+    
+    formData.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+    formData.append("file", new Blob([content], { type: mimeType }), filename);
+    
+    return formData;
   }
 }

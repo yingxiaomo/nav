@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DataSchema, DEFAULT_DATA, Category, Todo, Note } from "../types/types";
 import { GITHUB_CONFIG_KEY } from "../adapters/github";
-import { StorageAdapter, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, STORAGE_CONFIG_KEY, StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings } from "../adapters/storage";
+import { StorageAdapter, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, STORAGE_CONFIG_KEY, StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, DropboxSettings, GoogleDriveSettings } from "../adapters/storage";
 import { toast } from "sonner";
+import { convertToWebP } from '../utils/image-utils';
 
 const LOCAL_DATA_KEY = "clean-nav-local-data";
 
@@ -70,6 +71,14 @@ export function useNavData(initialWallpapers: string[]) {
         const settings = config.gist;
         return settings ? new GistAdapter(settings) : null;
     }
+    if (config.type === 'dropbox') {
+        const settings = config.dropbox;
+        return settings ? new DropboxAdapter(settings) : null;
+    }
+    if (config.type === 'googledrive') {
+        const settings = config.googledrive;
+        return settings ? new GoogleDriveAdapter(settings) : null;
+    }
     return null;
   }, []);
 
@@ -85,22 +94,30 @@ export function useNavData(initialWallpapers: string[]) {
             
             if (config.settings && Object.keys(config.settings).length > 0) {
                 if (config.type === 'github' && !config.github) {
-                    config.github = config.settings as GithubRepoSettings;
-                    delete config.settings;
-                    hasChanges = true;
-                } else if (config.type === 's3' && !config.s3) {
-                    config.s3 = config.settings as S3Settings;
-                    delete config.settings;
-                    hasChanges = true;
-                } else if (config.type === 'webdav' && !config.webdav) {
-                    config.webdav = config.settings as WebDavSettings;
-                    delete config.settings;
-                    hasChanges = true;
-                } else if (config.type === 'gist' && !config.gist) {
-                    config.gist = config.settings as GistSettings;
-                    delete config.settings;
-                    hasChanges = true;
-                }
+                config.github = config.settings as GithubRepoSettings;
+                delete config.settings;
+                hasChanges = true;
+            } else if (config.type === 's3' && !config.s3) {
+                config.s3 = config.settings as S3Settings;
+                delete config.settings;
+                hasChanges = true;
+            } else if (config.type === 'webdav' && !config.webdav) {
+                config.webdav = config.settings as WebDavSettings;
+                delete config.settings;
+                hasChanges = true;
+            } else if (config.type === 'gist' && !config.gist) {
+                config.gist = config.settings as GistSettings;
+                delete config.settings;
+                hasChanges = true;
+            } else if (config.type === 'dropbox' && !config.dropbox) {
+                config.dropbox = config.settings as DropboxSettings;
+                delete config.settings;
+                hasChanges = true;
+            } else if (config.type === 'googledrive' && !config.googledrive) {
+                config.googledrive = config.settings as GoogleDriveSettings;
+                delete config.settings;
+                hasChanges = true;
+            }
             }
             
             if (hasChanges) {
@@ -405,7 +422,15 @@ export function useNavData(initialWallpapers: string[]) {
           throw new Error("当前存储方式不支持文件上传");
       }
       
-      return await adapter.uploadFile(file, file.name, onProgress);
+      // 在上传前将图片转换为WebP格式
+      onProgress?.(5); // 开始转换进度
+      const webpFile = await convertToWebP(file);
+      onProgress?.(15); // 转换完成进度
+      
+      return await adapter.uploadFile(webpFile, webpFile.name, (progress) => {
+          // 调整进度值，加上转换的进度
+          onProgress?.(15 + (progress * 0.85));
+      });
   }, [getAdapter, getEffectiveConfig]);
 
   return {

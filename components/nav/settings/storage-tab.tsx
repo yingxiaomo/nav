@@ -1,6 +1,6 @@
 "use client";
 
-import { StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter } from "@/lib/adapters/storage";
+import { StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, DropboxSettings, GoogleDriveSettings, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter } from "@/lib/adapters/storage";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,8 @@ const DEFAULT_GITHUB: GithubRepoSettings = { token: "", owner: "", repo: "", bra
 const DEFAULT_S3: S3Settings = { endpoint: "", region: "auto", accessKeyId: "", secretAccessKey: "", bucket: "", key: "data.json" };
 const DEFAULT_WEBDAV: WebDavSettings = { url: "", username: "", password: "", path: "/data.json" };
 const DEFAULT_GIST: GistSettings = { token: "", gistId: "", filename: "nav-data.json" };
+const DEFAULT_DROPBOX: DropboxSettings = { token: "", path: "/nav-data.json" };
+const DEFAULT_GOOGLE_DRIVE: GoogleDriveSettings = { token: "", fileId: "", filename: "nav-data.json" };
 
 export function StorageTab({ config, setConfig }: StorageTabProps) {
   const [isTesting, setIsTesting] = useState(false);
@@ -51,6 +53,16 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
   const updateGist = (fields: Partial<GistSettings>) => {
     const current = config.gist || DEFAULT_GIST;
     setConfig({ ...config, gist: { ...current, ...fields } });
+  };
+
+  const updateDropbox = (fields: Partial<DropboxSettings>) => {
+    const current = config.dropbox || DEFAULT_DROPBOX;
+    setConfig({ ...config, dropbox: { ...current, ...fields } });
+  };
+
+  const updateGoogleDrive = (fields: Partial<GoogleDriveSettings>) => {
+    const current = config.googledrive || DEFAULT_GOOGLE_DRIVE;
+    setConfig({ ...config, googledrive: { ...current, ...fields } });
   };
 
   const handleTestConnection = async () => {
@@ -88,6 +100,22 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
           description: "已成功连接到 GitHub Gist",
           duration: 3000
         });
+      } else if (config.type === 'dropbox') {
+        const settings = config.dropbox || DEFAULT_DROPBOX;
+        const adapter = new DropboxAdapter(settings);
+        if (adapter.testConnection) await adapter.testConnection();
+        toast.success("Dropbox 连接成功！", {
+          description: "已成功连接到 Dropbox",
+          duration: 3000
+        });
+      } else if (config.type === 'googledrive') {
+        const settings = config.googledrive || DEFAULT_GOOGLE_DRIVE;
+        const adapter = new GoogleDriveAdapter(settings);
+        if (adapter.testConnection) await adapter.testConnection();
+        toast.success("Google Drive 连接成功！", {
+          description: "已成功连接到 Google Drive",
+          duration: 3000
+        });
       }
     } catch (error: unknown) {
       console.error("Test connection failed:", error);
@@ -102,6 +130,8 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
   const s3Cfg = config.s3 || DEFAULT_S3;
   const webdavCfg = config.webdav || DEFAULT_WEBDAV;
   const gistCfg = config.gist || DEFAULT_GIST;
+  const dropboxCfg = config.dropbox || DEFAULT_DROPBOX;
+  const googleDriveCfg = config.googledrive || DEFAULT_GOOGLE_DRIVE;
 
   return (
     <div className="space-y-4 py-4 overflow-y-auto h-full px-1 custom-scrollbar">
@@ -116,6 +146,8 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
             <SelectItem value="s3">S3 / Cloudflare R2</SelectItem>
             <SelectItem value="webdav">WebDAV</SelectItem>
             <SelectItem value="gist">GitHub Gist</SelectItem>
+            <SelectItem value="dropbox">Dropbox</SelectItem>
+            <SelectItem value="googledrive">Google Drive</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -329,6 +361,69 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
             </div>
             <p className="text-[11px] text-muted-foreground">
               请创建一个私有或公开的 Gist，并填入其 ID 和文件名。
+            </p>
+          </>
+        )}
+
+        {config.type === 'dropbox' && (
+          <>
+            <div className="space-y-2">
+              <Label>Token (需要 files.content.read 和 files.content.write 权限)</Label>
+              <Input 
+                type="password" 
+                value={dropboxCfg.token || ""} 
+                onChange={e => updateDropbox({ token: e.target.value })} 
+                placeholder="sl.xxx..." 
+                className="h-9" 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>文件路径</Label>
+              <Input 
+                value={dropboxCfg.path || ""} 
+                onChange={e => updateDropbox({ path: e.target.value })} 
+                placeholder="/nav-data.json" 
+                className="h-9" 
+              />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              请确保文件路径以斜杠开头，例如：/nav-data.json
+            </p>
+          </>
+        )}
+
+        {config.type === 'googledrive' && (
+          <>
+            <div className="space-y-2">
+              <Label>Token (需要 drive.file 权限)</Label>
+              <Input 
+                type="password" 
+                value={googleDriveCfg.token || ""} 
+                onChange={e => updateGoogleDrive({ token: e.target.value })} 
+                placeholder="ya29.xxx..." 
+                className="h-9" 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>文件 ID</Label>
+              <Input 
+                value={googleDriveCfg.fileId || ""} 
+                onChange={e => updateGoogleDrive({ fileId: e.target.value })} 
+                placeholder="Google Drive 文件 ID" 
+                className="h-9" 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>文件名</Label>
+              <Input 
+                value={googleDriveCfg.filename || ""} 
+                onChange={e => updateGoogleDrive({ filename: e.target.value })} 
+                placeholder="nav-data.json" 
+                className="h-9" 
+              />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              请创建一个 Google Drive 文件，并填入其文件 ID 和文件名。
             </p>
           </>
         )}

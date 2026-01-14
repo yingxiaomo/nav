@@ -6,6 +6,8 @@
 - **GitHub Gist**：适合快速上手，无需创建新仓库
 - **S3 兼容存储**：如 Cloudflare R2、AWS S3、MinIO 等
 - **WebDAV**：适合自建存储或使用 Nextcloud 等服务
+- **Dropbox**：适合已有 Dropbox 账号的用户
+- **Google Drive**：适合已有 Google 账号的用户
 
 ## 选项 A: 使用 GitHub 私有仓库
 
@@ -203,3 +205,117 @@ WebDAV 是一种基于 HTTP 的文件访问协议，适合自建存储或使用 
 - 建议使用 HTTPS 协议，确保数据传输安全
 
 点击保存并同步，如果提示“同步成功”，恭喜你，配置完成！
+
+---
+
+## 选项 E: 使用 Dropbox
+
+适合已有 Dropbox 账号的用户，操作简单，无需复杂配置。
+
+### 1. 获取 Dropbox Access Token
+
+1. 登录 [Dropbox Developer 控制台](https://www.dropbox.com/developers/apps)。
+2. 点击 **Create app**（创建应用）。
+3. 在 **Choose an API** 中选择 **Scoped access**。
+4. 在 **Choose the type of access you need** 中选择 **App folder**（仅访问应用专用文件夹，更安全）或 **Full Dropbox**（访问所有文件夹，不推荐）。
+5. 填写 **Name your app**，例如 `clean-nav-sync`。
+6. 点击 **Create app**。
+7. 在应用详情页中，切换到 **Permissions** 标签页。
+8. 勾选以下权限：
+   - `files.content.read`（读取文件内容）
+   - `files.content.write`（写入文件内容）
+9. 点击 **Submit** 保存权限设置。
+10. 切换到 **Settings** 标签页。
+11. 在 **OAuth 2** 部分，找到 **Generated access token**，点击 **Generate**。
+12. 复制生成的访问令牌（以 `sl.` 开头）。
+
+### 2. 填写到 Clean Nav 设置中
+
+| Clean Nav 设置项 | 对应 Dropbox 界面上的值 | 说明 |
+| :--- | :--- | :--- |
+| **Token** | 刚才复制的 `sl.xxx...` 令牌 | 例如 `sl.ABC123...` |
+| **文件路径** | 数据文件在 Dropbox 中的路径 | 例如 `/nav-data.json`（App folder 模式下）或 `/Documents/nav-data.json`（Full Dropbox 模式下） |
+
+点击保存并同步，如果提示“同步成功”，恭喜你，配置完成！
+
+---
+
+## 选项 F: 使用 Google Drive
+
+适合已有 Google 账号的用户，需要创建 OAuth 客户端并获取访问令牌。
+
+### 1. 创建 Google Cloud 项目
+
+1. 登录 [Google Cloud Console](https://console.cloud.google.com/)。
+2. 点击左上角的 **Select a project**，然后点击 **New Project**。
+3. 填写项目名称，例如 `clean-nav-sync`，点击 **Create**。
+4. 等待项目创建完成，然后在顶部选择该项目。
+
+### 2. 启用 Google Drive API
+
+1. 在 Google Cloud Console 中，点击左侧菜单的 **API & Services** -> **Library**。
+2. 搜索 **Google Drive API**，点击进入。
+3. 点击 **Enable** 启用 API。
+
+### 3. 创建 OAuth 客户端 ID
+
+1. 点击左侧菜单的 **API & Services** -> **Credentials**。
+2. 点击 **Create Credentials** -> **OAuth client ID**。
+3. 如果提示需要配置 **OAuth consent screen**，点击 **Configure consent screen**：
+   - 选择 **External**，点击 **Create**。
+   - 填写 **App name**（例如 `Clean Nav`）、**User support email** 和 **Developer contact information**。
+   - 点击 **Save and Continue**，跳过其他步骤，最后点击 **Back to Dashboard**。
+4. 回到 **Create OAuth client ID** 页面：
+   - **Application type** 选择 **Web application**。
+   - **Name** 填写 `clean-nav-client`。
+   - 在 **Authorized JavaScript origins** 中添加 `http://localhost`（用于本地测试）和你的导航页域名（如果有）。
+   - 点击 **Create**。
+5. 复制生成的 **Client ID** 和 **Client Secret**（可选，根据需要）。
+
+### 4. 获取访问令牌
+
+由于 Google Drive API 的访问令牌需要通过 OAuth 2.0 授权流程获取，建议使用以下方法之一：
+
+#### 方法 1: 使用 Google OAuth 2.0 Playground
+
+1. 访问 [Google OAuth 2.0 Playground](https://developers.google.com/oauthplayground/)。
+2. 点击右上角的 **Settings**（齿轮图标）。
+3. 勾选 **Use your own OAuth credentials**。
+4. 填写刚才生成的 **Client ID** 和 **Client Secret**。
+5. 点击 **Close**。
+6. 在左侧 **Step 1** 中，搜索并选择 **https://www.googleapis.com/auth/drive.file** 范围。
+7. 点击 **Authorize APIs**，登录你的 Google 账号并授权。
+8. 在 **Step 2** 中，点击 **Exchange authorization code for tokens**。
+9. 复制生成的 **Access token**（有效期约 1 小时）和 **Refresh token**（永久有效，用于刷新访问令牌）。
+
+#### 方法 2: 使用浏览器开发者工具（高级用户）
+
+1. 在浏览器中打开一个新标签页。
+2. 访问以下 URL（替换 `YOUR_CLIENT_ID` 为你的 Client ID）：
+   ```
+   https://accounts.google.com/o/oauth2/v2/auth?client_id=YOUR_CLIENT_ID&redirect_uri=http://localhost&response_type=token&scope=https://www.googleapis.com/auth/drive.file
+   ```
+3. 登录并授权后，浏览器地址栏会显示包含访问令牌的 URL，复制其中的 `access_token` 参数值。
+
+### 5. 填写到 Clean Nav 设置中
+
+| Clean Nav 设置项 | 对应 Google Cloud 界面上的值 | 说明 |
+| :--- | :--- | :--- |
+| **Token** | 刚才复制的访问令牌 | 例如 `ya29.XXX...` |
+| **文件 ID** | Google Drive 文件的 ID（可选，首次使用时留空） | 例如 `1ABCDEF1234567890abcdef1234567890abcdef` |
+| **文件名** | 数据文件的名称 | 例如 `nav-data.json` |
+
+**首次使用说明**：
+- 如果没有现有文件 ID，可以留空，系统会自动创建新文件。
+- 创建文件后，你可以在 Google Drive 中找到该文件，然后从 URL 中获取文件 ID（例如 `https://drive.google.com/file/d/ FILE_ID /view` 中的 `FILE_ID`）。
+
+点击保存并同步，如果提示“同步成功”，恭喜你，配置完成！
+
+---
+
+## 安全提示
+
+- 所有存储方式的访问令牌都会在本地加密存储，确保你的数据安全。
+- 建议定期更换访问令牌，特别是在使用公共设备时。
+- 对于重要数据，建议启用双重验证（2FA）保护你的云存储账号。
+- 定期备份你的导航数据，以防万一。

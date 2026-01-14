@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ClockWidget } from "@/components/nav/clock";
 import { SearchBar } from "@/components/nav/search-bar";
 import { LinkGrid } from "@/components/nav/link-grid";
-import { SettingsDialog } from "@/components/nav/settings";
+// 懒加载设置对话框组件
+const SettingsDialog = lazy(() => import("@/components/nav/settings").then(mod => ({ default: mod.SettingsDialog })));
 import { FeaturesLauncher } from "@/components/features/features-launcher";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -124,15 +125,21 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
         />
         <div className="fixed inset-0 z-0 bg-black/20 pointer-events-none" />
         <div className="fixed top-4 right-4 z-50 flex gap-2">
-          <SettingsDialog 
-            data={data} 
-            onSave={(newData) => handleSave(newData, initWallpaper)} 
-            isSaving={isSaving}
-            hasUnsavedChanges={hasUnsavedChanges}
-            syncError={syncError}
-            onRefreshWallpaper={() => initWallpaper(data)}
-            uploadWallpaper={uploadWallpaper}
-          />
+          <Suspense fallback={
+            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm">
+              <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"></div>
+            </div>
+          }>
+            <SettingsDialog 
+              data={data} 
+              onSave={(newData) => handleSave(newData, initWallpaper)} 
+              isSaving={isSaving}
+              hasUnsavedChanges={hasUnsavedChanges}
+              syncError={syncError}
+              onRefreshWallpaper={() => initWallpaper(data)}
+              uploadWallpaper={uploadWallpaper}
+            />
+          </Suspense>
         </div>
 
         <div className="relative z-10 w-full flex flex-col items-center flex-grow">

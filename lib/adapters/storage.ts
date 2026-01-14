@@ -700,11 +700,10 @@ export class GoogleDriveAdapter implements StorageAdapter {
   private createMultipartBody(filename: string, content: ArrayBuffer, mimeType: string): FormData {
     const formData = new FormData();
     
-    // 创建元数据部分
+    // 创建元数据部分，不指定固定的父文件夹ID，允许文件上传到默认位置
     const metadata = {
       name: filename,
-      mimeType: mimeType,
-      parents: ["1q_8fZpXr7Y4Z8a9b0c1d2e3f4g5h6i7j8k9l0m"], // 可选：指定父文件夹ID
+      mimeType: mimeType
     };
     
     formData.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));

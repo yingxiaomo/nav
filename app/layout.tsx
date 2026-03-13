@@ -80,7 +80,10 @@ export const metadata: Metadata = {
     icon: "/favicon.ico",
     shortcut: "/favicon.ico",
     apple: "/apple-touch-icon.png",
-  }
+  },
+  
+  // PWA related
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({

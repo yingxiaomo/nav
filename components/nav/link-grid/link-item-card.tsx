@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { LinkItem } from "@/lib/types/types";
 import { ChevronLeft } from "lucide-react";
@@ -32,8 +32,8 @@ export function LinkItemCard({ item, onClick, className }: LinkItemCardProps) {
     }
 
     return (
-       <div className={`group block relative ${className || ''}`}>
-           <div className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition-colors">
+       <div className={`group block relative ${className || ''}`} onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}>
+           <div className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition-colors cursor-pointer">
                <div className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center border border-white/20 overflow-hidden bg-blue-500/10 text-blue-500">
                    <IconRender name={item.icon || "Link"} className="h-4 w-4" />
                </div>

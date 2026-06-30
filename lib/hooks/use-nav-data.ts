@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DataSchema, DEFAULT_DATA, Category, Todo, Note } from "../types/types";
 import { GITHUB_CONFIG_KEY } from "../adapters/github";
-import { StorageAdapter, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, STORAGE_CONFIG_KEY, StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, DropboxSettings, GoogleDriveSettings } from "../adapters/storage";
+import { StorageAdapter, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, STORAGE_CONFIG_KEY, StorageConfig } from "../adapters/storage";
 import { toast } from "sonner";
 import { convertToWebP } from '../utils/image-utils';
 
@@ -88,41 +88,28 @@ export function useNavData(initialWallpapers: string[]) {
     const storageConfigStr = localStorage.getItem(STORAGE_CONFIG_KEY);
     if (storageConfigStr) {
         try {
-            const config = JSON.parse(storageConfigStr) as StorageConfig;
-
-            let hasChanges = false;
+            const rawConfig = JSON.parse(storageConfigStr);
             
-            if (config.settings && Object.keys(config.settings).length > 0) {
-                if (config.type === 'github' && !config.github) {
-                config.github = config.settings as GithubRepoSettings;
-                delete config.settings;
-                hasChanges = true;
-            } else if (config.type === 's3' && !config.s3) {
-                config.s3 = config.settings as S3Settings;
-                delete config.settings;
-                hasChanges = true;
-            } else if (config.type === 'webdav' && !config.webdav) {
-                config.webdav = config.settings as WebDavSettings;
-                delete config.settings;
-                hasChanges = true;
-            } else if (config.type === 'gist' && !config.gist) {
-                config.gist = config.settings as GistSettings;
-                delete config.settings;
-                hasChanges = true;
-            } else if (config.type === 'dropbox' && !config.dropbox) {
-                config.dropbox = config.settings as DropboxSettings;
-                delete config.settings;
-                hasChanges = true;
-            } else if (config.type === 'googledrive' && !config.googledrive) {
-                config.googledrive = config.settings as GoogleDriveSettings;
-                delete config.settings;
-                hasChanges = true;
+            if (rawConfig.settings && Object.keys(rawConfig.settings).length > 0) {
+                const oldSettings = rawConfig.settings;
+                if (rawConfig.type === 'github' && !rawConfig.github) {
+                rawConfig.github = oldSettings;
+            } else if (rawConfig.type === 's3' && !rawConfig.s3) {
+                rawConfig.s3 = oldSettings;
+            } else if (rawConfig.type === 'webdav' && !rawConfig.webdav) {
+                rawConfig.webdav = oldSettings;
+            } else if (rawConfig.type === 'gist' && !rawConfig.gist) {
+                rawConfig.gist = oldSettings;
+            } else if (rawConfig.type === 'dropbox' && !rawConfig.dropbox) {
+                rawConfig.dropbox = oldSettings;
+            } else if (rawConfig.type === 'googledrive' && !rawConfig.googledrive) {
+                rawConfig.googledrive = oldSettings;
             }
+                delete rawConfig.settings;
+                localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(rawConfig));
             }
             
-            if (hasChanges) {
-                localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(config));
-            }
+            const config = rawConfig as StorageConfig;
             return config;
         } catch (e) {
             console.error("Error parsing storage config", e);
@@ -248,7 +235,7 @@ export function useNavData(initialWallpapers: string[]) {
   }, [mergeItems]);
 
   // 使用 React Query Mutation 保存数据
-  const { mutate: saveMutate, isPending: isSaving, isSuccess, isError, error, data: mutationResult, variables: mutationVariables } = useMutation({
+  const { mutate: saveMutate, isPending: isSaving } = useMutation({
     mutationFn: (params: {
       newData: DataSchema;
       config: StorageConfig;
@@ -269,54 +256,40 @@ export function useNavData(initialWallpapers: string[]) {
       // 保存到云端
       return saveData({ data: newData, config, getAdapter });
     },
-  });
-
-  // 处理保存成功
-  useEffect(() => {
-    if (isSuccess && mutationResult && mutationVariables) {
-      if (mutationResult) {
+    onSuccess: (result, variables) => {
+      if (result) {
         toast.success("同步成功！", {
           description: "云端更新可能受 CDN 缓存影响有 1-5 分钟延迟，请勿频繁刷新或重复保存。",
           duration: 5000,
         });
-        setTimeout(() => {
-          setHasUnsavedChanges(false);
-          setSyncError(false);
-          setData(mutationVariables.newData);
-        }, 0);
+        setHasUnsavedChanges(false);
+        setSyncError(false);
+        setData(variables.newData);
       } else {
         toast.error("同步失败 (已暂存到本地)", {
           description: "请检查网络连接或云端配置，稍后重试",
           duration: 4000
         });
-        setTimeout(() => {
-          setSyncError(true);
-          setData(mutationVariables.newData);
-          setHasUnsavedChanges(true);
-        }, 0);
+        setSyncError(true);
+        setData(variables.newData);
+        setHasUnsavedChanges(true);
       }
-    }
-  }, [isSuccess, mutationResult, mutationVariables]);
-
-  // 处理保存错误
-  useEffect(() => {
-    if (isError && mutationVariables) {
+    },
+    onError: (error, variables) => {
       console.error("Save error", error);
       toast.error("保存时发生错误", {
         description: typeof error === 'object' && error !== null && 'message' in error ? (error.message as string) : "请检查网络或配置",
         duration: 4000
       });
-      setTimeout(() => {
-        setSyncError(true);
-        setData(mutationVariables.newData);
-        setHasUnsavedChanges(true);
-      }, 0);
-    }
-  }, [isError, error, mutationVariables]);
+      setSyncError(true);
+      setData(variables.newData);
+      setHasUnsavedChanges(true);
+    },
+  });
 
   // 使用 React Query 获取远程数据
   const { data: remoteData } = useQuery({
-    queryKey: ['navData', getEffectiveConfig()],
+    queryKey: ['navData', JSON.stringify(getEffectiveConfig())],
     queryFn: async () => {
       const config = getEffectiveConfig();
       if (!config) return null;
@@ -378,10 +351,6 @@ export function useNavData(initialWallpapers: string[]) {
     }
   }, [remoteData, dataRef, initialWallpapers, mergeCategories, mergeItems]);
 
-  // 处理远程数据获取错误
-  useEffect(() => {
-    // 移除未使用的变量
-  }, []);
 
   const handleSave = useCallback(async (newData: DataSchema, onWallpaperUpdate?: (cfg: DataSchema) => void) => {
     setSyncError(false);

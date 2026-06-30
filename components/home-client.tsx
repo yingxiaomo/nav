@@ -19,7 +19,7 @@ interface HomeClientProps {
 
 export default function HomeClient({ initialWallpapers }: HomeClientProps) {
   // 创建 QueryClient 实例
-  const queryClient = new QueryClient({
+  const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
         staleTime: 5 * 60 * 1000, // 5分钟后数据过期
@@ -27,7 +27,7 @@ export default function HomeClient({ initialWallpapers }: HomeClientProps) {
         refetchOnWindowFocus: true, // 窗口获取焦点时重新获取数据
       },
     },
-  });
+  }));
 
   return (
     <QueryClientProvider client={queryClient}>

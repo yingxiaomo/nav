@@ -1,4 +1,4 @@
-import React, { useState, ChangeEvent } from "react";
+import React, { useState, ChangeEvent, useRef, useEffect } from "react";
 import { DataSchema, Category, LinkItem } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,8 +31,16 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
   const [isUploadingIcon, setIsUploadingIcon] = useState(false);
   const [iconUploadProgress, setIconUploadProgress] = useState(0);
   const existingCategories = Array.from(new Set(localData.categories.map(c => c.title)));
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const handleSmartIdentify = (rawUrl: string, isAuto: boolean = false) => {
+ const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const identifyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  useEffect(() => {
+    return () => {
+      if (identifyTimerRef.current) clearTimeout(identifyTimerRef.current);
+    };
+  }, []);
+  
+ const handleSmartIdentify = (rawUrl: string, isAuto: boolean = false) => {
     if (!rawUrl) {
       if (!isAuto) toast.error("请先输入 URL", { description: "请输入要添加的链接地址" });
       return;
@@ -175,12 +183,13 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
       categoryIndex = newData.categories.length - 1;
     }
     
-    newData.categories[categoryIndex].links.push({ 
-      id: `l-${Date.now()}`, 
-      title: sanitizedTitle, 
-      url: finalUrl, 
-      icon: newIcon 
-    });
+      newData.categories[categoryIndex].links.push({ 
+        id: `l-${Date.now()}`, 
+        title: sanitizedTitle, 
+        url: finalUrl, 
+        icon: newIcon, 
+        updatedAt: Date.now() 
+      });
     
     setLocalData(newData);
     setNewUrl(""); 
@@ -238,7 +247,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
                             }
 
                             items.push({
-                                id: `f-${Date.now()}-${Math.random()}`,
+                                id: crypto.randomUUID(),
                                 title: folderTitle,
                                 url: "",
                                 icon: "FolderOpen",
@@ -248,7 +257,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
                             totalFolders++;
                         } else if (a) {
                             items.push({
-                                id: `l-${Date.now()}-${Math.random()}`,
+                                id: crypto.randomUUID(),
                                 title: a.innerText,
                                 url: a.href,
                                 icon: `https://www.google.com/s2/favicons?domain=${new URL(a.href).hostname}&sz=128`,
@@ -271,7 +280,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
                 for (const item of rootItems) {
                     if (item.type === 'folder' && item.children) {
                         newCategories.push({
-                            id: `c-${Date.now()}-${Math.random()}`,
+                            id: crypto.randomUUID(),
                             title: item.title,
                             icon: "FolderOpen",
                             links: item.children
@@ -283,7 +292,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
 
                 if (looseLinks.length > 0) {
                     newCategories.push({
-                        id: `c-${Date.now()}-${Math.random()}`,
+                        id: crypto.randomUUID(),
                         title: "导入的书签",
                         icon: "FolderDown",
                         links: looseLinks
@@ -324,11 +333,12 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
                         <Input 
                             placeholder="example.com" 
                             value={newUrl} 
-                            onChange={e => {
-                                const val = e.target.value;
-                                setNewUrl(val);
-                                handleSmartIdentify(val, true);
-                            }} 
+                           onChange={e => {
+                               const val = e.target.value;
+                               setNewUrl(val);
+                                if (identifyTimerRef.current) clearTimeout(identifyTimerRef.current);
+                                identifyTimerRef.current = setTimeout(() => handleSmartIdentify(val, true), 300);
+                           }} 
                             onBlur={() => handleSmartIdentify(newUrl, true)}
                             className="h-10 bg-background"
                         />

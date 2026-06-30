@@ -1,19 +1,19 @@
-// 数据验证模块
-// 提供统一的验证函数，防止XSS和其他安全漏洞
+// 验证与安全工具函数
+// 提供表单输入验证、XSS 防护等通用工具函数
 
 /**
- * 验证字符串是否为空
- * @param str 要验证的字符串
- * @returns 布尔值，表示字符串是否为空
+ * 检查字符串是否为空
+ * @param str 要检查的字符串
+ * @returns 如果字符串为空或仅含空白符则返回 true
  */
 export const isEmptyString = (str: string | undefined | null): boolean => {
   return !str || str.trim() === '';
 };
 
 /**
- * 验证URL格式是否正确
- * @param url 要验证的URL字符串
- * @returns 布尔值，表示URL格式是否正确
+ * 验证 URL 格式是否有效
+ * @param url 要验证的 URL 字符串
+ * @returns 如果 URL 格式有效则返回 true
  */
 export const isValidUrl = (url: string): boolean => {
   if (!url) return false;
@@ -26,34 +26,31 @@ export const isValidUrl = (url: string): boolean => {
 };
 
 /**
- * 验证文件夹名称是否合法
- * @param name 文件夹名称
- * @returns 布尔值，表示名称是否合法
+ * 验证分类名称是否有效
+ * @param name 分类名称
+ * @returns 如果名称长度在 1-50 字符且不含特殊字符则返回 true
  */
 export const isValidFolderName = (name: string): boolean => {
   if (isEmptyString(name)) return false;
-  // 检查长度（1-50字符）
   if (name.length < 1 || name.length > 50) return false;
-  // 检查是否包含特殊字符
-  const invalidChars = /[<>:"/\\|?*]/;
+  const invalidChars = /[<>:"\\/|?*]/;
   return !invalidChars.test(name);
 };
 
 /**
- * 验证链接标题是否合法
+ * 验证链接标题是否有效
  * @param title 链接标题
- * @returns 布尔值，表示标题是否合法
+ * @returns 如果标题长度在 1-100 字符则返回 true
  */
 export const isValidLinkTitle = (title: string): boolean => {
   if (isEmptyString(title)) return false;
-  // 检查长度（1-100字符）
   return title.length >= 1 && title.length <= 100;
 };
 
 /**
- * 验证链接URL是否合法
- * @param url 链接URL
- * @returns 布尔值，表示URL是否合法
+ * 验证链接 URL 是否有效
+ * @param url 链接 URL
+ * @returns 如果 URL 有效则返回 true
  */
 export const isValidLinkUrl = (url: string): boolean => {
   if (isEmptyString(url)) return false;
@@ -61,37 +58,19 @@ export const isValidLinkUrl = (url: string): boolean => {
 };
 
 /**
- * 验证图标名称是否合法
+ * 验证图标名称是否有效
  * @param icon 图标名称
- * @returns 布尔值，表示图标是否合法
+ * @returns 如果图标名称长度在 1-50 字符则返回 true
  */
 export const isValidIconName = (icon: string): boolean => {
   if (isEmptyString(icon)) return false;
-  // 图标名称长度限制（1-50字符）
   return icon.length >= 1 && icon.length <= 50;
 };
 
 /**
- * 净化HTML内容，防止XSS攻击
- * @param html 要净化的HTML字符串
- * @returns 净化后的HTML字符串
- */
-export const sanitizeHtml = (html: string): string => {
-  if (!html) return '';
-  // 移除所有脚本标签
-  return html.replace(/<script[^>]*>.*?<\/script>/gi, '')
-    // 移除所有事件属性
-    .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
-    // 移除所有style属性（防止CSS注入）
-    .replace(/style\s*=\s*["'][^"']*["']/gi, '')
-    // 移除危险的HTML标签
-    .replace(/<(iframe|object|embed|form|input|button)[^>]*>.*?<\/\1>/gi, '');
-};
-
-/**
- * 净化用户输入的文本，防止XSS攻击
- * @param text 要净化的文本
- * @returns 净化后的文本
+ * 对输入文本进行 XSS 安全过滤
+ * @param text 需要过滤的文本
+ * @returns 过滤后的安全文本
  */
 export const sanitizeText = (text: string): string => {
   if (!text) return '';
@@ -101,20 +80,20 @@ export const sanitizeText = (text: string): string => {
 };
 
 /**
- * 验证文件是否为有效的图片类型
- * @param file 文件对象
- * @returns 布尔值，表示文件是否为有效图片
+ * 验证上传文件是否为支持的图片格式
+ * @param file 上传的文件
+ * @returns 如果文件类型为支持的图片格式则返回 true
  */
 export const isValidImageFile = (file: File): boolean => {
-  const allowedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/svg+xml'];
+  const allowedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/svg+xml', 'image/webp'];
   return allowedTypes.includes(file.type);
 };
 
 /**
- * 验证文件大小是否在限制范围内
- * @param file 文件对象
- * @param maxSizeMB 最大允许大小（MB）
- * @returns 布尔值，表示文件大小是否合法
+ * 验证上传文件大小是否在限制范围内
+ * @param file 上传的文件
+ * @param maxSizeMB 最大文件大小（MB），默认 2MB
+ * @returns 如果文件大小未超过限制则返回 true
  */
 export const isValidFileSize = (file: File, maxSizeMB: number = 2): boolean => {
   const maxSizeBytes = maxSizeMB * 1024 * 1024;
@@ -124,11 +103,10 @@ export const isValidFileSize = (file: File, maxSizeMB: number = 2): boolean => {
 /**
  * 验证存储配置是否有效
  * @param config 存储配置对象
- * @returns 布尔值，表示配置是否有效
+ * @returns 如果配置包含必要字段则返回 true
  */
 export const isValidStorageConfig = (config: Record<string, unknown>): boolean => {
   if (!config || typeof config !== 'object') return false;
-  // 检查必要的配置字段
   const requiredFields = ['type'];
   for (const field of requiredFields) {
     if (!config[field]) return false;
@@ -137,37 +115,37 @@ export const isValidStorageConfig = (config: Record<string, unknown>): boolean =
 };
 
 /**
- * 验证GitHub Token格式是否正确
+ * 验证 GitHub Token 格式是否有效
  * @param token GitHub Token
- * @returns 布尔值，表示Token格式是否正确
+ * @returns 如果 Token 格式有效则返回 true
  */
 export const isValidGithubToken = (token: string): boolean => {
   if (!token) return false;
-  // GitHub Token通常以ghp_开头，长度约为40字符
-  return /^ghp_[a-zA-Z0-9]{36,}$/.test(token);
+  // 支持多种 GitHub Token 格式: ghp_(经典 PAT)、github_pat_(细粒度 PAT)、gho_(OAuth)、ghu_(用户)、ghs_(SSH)、ghr_(刷新)
+  return /^gh[psuor]_[a-zA-Z0-9]{36,}$/.test(token) || /^github_pat_[a-zA-Z0-9_]{36,}$/.test(token);
 };
 
 /**
- * 验证Gist ID格式是否正确
+ * 验证 Gist ID 格式是否有效
  * @param gistId Gist ID
- * @returns 布尔值，表示Gist ID格式是否正确
+ * @returns 如果 Gist ID 格式有效则返回 true
  */
 export const isValidGistId = (gistId: string): boolean => {
   if (!gistId) return false;
-  // Gist ID通常是32字符的十六进制字符串
+  // Gist ID 通常为 32 位以上的十六进制字符串
   return /^[a-f0-9]{32,}$/i.test(gistId);
 };
 
 /**
- * 验证WebDAV URL格式是否正确
+ * 验证 WebDAV URL 格式是否有效
  * @param url WebDAV URL
- * @returns 布尔值，表示URL格式是否正确
+ * @returns 如果 URL 格式有效则返回 true
  */
 export const isValidWebdavUrl = (url: string): boolean => {
   if (!url) return false;
   try {
     const urlObj = new URL(url);
-    // WebDAV通常使用http或https协议
+    // WebDAV 仅支持 http 和 https 协议
     return ['http:', 'https:'].includes(urlObj.protocol);
   } catch {
     return false;

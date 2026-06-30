@@ -3,9 +3,11 @@ import { render, screen } from '@testing-library/react';
 import { IconRender } from '../../nav/settings/shared';
 
 describe('IconRender Component', () => {
-  test('renders Lucide icon correctly', () => {
-    render(<IconRender name="Home" className="w-6 h-6" />);
-    expect(screen.getByRole('img')).toBeInTheDocument();
+  test('renders Lucide icon correctly (SVG with aria-hidden)', () => {
+    const { container } = render(<IconRender name="Home" className="w-6 h-6" />);
+    const svg = container.querySelector('svg.lucide');
+    expect(svg).toBeInTheDocument();
+    expect(svg).toHaveAttribute('aria-hidden', 'true');
   });
 
   test('renders custom icon correctly', () => {
@@ -13,11 +15,14 @@ describe('IconRender Component', () => {
     render(<IconRender name={customIconUrl} className="w-6 h-6" />);
     const imgElement = screen.getByRole('img');
     expect(imgElement).toBeInTheDocument();
-    expect(imgElement).toHaveAttribute('src', customIconUrl);
+    // Next.js Image rewrites src for optimization; check URL is encoded inside
+    expect(imgElement).toHaveAttribute('src', expect.stringContaining(encodeURIComponent(customIconUrl)));
   });
 
-  test('renders default icon when name is not provided', () => {
-    render(<IconRender name="" className="w-6 h-6" />);
-    expect(screen.getByRole('img')).toBeInTheDocument();
+  test('renders default LinkIcon SVG when name is empty', () => {
+    const { container } = render(<IconRender name="" className="w-6 h-6" />);
+    const svg = container.querySelector('svg.lucide');
+    expect(svg).toBeInTheDocument();
+    expect(svg).toHaveClass('lucide-link');
   });
 });

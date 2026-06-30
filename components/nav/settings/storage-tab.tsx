@@ -134,7 +134,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
   const googleDriveCfg = config.googledrive || DEFAULT_GOOGLE_DRIVE;
 
   return (
-    <div className="space-y-4 py-4 overflow-y-auto h-full px-1 custom-scrollbar">
+      <div className="space-y-4 py-4 overflow-y-auto h-full px-1">
       <div className="space-y-2">
         <Label>存储类型</Label>
         <Select value={config.type} onValueChange={handleTypeChange}>

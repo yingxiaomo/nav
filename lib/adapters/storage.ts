@@ -13,7 +13,6 @@ export interface StorageConfig {
   gist?: GistSettings;
   dropbox?: DropboxSettings;
   googledrive?: GoogleDriveSettings;
-  settings?: GithubRepoSettings | S3Settings | WebDavSettings | GistSettings | DropboxSettings | GoogleDriveSettings;
 }
 
 export interface StorageAdapter {
@@ -432,7 +431,7 @@ export class WebDavAdapter implements StorageAdapter {
       onProgress?.(50);
       
       // 上传文件
-      await this.client.putFileContents(filePath, Buffer.from(arrayBuffer));
+       await this.client.putFileContents(filePath, arrayBuffer);
       onProgress?.(100);
       
       // 返回文件的访问URL

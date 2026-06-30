@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { DataSchema, DEFAULT_DATA, Category, Todo, Note } from "../types/types";
+import { DataSchema, DEFAULT_DATA, Category, Todo, Note, LinkItem } from "../types/types";
 import { GITHUB_CONFIG_KEY } from "../adapters/github";
 import { StorageAdapter, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, STORAGE_CONFIG_KEY, StorageConfig } from "../adapters/storage";
 import { toast } from "sonner";
@@ -370,6 +370,14 @@ export function useNavData(initialWallpapers: string[]) {
     saveMutate({ newData, config, onWallpaperUpdate });
   }, [getEffectiveConfig, saveMutate, updateLocalAndState]);
 
+
+  const handleLinkReorder = useCallback((categoryId: string, links: LinkItem[]) => {
+    const newCategories = data.categories.map(cat =>
+      cat.id === categoryId ? { ...cat, links, updatedAt: Date.now() } : cat
+    );
+    updateLocalAndState({ ...data, categories: newCategories });
+  }, [data, updateLocalAndState]);
+
   const handleReorder = useCallback((newCategories: Category[]) => {
     updateLocalAndState({ ...data, categories: newCategories });
   }, [data, updateLocalAndState]);
@@ -410,6 +418,7 @@ export function useNavData(initialWallpapers: string[]) {
     syncError,
     handleSave,
     handleReorder,
+    handleLinkReorder,
     handleTodosUpdate,
     handleNotesUpdate,
     uploadWallpaper,

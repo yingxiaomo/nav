@@ -45,6 +45,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
     syncError,
     handleSave,
     handleReorder,
+    handleLinkReorder,
     handleTodosUpdate,
     handleNotesUpdate,
     uploadWallpaper
@@ -177,6 +178,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
                <LinkGrid 
                   categories={displayCategories} 
                   onReorder={searchQuery ? undefined : handleReorder}
+               onLinkReorder={handleLinkReorder}
                   displayMode={data.settings.homeLayout}
                />
             </div>

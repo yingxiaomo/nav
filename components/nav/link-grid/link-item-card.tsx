@@ -1,8 +1,10 @@
-﻿"use client";
+"use client";
 
 import { LinkItem } from "@/lib/types/types";
 import { ChevronLeft } from "lucide-react";
 import { IconRender } from "@/components/nav/settings/shared";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface LinkItemCardProps {
   item: LinkItem;
@@ -45,4 +47,32 @@ export function LinkItemCard({ item, onClick, className }: LinkItemCardProps) {
            </div>
        </div>
     );
+}
+
+interface SortableLinkItemCardProps {
+  item: LinkItem;
+  onClick?: (item: LinkItem) => void;
+}
+
+export function SortableLinkItemCard({ item, onClick }: SortableLinkItemCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <LinkItemCard item={item} onClick={onClick} />
+    </div>
+  );
 }

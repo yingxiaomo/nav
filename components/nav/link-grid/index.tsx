@@ -14,7 +14,6 @@ import {
   DragEndEvent,
 } from "@dnd-kit/core";
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   rectSortingStrategy,
@@ -22,17 +21,20 @@ import {
 import { IconRender } from "@/components/nav/settings/shared";
 
 import { SortableCard } from "./category-cards";
-import { LinkItemCard } from "./link-item-card";
+import { LinkItemCard, SortableLinkItemCard } from "./link-item-card";
 import { RenderFolderContent } from "./render-folder-content";
+
+import { arrayMove } from "@dnd-kit/sortable";
 
 interface LinkGridProps {
   categories: Category[];
   onReorder?: (categories: Category[]) => void;
   onOpenChange?: (open: boolean) => void;
   displayMode?: 'folder' | 'list';
+  onLinkReorder?: (categoryId: string, links: LinkItem[]) => void;
 }
 
-export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'folder' }: LinkGridProps) {
+export function LinkGrid({ categories, onReorder, onOpenChange, onLinkReorder, displayMode = 'folder' }: LinkGridProps) {
 
   const dndContextId = useId();
   const [selectedId, setSelectedId] = useState<string | null>(null); 
@@ -97,6 +99,20 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
       if (item.type === 'folder') {
           setNavStack(prev => [...prev, item]);
       }
+  };
+
+  const handleLinkDragEnd = (event: DragEndEvent) => {
+    if (!onLinkReorder || !selectedId) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = modalCurrentItems.findIndex(item => item.id === active.id);
+    const newIndex = modalCurrentItems.findIndex(item => item.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(modalCurrentItems, oldIndex, newIndex);
+
+    onLinkReorder(selectedId, reordered);
   };
 
   const toggleFolder = (id: string) => {
@@ -221,16 +237,20 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
                 transition={{ duration: 0.2 }} 
                 className="p-6 overflow-y-auto flex-1 bg-transparent [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40"
               >
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                  {modalCurrentItems.map((item) => (
-                       <LinkItemCard key={item.id} item={item} onClick={handleModalFolderClick} />
-                  ))}
-                  {modalCurrentItems.length === 0 && (
-                      <div className="col-span-full py-10 text-center text-muted-foreground">
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleLinkDragEnd}>
+                  <SortableContext items={modalCurrentItems.map(i => i.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                      {modalCurrentItems.map((item) => (
+                        <SortableLinkItemCard key={item.id} item={item} onClick={handleModalFolderClick} />
+                      ))}
+                      {modalCurrentItems.length === 0 && (
+                        <div className="col-span-full py-10 text-center text-muted-foreground">
                           此文件夹为空
-                      </div>
-                  )}
-                </div>
+                        </div>
+                      )}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               </motion.div>
             </motion.div>
           </div>

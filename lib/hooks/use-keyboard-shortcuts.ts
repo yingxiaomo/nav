@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useCallback } from "react"
+import { useEffect, useCallback, useRef } from "react"
 
 interface KeyboardShortcutOptions {
   onSave?: () => void
@@ -11,8 +11,11 @@ interface KeyboardShortcutOptions {
 }
 
 export function useKeyboardShortcuts(options: KeyboardShortcutOptions) {
+  const optionsRef = useRef(options)
+  optionsRef.current = options
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
+      const opts = optionsRef.current
       // 检查是否按下了 Ctrl 或 Cmd 键
       const isModifierPressed = event.ctrlKey || event.metaKey
       
@@ -30,15 +33,15 @@ export function useKeyboardShortcuts(options: KeyboardShortcutOptions) {
         switch (event.key.toLowerCase()) {
           case "s":
             event.preventDefault()
-            options.onSave?.()
+            opts.onSave?.()
             break
           case "f":
             event.preventDefault()
-            options.onSearch?.()
+            opts.onSearch?.()
             break
           case "n":
             event.preventDefault()
-            options.onAddLink?.()
+            opts.onAddLink?.()
             break
         }
       }
@@ -50,7 +53,7 @@ export function useKeyboardShortcuts(options: KeyboardShortcutOptions) {
           break
       }
     },
-    [options]
+    [] // Stable reference ? callbacks accessed via optionsRef
   )
 
   useEffect(() => {

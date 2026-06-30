@@ -408,7 +408,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   }, [setLocalData]);
 
   const handleCategoryIconChange = useCallback((catId: string, icon: string) => {
-    const newData = { ...localData };
+    const newData = JSON.parse(JSON.stringify(localData)) as DataSchema;
     const catIndex = newData.categories.findIndex(c => c.id === catId);
     if (catIndex !== -1) {
         newData.categories[catIndex].icon = icon;
@@ -419,7 +419,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
   const handleRenameCategory = useCallback((id: string, title: string) => {
     setLocalData(prev => {
-        const newData = { ...prev };
+        const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
         const index = newData.categories.findIndex(c => c.id === id);
         if (index !== -1) {
             newData.categories[index].title = title;
@@ -436,7 +436,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
     if (newData.categories[catIndex].links.length > 0) {
         if (!confirm("该分类下还有链接，确定要删除吗？")) return;
     }
-    newData.categories.splice(catIndex, 1);
+    newData.categories = newData.categories.filter((_, i) => i !== catIndex);
     setLocalData(newData);
   }, [localData, setLocalData]);
 

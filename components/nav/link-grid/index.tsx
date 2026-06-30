@@ -21,7 +21,7 @@ import {
 } from "@dnd-kit/sortable";
 import { IconRender } from "@/components/nav/settings/shared";
 
-import { SortableCard, StaticCard } from "./category-cards";
+import { SortableCard } from "./category-cards";
 import { LinkItemCard } from "./link-item-card";
 import { RenderFolderContent } from "./render-folder-content";
 
@@ -45,7 +45,6 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
   const [navStack, setNavStack] = useState<LinkItem[]>([]); 
   const [allCollapsedState, setAllCollapsedState] = useState<Record<string, boolean>>({}); 
 
-  const mounted = true;
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -155,7 +154,7 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
       );
     }
 
-    return mounted ? (
+    return (
         <DndContext id={dndContextId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <div className="w-full max-w-5xl mx-auto pb-6 px-4 relative z-30">
             <SortableContext items={categories.map(c => c.id)} strategy={rectSortingStrategy}>
@@ -167,14 +166,6 @@ export function LinkGrid({ categories, onReorder, onOpenChange, displayMode = 'f
             </SortableContext>
           </div>
         </DndContext>
-      ) : (
-        <div className="w-full max-w-5xl mx-auto pb-6 px-4 relative z-30">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-9 gap-2 sm:gap-3">
-            {categories.map((category) => (
-              <StaticCard key={category.id} category={category} onClick={() => setSelectedId(category.id)} />
-            ))}
-          </div>
-        </div>
       );
   };
 

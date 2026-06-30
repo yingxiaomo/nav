@@ -33,6 +33,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
   const existingCategories = Array.from(new Set(localData.categories.map(c => c.title)));
  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const identifyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const titleEditedManually = useRef(false);
   
   useEffect(() => {
     return () => {
@@ -62,10 +63,12 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
       const hostname = urlObj.hostname;
       
       const iconUrl = `https://www.google.com/s2/favicons?domain=${hostname}&sz=128`;
-      setNewIcon(iconUrl);
+      if (!(isAuto && titleEditedManually.current)) {
+        setNewIcon(iconUrl);
+      }
 
       let name = hostname.replace(/^www\./, "").split(".")[0];
-      if (name) {
+      if (name && !(isAuto && titleEditedManually.current)) {
           name = name.charAt(0).toUpperCase() + name.slice(1);
           setNewTitle(name);
       }
@@ -339,7 +342,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
                                 if (identifyTimerRef.current) clearTimeout(identifyTimerRef.current);
                                 identifyTimerRef.current = setTimeout(() => handleSmartIdentify(val, true), 300);
                            }} 
-                            onBlur={() => handleSmartIdentify(newUrl, true)}
+                            onBlur={() => { handleSmartIdentify(newUrl, true); titleEditedManually.current = false; }}
                             className="h-10 bg-background"
                         />
                         <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" onClick={() => handleSmartIdentify(newUrl, false)} title="强制识别标题和图标">
@@ -351,7 +354,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
                 <div className="space-y-2">
                     <Label className="text-xs font-medium">标题 & 图标</Label>
                     <div className="flex gap-2">
-                        <Input placeholder="输入标题" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="h-10 flex-1 bg-background"/>
+                        <Input placeholder="输入标题" value={newTitle} onChange={e => { setNewTitle(e.target.value); titleEditedManually.current = true; }} className="h-10 flex-1 bg-background"/>
                         <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                 <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 overflow-hidden bg-background" title="选择图标">

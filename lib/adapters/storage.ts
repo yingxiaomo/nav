@@ -630,7 +630,7 @@ export class GoogleDriveAdapter implements StorageAdapter {
       const fileId = this.config.fileId;
       
       // 更新文件内容
-      const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}`, {
+      const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${this.config.token}`,

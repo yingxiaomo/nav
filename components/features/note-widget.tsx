@@ -20,7 +20,7 @@ export function NoteWidget({ notes = [], onUpdate }: NoteWidgetProps) {
 
   const addNote = () => {
     const newNote: Note = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       title: "", 
       content: "",
       updatedAt: Date.now(),

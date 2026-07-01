@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useId } from "react";
 import { Category, LinkItem } from "@/lib/types/types";
@@ -23,6 +23,7 @@ import { IconRender } from "@/components/nav/settings/shared";
 import { SortableCard } from "./category-cards";
 import { LinkItemCard, SortableLinkItemCard, SortablePinnedLinkCard } from "./link-item-card";
 import { RenderFolderContent } from "./render-folder-content";
+import { BookmarkSidebar } from "./bookmark-sidebar";
 
 import { arrayMove } from "@dnd-kit/sortable";
 
@@ -30,7 +31,7 @@ interface LinkGridProps {
   categories: Category[];
   onReorder?: (categories: Category[]) => void;
   onOpenChange?: (open: boolean) => void;
-  displayMode?: 'folder' | 'list';
+  displayMode?: 'folder' | 'list' | 'sidebar';
   onLinkReorder?: (categoryId: string, links: LinkItem[]) => void;
   pinnedLinks?: LinkItem[];
   onPinLink?: (link: LinkItem) => void;
@@ -59,8 +60,7 @@ export function LinkGrid({
   );
 
   const [navStack, setNavStack] = useState<LinkItem[]>([]); 
-  const [allCollapsedState, setAllCollapsedState] = useState<Record<string, boolean>>({}); 
-
+  const [allCollapsedState, setAllCollapsedState] = useState<Record<string, boolean>>({});
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -240,7 +240,13 @@ export function LinkGrid({
     <>
       {renderPinnedLinks()}
 
-      {renderMainContent()}
+      {displayMode === 'sidebar' ? (
+        <>
+          <BookmarkSidebar categories={categories} pinnedLinks={pinnedLinks} onPinLink={onPinLink} onUnpinLink={onUnpinLink} />
+        </>
+      ) : (
+        renderMainContent()
+      )}
 
       <AnimatePresence>
         {selectedId && selectedCategory && (

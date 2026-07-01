@@ -102,7 +102,7 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
         <Label>首页布局</Label>
         <div className="flex gap-2">
           <Button 
-            variant={localData.settings.homeLayout === 'list' ? "outline" : "default"} 
+            variant={localData.settings.homeLayout === 'folder' ? "default" : "outline"} 
             size="sm" 
             onClick={() => {
               const newData = {
@@ -131,11 +131,28 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
           >
             直显模式
           </Button>
+          <Button 
+            variant={localData.settings.homeLayout === 'sidebar' ? "default" : "outline"} 
+            size="sm" 
+            onClick={() => {
+              const newData = {
+                ...localData,
+                settings: { ...localData.settings, homeLayout: 'sidebar' as const },
+              };
+              setLocalData(newData);
+              if (onSave) onSave(newData);
+            }} 
+            className="flex-1 h-9"
+          >
+            侧栏模式
+          </Button>
         </div>
         <p className="text-xs text-muted-foreground px-1">
-          {localData.settings.homeLayout === 'list' 
-            ? "直接在首页显示所有收藏内容，隐藏时钟" 
-            : "使用经典的文件夹图标布局"}
+          {localData.settings.homeLayout === 'list'
+            ? "直接在首页显示所有收藏内容，隐藏时钟"
+            : localData.settings.homeLayout === 'sidebar'
+              ? "在左侧显示文件夹侧边栏，主页固定标签不变"
+              : "使用经典的文件夹图标布局"}
         </p>
       </div>
 

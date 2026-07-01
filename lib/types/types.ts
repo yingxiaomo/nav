@@ -1,4 +1,4 @@
-export interface LinkItem {
+﻿export interface LinkItem {
   id: string;
   title: string;
   url: string;
@@ -39,7 +39,7 @@ export interface SiteSettings {
   blurLevel: 'low' | 'medium' | 'high';
   maxPackedWallpapers?: number;
   showFeatures?: boolean; 
-  homeLayout?: 'folder' | 'list';
+  homeLayout?: 'folder' | 'list' | 'sidebar';
   theme?: 'light' | 'dark' | 'system';
 }
 
@@ -68,3 +68,4 @@ export const DEFAULT_DATA: DataSchema = {
   notes: [],
   pinnedLinks: []
 };
+

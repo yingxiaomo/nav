@@ -29,7 +29,7 @@ export function LinkItemCard({ item, onClick, className, showPinButton, isPinned
                        <IconRender name={item.icon || "FolderOpen"} className="h-4 w-4" />
                    </div>
                    <div className="min-w-0 flex-1">
-                       <h4 className="text-white font-medium text-sm" title={item.title}>
+                       <h4 className="text-white font-medium text-sm truncate" title={item.title}>
                            {item.title}
                        </h4>
                    </div>
@@ -65,7 +65,7 @@ export function LinkItemCard({ item, onClick, className, showPinButton, isPinned
                    <IconRender name={item.icon || "Link"} className="h-4 w-4" />
                </div>
                <div className="min-w-0 flex-1">
-                   <h4 className="text-white font-medium text-sm" title={item.title}>
+                   <h4 className="text-white font-medium text-sm truncate" title={item.title}>
                        {item.title}
                    </h4>
                </div>

@@ -29,7 +29,7 @@ export function RenderFolderContent({ items, onFolderClick }: RenderFolderConten
   }, []);
   
   const columnCount = useMemo(() => {
-    if (containerWidth >= 1024) return 4; 
+    if (containerWidth >= 1024) return 5; 
     if (containerWidth >= 768) return 3; 
     if (containerWidth >= 640) return 2; 
     return 1; 
@@ -39,7 +39,7 @@ export function RenderFolderContent({ items, onFolderClick }: RenderFolderConten
   
   if (items.length < 100) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         {items.map((item) => {
           if (item.type === 'folder') {
             return (

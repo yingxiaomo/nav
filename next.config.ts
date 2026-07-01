@@ -1,5 +1,5 @@
-import type { NextConfig } from "next";
-import withPWA from "next-pwa";
+﻿import type { NextConfig } from "next";
+import withSerwistInit from "@serwist/next";
 
 const isExportMode = process.env.DOCKER_BUILD !== "true" && !process.env.VERCEL;
 const isProduction = process.env.NODE_ENV === "production";
@@ -75,13 +75,13 @@ const nextConfig: NextConfig = {
   }),
 };
 
-// PWA配置
-const pwaConfig = {
-  dest: "public",
+// PWA 配置 - 使用 @serwist/next
+// skipWaiting 和 clientsClaim 在 app/sw.ts 中配置
+const withSerwist = withSerwistInit({
+  swSrc: "app/sw.ts",
+  swDest: "public/sw.js",
   disable: !isProduction || isExportMode,
   register: true,
-  skipWaiting: true,
-  buildExcludes: [/app-build-manifest\.json$/],
-};
+});
 
-export default withPWA(pwaConfig)(nextConfig);
+export default withSerwist(nextConfig);

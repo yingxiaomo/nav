@@ -48,6 +48,7 @@ export interface DataSchema {
   categories: Category[];
   todos?: Todo[];
   notes?: Note[];
+  pinnedLinks?: LinkItem[];
 }
 
 export const DEFAULT_DATA: DataSchema = {
@@ -64,5 +65,6 @@ export const DEFAULT_DATA: DataSchema = {
   },
   categories: [],
   todos: [],
-  notes: []
+  notes: [],
+  pinnedLinks: []
 };

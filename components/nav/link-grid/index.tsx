@@ -21,7 +21,7 @@ import {
 import { IconRender } from "@/components/nav/settings/shared";
 
 import { SortableCard } from "./category-cards";
-import { LinkItemCard, SortableLinkItemCard } from "./link-item-card";
+import { LinkItemCard, SortableLinkItemCard, SortablePinnedLinkCard } from "./link-item-card";
 import { RenderFolderContent } from "./render-folder-content";
 
 import { arrayMove } from "@dnd-kit/sortable";
@@ -32,9 +32,23 @@ interface LinkGridProps {
   onOpenChange?: (open: boolean) => void;
   displayMode?: 'folder' | 'list';
   onLinkReorder?: (categoryId: string, links: LinkItem[]) => void;
+  pinnedLinks?: LinkItem[];
+  onPinLink?: (link: LinkItem) => void;
+  onUnpinLink?: (linkId: string) => void;
+  onPinnedReorder?: (pinned: LinkItem[]) => void;
 }
 
-export function LinkGrid({ categories, onReorder, onOpenChange, onLinkReorder, displayMode = 'folder' }: LinkGridProps) {
+export function LinkGrid({
+  categories,
+  onReorder,
+  onOpenChange,
+  onLinkReorder,
+  displayMode = 'folder',
+  pinnedLinks = [],
+  onPinLink,
+  onUnpinLink,
+  onPinnedReorder,
+}: LinkGridProps) {
 
   const dndContextId = useId();
   const [selectedId, setSelectedId] = useState<string | null>(null); 
@@ -56,6 +70,18 @@ export function LinkGrid({ categories, onReorder, onOpenChange, onLinkReorder, d
       if (onReorder) {
         onReorder(arrayMove(categories, oldIndex, newIndex));
       }
+    }
+  };
+
+  const pinnedDndContextId = useId();
+  const handlePinnedDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !onPinnedReorder) return;
+
+    const oldIndex = pinnedLinks.findIndex(l => `pin-${l.id}` === active.id);
+    const newIndex = pinnedLinks.findIndex(l => `pin-${l.id}` === over.id);
+    if (oldIndex !== -1 && newIndex !== -1) {
+      onPinnedReorder(arrayMove(pinnedLinks, oldIndex, newIndex));
     }
   };
 
@@ -123,6 +149,31 @@ export function LinkGrid({ categories, onReorder, onOpenChange, onLinkReorder, d
   };
 
 
+  const isLinkPinned = (linkId: string) => pinnedLinks.some(l => l.id === linkId);
+
+  const renderPinnedLinks = () => {
+    if (pinnedLinks.length === 0) return null;
+
+    return (
+      <div className="w-full max-w-5xl mx-auto pb-3 px-4 relative z-30">
+        <DndContext id={pinnedDndContextId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handlePinnedDragEnd}>
+          <SortableContext items={pinnedLinks.map(l => `pin-${l.id}`)} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-1 sm:gap-1.5">
+              {pinnedLinks.map((link) => (
+                <SortablePinnedLinkCard
+                  key={link.id}
+                  item={link}
+                  onUnpin={() => onUnpinLink?.(link.id)}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      </div>
+    );
+  };
+
+
   const renderMainContent = () => {
     if (displayMode === 'list') {
       return (
@@ -187,6 +238,8 @@ export function LinkGrid({ categories, onReorder, onOpenChange, onLinkReorder, d
 
   return (
     <>
+      {renderPinnedLinks()}
+
       {renderMainContent()}
 
       <AnimatePresence>
@@ -241,7 +294,20 @@ export function LinkGrid({ categories, onReorder, onOpenChange, onLinkReorder, d
                   <SortableContext items={modalCurrentItems.map(i => i.id)} strategy={rectSortingStrategy}>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                       {modalCurrentItems.map((item) => (
-                        <SortableLinkItemCard key={item.id} item={item} onClick={handleModalFolderClick} />
+                        <SortableLinkItemCard
+                          key={item.id}
+                          item={item}
+                          onClick={handleModalFolderClick}
+                          showPinButton={item.type !== 'folder'}
+                          isPinned={isLinkPinned(item.id)}
+                          onPinToggle={() => {
+                            if (isLinkPinned(item.id)) {
+                              onUnpinLink?.(item.id);
+                            } else {
+                              onPinLink?.(item);
+                            }
+                          }}
+                        />
                       ))}
                       {modalCurrentItems.length === 0 && (
                         <div className="col-span-full py-10 text-center text-muted-foreground">

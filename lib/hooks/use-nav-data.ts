@@ -390,6 +390,22 @@ export function useNavData(initialWallpapers: string[]) {
     updateLocalAndState({ ...data, notes: newNotes });
   }, [data, updateLocalAndState]);
 
+
+  const handlePinnedReorder = useCallback((newPinned: LinkItem[]) => {
+    updateLocalAndState({ ...data, pinnedLinks: newPinned });
+  }, [data, updateLocalAndState]);
+
+  const handlePinLink = useCallback((link: LinkItem) => {
+    if ((data.pinnedLinks || []).some(l => l.id === link.id)) return;
+    const newPinnedLinks = [...(data.pinnedLinks || []), { ...link }];
+    updateLocalAndState({ ...data, pinnedLinks: newPinnedLinks });
+  }, [data, updateLocalAndState]);
+
+  const handleUnpinLink = useCallback((linkId: string) => {
+    const newPinnedLinks = (data.pinnedLinks || []).filter(l => l.id !== linkId);
+    updateLocalAndState({ ...data, pinnedLinks: newPinnedLinks });
+  }, [data, updateLocalAndState]);
+
   const uploadWallpaper = useCallback(async (file: File, onProgress?: (progress: number) => void): Promise<string> => {
       const config = getEffectiveConfig();
       if (!config) throw new Error("未配置存储，无法上传");
@@ -422,6 +438,9 @@ export function useNavData(initialWallpapers: string[]) {
     handleTodosUpdate,
     handleNotesUpdate,
     uploadWallpaper,
-    setData
+    setData,
+    handlePinLink,
+    handleUnpinLink,
+    handlePinnedReorder
   };
 }

@@ -48,7 +48,10 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
     handleLinkReorder,
     handleTodosUpdate,
     handleNotesUpdate,
-    uploadWallpaper
+    uploadWallpaper,
+    handlePinLink,
+    handleUnpinLink,
+    handlePinnedReorder
   } = useNavData(initialWallpapers);
 
   const {
@@ -178,8 +181,12 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
                <LinkGrid 
                   categories={displayCategories} 
                   onReorder={searchQuery ? undefined : handleReorder}
-               onLinkReorder={handleLinkReorder}
+                  onLinkReorder={handleLinkReorder}
                   displayMode={data.settings.homeLayout}
+                  pinnedLinks={data.pinnedLinks || []}
+                  onPinLink={handlePinLink}
+                  onUnpinLink={handleUnpinLink}
+                  onPinnedReorder={handlePinnedReorder}
                />
             </div>
 

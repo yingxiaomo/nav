@@ -130,7 +130,7 @@ export const deepCopy = <T>(obj: T): T => {
  * @param newObj 新对象
  * @returns 合并后的对象
  */
-export const mergeObjects = <T>(oldObj: T, newObj: Partial<T>): T => {
+export const mergeObjects = <T, U>(oldObj: T, newObj: U): T & U => {
   return { ...oldObj, ...newObj };
 };
 

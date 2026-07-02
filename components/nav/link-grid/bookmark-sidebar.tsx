@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from "react";
 import { Category, LinkItem } from "@/lib/types/types";
-import { IconRender } from "@/components/nav/settings/shared";
 import { PanelLeft, PanelLeftClose, ChevronLeft, Pin } from "lucide-react";
+import { generateFaviconUrl } from "@/lib/utils/common";
 
 interface BookmarkSidebarProps {
   categories: Category[];
@@ -37,13 +37,24 @@ function buildTree(categories: Category[]): TreeNode[] {
   return roots;
 }
 
+function getLinkIcon(item: LinkItem): string {
+  if (item.icon && (item.icon.startsWith('http') || item.icon.startsWith('/') || item.icon.startsWith('data:'))) return item.icon;
+  if (item.type === "folder") return "FolderOpen";
+  if (!item.url) return "Link";
+  try {
+    return generateFaviconUrl(new URL(item.url).hostname);
+  } catch {
+    return "Link";
+  }
+}
+
 function buildLinkTree(items: LinkItem[], _prefix: string): TreeNode[] {
   const nodes: TreeNode[] = [];
   for (const item of items) {
     nodes.push({
       id: _prefix + item.id,
       title: item.title,
-      icon: item.icon || (item.type === "folder" ? "FolderOpen" : "Link"),
+      icon: getLinkIcon(item),
       type: item.type === "folder" ? "folder" : "link",
       children: item.children ? buildLinkTree(item.children, _prefix + item.id + "-") : undefined,
       url: item.url,
@@ -140,9 +151,9 @@ export function BookmarkSidebar({ categories, pinnedLinks, onPinLink, onUnpinLin
               const isLink = node.type === "link";
               const hasChildren = node.children && node.children.length > 0;
               const pinned = isLink ? isLinkPinned(node.id.split("-sub-").pop() || node.id) : false;
-              const iconColor = node.type === "category"
-                ? "text-yellow-200/90" : node.type === "folder"
-                  ? "text-blue-200/90" : "text-white/40";
+              const iconSrc = isLink && node.url
+                ? (() => { try { return generateFaviconUrl(new URL(node.url).hostname); } catch { return null; } })()
+                : null;
 
               return (
                 <div key={node.id} className="group flex items-center">
@@ -151,7 +162,18 @@ export function BookmarkSidebar({ categories, pinnedLinks, onPinLink, onUnpinLin
                     className="flex-1 flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors text-white/60 hover:text-white hover:bg-white/5"
                     style={{ minWidth: 0 }}
                   >
-                    <IconRender name={node.icon || "Link"} className={"h-4 w-4 flex-shrink-0 " + iconColor} />
+                    {iconSrc ? (
+                      <img src={iconSrc} alt="" className="h-4 w-4 flex-shrink-0 rounded-sm object-contain" />
+                    ) : (
+                      <div className={"h-4 w-4 flex-shrink-0 " + (node.type === "category" ? "text-yellow-200/90" : node.type === "folder" ? "text-blue-200/90" : "text-white/40")}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-full w-full">
+                          {node.type === "folder" || node.type === "category"
+                            ? <><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></>
+                            : <><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></>
+                          }
+                        </svg>
+                      </div>
+                    )}
                     <span className="text-sm truncate flex-1">{node.title}</span>
                     {hasChildren && <ChevronLeft className="h-3.5 w-3.5 flex-shrink-0 -rotate-90 text-white/30" />}
                   </button>

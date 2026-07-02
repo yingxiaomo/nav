@@ -5,6 +5,7 @@ import { LinkItem } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Trash2, FolderInput, Pencil, MoreVertical } from "lucide-react";
 import { IconRender } from "./shared";
+import { generateFaviconUrl } from "@/lib/utils/common";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -66,7 +67,12 @@ const SortableLinkItemComponent = ({ link, catId, handleDeleteLink, onEditFolder
         }}
       >
         <div className={`p-1.5 rounded-md shrink-0 flex items-center justify-center pointer-events-none ${isFolder ? 'bg-yellow-500/10 text-yellow-500' : 'bg-muted/50 text-foreground/70'}`}>
-          <IconRender name={link.icon || (isFolder ? "FolderOpen" : "Link")} className="h-4 w-4" />
+          <IconRender name={(() => {
+            if (link.icon && link.icon !== "Link" && !link.icon.includes('google.com/s2/favicons')) return link.icon;
+            if (isFolder) return "FolderOpen";
+            if (!link.url) return "Link";
+            try { return generateFaviconUrl(new URL(link.url).hostname); } catch { return "Link"; }
+          })()} className="h-4 w-4" />
         </div>
         
         <div className="flex-1 min-w-0">

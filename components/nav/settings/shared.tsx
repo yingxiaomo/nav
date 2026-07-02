@@ -23,12 +23,12 @@ export const IconRender = ({ name, className }: { name: string; className?: stri
 
   if ((name?.startsWith("http") || name?.startsWith("/")) && !error) {
     return (
-      <Image 
-        src={name} 
-        alt="icon" 
-        width={32} 
-        height={32} 
-        className={`${className} object-contain rounded-sm`} 
+      <Image
+        src={name}
+        alt="icon"
+        width={32}
+        height={32}
+        className={`${className} object-contain rounded-sm`}
         loading="lazy"
         onError={handleError}
       />

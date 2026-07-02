@@ -156,13 +156,13 @@ export const throttle = <T extends (...args: unknown[]) => unknown>(
 };
 
 /**
- * 生成Google favicon URL
+ * 生成 favicon URL（使用自部署的多源聚合 API）
  * @param domain 域名
- * @returns Google favicon URL
+ * @returns favicon URL
  */
 export const generateFaviconUrl = (domain: string): string => {
   if (!domain) return '';
-  return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+  return `https://iconapi.396638.xyz/api/icon?url=${domain}`;
 };
 
 /**

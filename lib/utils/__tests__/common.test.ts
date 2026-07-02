@@ -218,10 +218,9 @@ describe("throttle", () => {
 // generateFaviconUrl
 // ---------------------------------------------------------------------------
 describe("generateFaviconUrl", () => {
-  it("应为域名生成 Google Favicon URL", () => {
+  it("应为域名生成自部署 Favicon API URL", () => {
     const url = generateFaviconUrl("github.com");
-    expect(url).toContain("google.com/s2/favicons");
-    expect(url).toContain("domain=github.com");
+    expect(url).toBe("https://iconapi.396638.xyz/api/icon?url=github.com");
   });
 
   it("应对空输入返回空", () => {

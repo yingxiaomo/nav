@@ -72,11 +72,11 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
           name = name.charAt(0).toUpperCase() + name.slice(1);
           setNewTitle(name);
       }
-      
+
       if (!isAuto) toast.success("已刷新标题和图标", { description: "已从 URL 中提取并更新标题和图标" });
 
-    } catch { 
-        if (!isAuto) toast.error("URL 格式不正确", { description: "请输入有效的 URL 地址，如 https://example.com" }); 
+    } catch {
+        if (!isAuto) toast.error("URL 格式不正确", { description: "请输入有效的 URL 地址，如 https://example.com" });
     }
   };
 

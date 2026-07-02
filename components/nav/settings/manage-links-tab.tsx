@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { isValidUrl, sanitizeText } from "@/lib/utils/validation";
+import { generateFaviconUrl } from "@/lib/utils/common";
 
 interface ManageLinksTabProps {
   localData: DataSchema;
@@ -646,7 +647,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
                 {activeLink && (
                     <div className="flex items-center gap-2 p-2 rounded-lg bg-background border shadow-xl opacity-90 w-[200px]">
                         <div className="p-1.5 rounded-md bg-muted text-foreground shrink-0">
-                            <IconRender name={activeLink.icon || "Link"} className="h-4 w-4" />
+                            <IconRender name={(() => { try { return (activeLink.icon && activeLink.icon !== "Link" && !activeLink.icon.includes('google.com/s2/favicons')) ? activeLink.icon : generateFaviconUrl(new URL(activeLink.url).hostname); } catch { return "Link"; }})()} className="h-4 w-4" />
                         </div>
                         <span className="text-sm font-medium truncate">{activeLink.title}</span>
                     </div>

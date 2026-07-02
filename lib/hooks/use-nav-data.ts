@@ -131,8 +131,11 @@ export function useNavData(initialWallpapers: string[]) {
     return null;
   }, []);
 
+  const initialWallpapersRef = useRef(initialWallpapers);
+
   // 初始化数据
   useEffect(() => {
+    const wallpapers = initialWallpapersRef.current;
     async function initData() {
       try {
         let loadedFromStorage = false;
@@ -142,9 +145,9 @@ export function useNavData(initialWallpapers: string[]) {
           if (localDataString) {
             try {
               const localData = JSON.parse(localDataString) as DataSchema;
-              if (initialWallpapers.length > 0) {
+              if (wallpapers.length > 0) {
                 if (!localData.settings.wallpaperList || localData.settings.wallpaperList.length === 0) {
-                  localData.settings.wallpaperList = [...initialWallpapers];
+                  localData.settings.wallpaperList = [...wallpapers];
                 }
               }
               setData(localData);
@@ -163,7 +166,7 @@ export function useNavData(initialWallpapers: string[]) {
             if (res.ok) {
               const fetchedData = await res.json();
               const finalData = { ...fetchedData, todos: [], notes: [] };
-              if (initialWallpapers.length > 0) finalData.settings.wallpaperList = [...initialWallpapers];
+              if (wallpapers.length > 0) finalData.settings.wallpaperList = [...wallpapers];
               setData(finalData);
               if (typeof window !== 'undefined') {
                 localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(finalData));
@@ -186,7 +189,7 @@ export function useNavData(initialWallpapers: string[]) {
     }
 
     initData();
-  }, [initialWallpapers, getEffectiveConfig]);
+  }, [getEffectiveConfig]);
 
   // 数据合并函数
   const mergeItems = useCallback(<T extends { id: string; updatedAt?: number }>(
@@ -322,8 +325,8 @@ export function useNavData(initialWallpapers: string[]) {
       };
 
       if (JSON.stringify(finalData) !== JSON.stringify(currentData)) {
-        if (initialWallpapers.length > 0) {
-          finalData.settings.wallpaperList = [...initialWallpapers];
+        if (initialWallpapersRef.current.length > 0) {
+          finalData.settings.wallpaperList = [...initialWallpapersRef.current];
         }
         if (typeof window !== 'undefined') {
           localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(finalData));
@@ -349,7 +352,7 @@ export function useNavData(initialWallpapers: string[]) {
         }, 0);
       }
     }
-  }, [remoteData, dataRef, initialWallpapers, mergeCategories, mergeItems]);
+  }, [remoteData, dataRef, mergeCategories, mergeItems]);
 
 
   const handleSave = useCallback(async (newData: DataSchema, onWallpaperUpdate?: (cfg: DataSchema) => void) => {

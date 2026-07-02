@@ -56,6 +56,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   const [folderPath, setFolderPath] = useState<LinkItem[]>([]);
   const [editingLink, setEditingLink] = useState<LinkItem | null>(null);
   const [movingLink, setMovingLink] = useState<LinkItem | null>(null);
+  const [confirmDeleteCategory, setConfirmDeleteCategory] = useState<{ id: string; hasLinks: boolean } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -233,11 +234,9 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       return options;
   }, [localData.categories, movingLink]);
 
-  // 使用 useRef 来处理递归函数
-  const findContainerRef = useRef<(id: string, items: (Category | LinkItem)[]) => string | undefined>(undefined);
-  
-  const findContainer = useCallback((id: string, items: (Category | LinkItem)[]): string | undefined => {
-      if (items.find(i => i.id === id)) return id; 
+  // 定义递归函数 findContainer（不依赖 hooks）
+  const findContainer = (id: string, items: (Category | LinkItem)[]): string | undefined => {
+      if (items.find(i => i.id === id)) return id;
   
       for (const item of items) {
           const children = getChildren(item);
@@ -245,18 +244,12 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
               if (children.find(c => c.id === id)) {
                   return item.id;
               }
-              // 使用 ref 中的函数引用进行递归调用
-              const found = findContainerRef.current?.(id, children);
+              const found = findContainer(id, children);
               if (found) return found;
           }
       }
       return undefined;
-  }, []);
-  
-  // 使用 useEffect 将函数赋值给 ref，避免在渲染期间更新 ref
-  useEffect(() => {
-    findContainerRef.current = findContainer;
-  }, [findContainer]);
+  };
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event;
@@ -434,11 +427,20 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
     const catIndex = newData.categories.findIndex(c => c.id === catId);
     if (catIndex === -1) return;
     if (newData.categories[catIndex].links.length > 0) {
-        if (!confirm("该分类下还有链接，确定要删除吗？")) return;
+        setConfirmDeleteCategory({ id: catId, hasLinks: true });
+        return;
     }
     newData.categories = newData.categories.filter((_, i) => i !== catIndex);
     setLocalData(newData);
   }, [localData, setLocalData]);
+
+  const handleConfirmDeleteCategory = useCallback(() => {
+    if (!confirmDeleteCategory) return;
+    const newData = { ...localData };
+    newData.categories = newData.categories.filter(c => c.id !== confirmDeleteCategory.id);
+    setLocalData(newData);
+    setConfirmDeleteCategory(null);
+  }, [confirmDeleteCategory, localData, setLocalData]);
 
   const toggleCollapse = useCallback((catId: string) => {
     const newSet = new Set(collapsedCats);
@@ -474,9 +476,11 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   }, [localData, currentFolder]);
 
 
-  if (currentFolder && !resolvedCurrentFolder) {
-      setFolderPath([]);
-  }
+  useEffect(() => {
+    if (currentFolder && !resolvedCurrentFolder) {
+        setFolderPath([]);
+    }
+  }, [currentFolder, resolvedCurrentFolder]);
 
   const itemsToShow = resolvedCurrentFolder ? (resolvedCurrentFolder.children || []) : [];
 
@@ -651,6 +655,22 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
             document.body
         )}
       </DndContext>
+
+      {/* 确认删除分类对话框 */}
+      <Dialog open={!!confirmDeleteCategory} onOpenChange={(open) => !open && setConfirmDeleteCategory(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>确认删除</DialogTitle>
+            <DialogDescription>
+              该分类下还有链接，确定要删除吗？删除后链接将无法恢复。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmDeleteCategory(null)}>取消</Button>
+            <Button variant="destructive" onClick={handleConfirmDeleteCategory}>确认删除</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

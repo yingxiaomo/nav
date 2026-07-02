@@ -28,7 +28,9 @@ export async function loadDataFromGithub(config: GithubConfig): Promise<DataSche
     
     if ('content' in response.data) {
       const content = atob(response.data.content);
-      const json = JSON.parse(decodeURIComponent(escape(content))); 
+      // 将 Base64 解为 UTF-8 字符串（替代已废弃的 escape/unescape）
+      const bytes = Uint8Array.from(content, c => c.charCodeAt(0));
+      const json = JSON.parse(new TextDecoder().decode(bytes)); 
       return json as DataSchema;
     }
     
@@ -65,8 +67,9 @@ export async function saveDataToGithub(config: GithubConfig, data: DataSchema, m
     }
 
 
-    const content = unescape(encodeURIComponent(JSON.stringify(data, null, 2))); 
-    const base64Content = btoa(content);
+    const encoder = new TextEncoder();
+    const encoded = encoder.encode(JSON.stringify(data, null, 2));
+    const base64Content = btoa(String.fromCharCode(...encoded));
 
     await octokit.repos.createOrUpdateFileContents({
       owner: config.owner,

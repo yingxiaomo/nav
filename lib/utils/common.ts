@@ -6,23 +6,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-
-
-/**
- * 验证URL格式是否正确
- * @param url 要验证的URL字符串
- * @returns 布尔值，表示URL格式是否正确
- */
-export const isValidUrl = (url: string): boolean => {
-  if (!url) return false;
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 /**
  * 处理URL，确保其包含协议
  * @param url 要处理的URL字符串
@@ -30,7 +13,8 @@ export const isValidUrl = (url: string): boolean => {
  */
 export const normalizeUrl = (url: string): string => {
   if (!url) return '';
-  if (url.startsWith('http://') || url.startsWith('https://')) {
+  // 支持任意协议前缀（http://, https://, ftp://, 等）
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(url)) {
     return url;
   }
   return `https://${url}`;
@@ -237,17 +221,26 @@ export const generateRandomBackgroundColor = (): string => {
  * @returns 随机前景颜色的十六进制字符串，与背景颜色形成对比
  */
 export const generateContrastColor = (backgroundColor: string): string => {
-  // 提取RGB值
-  const match = backgroundColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-  if (!match) return '#000000';
-  
-  const r = parseInt(match[1]);
-  const g = parseInt(match[2]);
-  const b = parseInt(match[3]);
-  
+  let r, g, b;
+
+  // 支持 #RRGGBB 十六进制格式
+  const hexMatch = backgroundColor.match(/^#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$/);
+  if (hexMatch) {
+    r = parseInt(hexMatch[1], 16);
+    g = parseInt(hexMatch[2], 16);
+    b = parseInt(hexMatch[3], 16);
+  } else {
+    // 支持 rgb(NNN, NNN, NNN) 格式
+    const rgbMatch = backgroundColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (!rgbMatch) return '#000000';
+    r = parseInt(rgbMatch[1]);
+    g = parseInt(rgbMatch[2]);
+    b = parseInt(rgbMatch[3]);
+  }
+
   // 计算亮度
   const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  
+
   // 返回对比色
   return brightness > 128 ? '#000000' : '#ffffff';
 };
@@ -259,11 +252,11 @@ export const generateContrastColor = (backgroundColor: string): string => {
  */
 export const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 Bytes';
-  
+
   const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
+
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
@@ -318,7 +311,12 @@ export const toCamelCase = (str: string): string => {
  */
 export const toSnakeCase = (str: string): string => {
   if (!str) return '';
-  return str.replace(/([A-Z])/g, '_$1').toLowerCase();
+  // 处理大写序列：ABC → abc，而非 _a_b_c
+  return str
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .toLowerCase()
+    .replace(/^_/, ''); // 去掉可能的前导下划线
 };
 
 /**
@@ -328,7 +326,11 @@ export const toSnakeCase = (str: string): string => {
  */
 export const toKebabCase = (str: string): string => {
   if (!str) return '';
-  return str.replace(/([A-Z])/g, '-$1').toLowerCase();
+  return str
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .toLowerCase()
+    .replace(/^-/, '');
 };
 
 /**

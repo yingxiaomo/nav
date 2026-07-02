@@ -139,7 +139,7 @@ export function BookmarkSidebar({ categories, pinnedLinks, onPinLink, onUnpinLin
             currentNodes.map((node) => {
               const isLink = node.type === "link";
               const hasChildren = node.children && node.children.length > 0;
-              const pinned = isLink ? isLinkPinned(node.id.replace(/^.*?-sub-/, "")) : false;
+              const pinned = isLink ? isLinkPinned(node.id.split("-sub-").pop() || node.id) : false;
               const iconColor = node.type === "category"
                 ? "text-yellow-200/90" : node.type === "folder"
                   ? "text-blue-200/90" : "text-white/40";

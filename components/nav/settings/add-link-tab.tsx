@@ -91,7 +91,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
     if (newData.categories.some(c => c.title === sanitizedFolderName)) {
         return toast.error("该文件夹已存在", { description: "请使用不同的文件夹名称" });
     }
-    newData.categories.push({ id: `c-${Date.now()}`, title: sanitizedFolderName, icon: "FolderOpen", links: [] });
+    newData.categories.push({ id: `c-${crypto.randomUUID()}`, title: sanitizedFolderName, icon: "FolderOpen", links: [] });
     setLocalData(newData);
     setNewCategory(sanitizedFolderName); 
     setIsCreatingFolder(false);
@@ -182,12 +182,12 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
     const newData = { ...localData };
     let categoryIndex = newData.categories.findIndex(c => c.title === sanitizedCategory);
     if (categoryIndex === -1) {
-      newData.categories.push({ id: `c-${Date.now()}`, title: sanitizedCategory, icon: "FolderOpen", links: [] });
+      newData.categories.push({ id: `c-${crypto.randomUUID()}`, title: sanitizedCategory, icon: "FolderOpen", links: [] });
       categoryIndex = newData.categories.length - 1;
     }
     
       newData.categories[categoryIndex].links.push({ 
-        id: `l-${Date.now()}`, 
+        id: `l-${crypto.randomUUID()}`, 
         title: sanitizedTitle, 
         url: finalUrl, 
         icon: newIcon, 

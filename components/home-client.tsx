@@ -103,8 +103,12 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
         <div className="min-h-screen w-full bg-gradient-to-br from-gray-900 via-black to-gray-900 flex flex-col items-center justify-center p-4">
             <div className="flex flex-col items-center gap-4">
                 <div className="relative">
-                    <div className="h-16 w-16 rounded-full bg-white/10 animate-pulse flex items-center justify-center">
-                        <div className="h-12 w-12 rounded-full bg-white/20 animate-pulse"></div>
+                    <div className="h-16 w-16 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
+                        <img
+                            src="/icon/logo.png"
+                            alt="Logo"
+                            className="h-12 w-12 object-contain"
+                        />
                     </div>
                     <div className="absolute inset-0 rounded-full border-4 border-white/30 border-t-transparent animate-spin-slow"></div>
                 </div>

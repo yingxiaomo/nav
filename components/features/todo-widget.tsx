@@ -23,7 +23,7 @@ export function TodoWidget({ todos = [], onUpdate }: TodoWidgetProps) {
     
     const timestamp = Date.now()
     const newItem: Todo = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       text: newTodo.trim(),
       completed: false,
       createdAt: timestamp,

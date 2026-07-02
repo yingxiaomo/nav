@@ -109,68 +109,63 @@ export const encryptData = async (data: string): Promise<string> => {
  * @param encryptedData 加密后的数据
  * @returns 解密后的字符串
  */
-export const decryptData = async (encryptedData: string): Promise<string> => {
+export const decryptData = async (encryptedData: string): Promise<string | null> => {
   try {
     // 如果数据看起来没有被加密，直接返回
     if (!encryptedData || encryptedData.length < 20) {
-      return encryptedData;
+      return null;
     }
-    
+
     // 验证是否为有效的Base64字符串
     const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
     if (!base64Regex.test(encryptedData)) {
-      // 不是有效的Base64字符串，直接返回原始数据
-      return encryptedData;
+      return null;
     }
-    
+
     const key = await getOrCreateEncryptionKey();
-    
+
     let binaryString;
     try {
-      // 优化：使用更高效的方式将Base64字符串转换为Uint8Array
       binaryString = atob(encryptedData);
     } catch {
-      // atob解码失败，直接返回原始数据
-      return encryptedData;
+      return null;
     }
-    
+
     const len = binaryString.length;
     const bytes = new Uint8Array(len);
     for (let i = 0; i < len; i++) {
       bytes[i] = binaryString.charCodeAt(i);
     }
-    
+
     // 确保数据长度足够（至少包含12字节IV）
     if (bytes.length < 12) {
-      return encryptedData;
+      return null;
     }
-    
+
     const iv = bytes.slice(0, 12);
     const encrypted = bytes.slice(12);
-    
+
     // 确保有加密数据
     if (encrypted.length === 0) {
-      return encryptedData;
+      return null;
     }
-    
+
     try {
       const decrypted = await crypto.subtle.decrypt(
         { name: 'AES-GCM', iv: iv },
         key,
         encrypted
       );
-      
+
       const decoder = new TextDecoder();
       return decoder.decode(decrypted);
     } catch {
-      // 解密操作失败，直接返回原始数据
-      // 可能的原因：密钥不匹配、IV不匹配、数据损坏等
-      return encryptedData;
+      // 解密失败，返回 null，调用方应保留原始加密数据
+      return null;
     }
   } catch (error) {
     console.error('Decryption failed:', error);
-    // 解密失败时，返回原始数据（可能是未加密的数据）
-    return encryptedData;
+    return null;
   }
 };
 
@@ -217,7 +212,8 @@ export const safeLocalStorageSet = async <T>(
       
       const lastKey = keys[keys.length - 1];
       if (current && typeof current === 'object' && lastKey in (current as Record<string, unknown>)) {
-        const value = String((current as Record<string, unknown>)[lastKey] || '');
+        const rawValue = (current as Record<string, unknown>)[lastKey];
+        const value = rawValue != null ? String(rawValue) : '';
         (current as Record<string, unknown>)[lastKey] = await encryptData(value);
       }
     }
@@ -278,15 +274,20 @@ export const safeLocalStorageGet = async <T>(
       
       const lastKey = keys[keys.length - 1];
       if (current && typeof current === 'object' && lastKey in (current as Record<string, unknown>)) {
-        const value = String((current as Record<string, unknown>)[lastKey] || '');
-        (current as Record<string, unknown>)[lastKey] = await decryptData(value);
+        const rawValue = (current as Record<string, unknown>)[lastKey];
+        const value = String(rawValue ?? '');
+        // 解密失败时保留原始加密值，避免数据损坏
+        const decrypted = await decryptData(value);
+        if (decrypted !== null) {
+          (current as Record<string, unknown>)[lastKey] = decrypted;
+        }
       }
     }
     
     return clone;
   } catch (error) {
     console.error('Safe localStorage get failed:', error);
-    // 失败时，降级为直接读取（如果在浏览器环境中）
+    // 失败时，降级为直接返回原始解析数据（保留加密字段原样）
     if (typeof window !== 'undefined') {
       const item = window.localStorage.getItem(key);
       return item ? JSON.parse(item) as T : null;

@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   cn,
-  isValidUrl,
   normalizeUrl,
   extractHostname,
   extractSiteName,
@@ -63,22 +62,6 @@ describe("cn", () => {
     expect(result).toBe("px-6");
   });
 });
-
-// ---------------------------------------------------------------------------
-// isValidUrl
-// ---------------------------------------------------------------------------
-describe("isValidUrl", () => {
-  it("应识别合法 URL", () => {
-    expect(isValidUrl("https://example.com")).toBe(true);
-    expect(isValidUrl("http://localhost:3000/api")).toBe(true);
-  });
-
-  it("应拒绝非法输入", () => {
-    expect(isValidUrl("")).toBe(false);
-    expect(isValidUrl("not-a-url")).toBe(false);
-  });
-});
-
 // ---------------------------------------------------------------------------
 // normalizeUrl
 // ---------------------------------------------------------------------------

@@ -204,7 +204,8 @@ export class GithubRepoAdapter implements StorageAdapter {
       
       if ('content' in response.data) {
         const content = atob(response.data.content);
-        return JSON.parse(decodeURIComponent(escape(content))) as DataSchema;
+        const bytes = Uint8Array.from(content, c => c.charCodeAt(0));
+        return JSON.parse(new TextDecoder().decode(bytes)) as DataSchema;
       }
       return null;
     } catch (error) {
@@ -234,7 +235,9 @@ export class GithubRepoAdapter implements StorageAdapter {
         }
     }
 
-      const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
+      const encoder = new TextEncoder();
+      const encoded = encoder.encode(JSON.stringify(data, null, 2));
+      const content = btoa(String.fromCharCode(...encoded));
 
       await octokit.repos.createOrUpdateFileContents({
         owner,
@@ -371,17 +374,11 @@ export class WebDavAdapter implements StorageAdapter {
         }
         const content = await this.client.getFileContents(this.config.path, { format: "text" });
         if (typeof content === 'string') {
-
+            // 优先尝试 JSON 解析
             try {
                 return JSON.parse(content) as DataSchema;
             } catch {
-
-                const parsed = parseNetscapeBookmarks(content);
-                if (parsed) {
-                    console.log("Successfully parsed WebDAV file as Netscape HTML bookmarks");
-                    return parsed;
-                }
-                console.warn("File content is neither JSON nor valid HTML Bookmarks");
+                console.warn("WebDAV 文件内容不是有效的 JSON 格式，请确保文件为 .json 格式");
                 return null;
             }
         }

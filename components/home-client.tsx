@@ -194,7 +194,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
                />
             </div>
 
-            <footer className="absolute bottom-2 left-0 w-full text-center z-0">
+            <footer className="relative mt-auto pt-4 w-full text-center z-0">
               <p className="text-[10px] text-white/30 font-light tracking-widest font-mono select-none">
                 © 2025 Clean Nav · Designed by{' '}
                 <a href="https://github.com/YingXiaoMo/clean-nav" target="_blank" rel="noopener noreferrer" className="hover:text-white/80 transition-colors cursor-pointer hover:underline underline-offset-4 decoration-white/30">

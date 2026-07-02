@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch" 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ImageIcon, Shuffle, Layers, Upload, Loader2, Sun, Moon, Monitor } from "lucide-react"; 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
@@ -22,6 +22,31 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 防抖保存：避免快速切换时频繁触发云同步
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingDataRef = useRef<DataSchema | null>(null);
+
+  const debouncedSave = useCallback((data: DataSchema) => {
+    pendingDataRef.current = data;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      if (pendingDataRef.current && onSave) {
+        onSave(pendingDataRef.current);
+        pendingDataRef.current = null;
+      }
+    }, 500);
+  }, [onSave]);
+
+  // 组件卸载时执行最后一次待处理的保存
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (pendingDataRef.current && onSave) {
+        onSave(pendingDataRef.current);
+      }
+    };
+  }, [onSave]);
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
@@ -110,7 +135,7 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
                 settings: { ...localData.settings, homeLayout: 'folder' as const },
               };
               setLocalData(newData);
-              if (onSave) onSave(newData);
+              debouncedSave(newData);
             }} 
             className="flex-1 h-9"
           >
@@ -125,7 +150,7 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
                 settings: { ...localData.settings, homeLayout: 'list' as const },
               };
               setLocalData(newData);
-              if (onSave) onSave(newData);
+              debouncedSave(newData);
             }} 
             className="flex-1 h-9"
           >
@@ -140,7 +165,7 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
                 settings: { ...localData.settings, homeLayout: 'sidebar' as const },
               };
               setLocalData(newData);
-              if (onSave) onSave(newData);
+              debouncedSave(newData);
             }} 
             className="flex-1 h-9"
           >
@@ -174,9 +199,7 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
             
             setLocalData(newData);
 
-            if (onSave) {
-              onSave(newData);
-            }
+            debouncedSave(newData);
           }}
         />
       </div>
@@ -191,7 +214,7 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
               settings: { ...localData.settings, theme: value as "light" | "dark" | "system" },
             };
             setLocalData(newData);
-            if (onSave) onSave(newData);
+            debouncedSave(newData);
           }}
         >
           <SelectTrigger className="h-9">

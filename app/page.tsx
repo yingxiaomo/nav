@@ -35,7 +35,12 @@ export default function Page() {
       );
 
       // 随机选取maxWallpapers张图片
-      const shuffled = [...imageFiles].sort(() => 0.5 - Math.random());
+      // Fisher-Yates 洗牌算法（均匀分布）
+  const shuffled = [...imageFiles];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
       const selected = shuffled.slice(0, maxWallpapers);
 
       wallpapersBase64 = selected.map(file => `/wallpapers/${file}`);

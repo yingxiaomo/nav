@@ -66,6 +66,8 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
             <button
               key={e.name}
               onClick={() => handleEngineChange(e)}
+              aria-label={`切换搜索引擎为 ${e.name}`}
+              aria-pressed={engine.name === e.name}
               className={[
                 "px-3 py-1 rounded-full text-xs font-medium transition-all duration-200",
                 "cursor-pointer hover:scale-105 active:scale-95",
@@ -99,6 +101,11 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
                 engine.url === "local"
                   ? "筛选我的链接..."
                   : `在 ${engine.name} 中搜索...`
+              }
+              aria-label={
+                engine.url === "local"
+                  ? "本地链接搜索"
+                  : "搜索引擎搜索"
               }
               className="h-14 pl-6 pr-14 rounded-2xl border-white/20 bg-white/10 dark:bg-black/20 backdrop-blur-xl text-white placeholder:text-white/50 focus-visible:ring-2 focus-visible:ring-white/30 shadow-xl transition-all hover:bg-white/15 text-lg"
             />

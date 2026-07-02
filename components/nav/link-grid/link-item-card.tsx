@@ -45,7 +45,7 @@ export function LinkItemCard({ item, onClick, className, showPinButton, isPinned
              <button
                onPointerDown={(e) => e.stopPropagation()}
                onClick={(e) => { e.stopPropagation(); onPinToggle?.(); }}
-               className="absolute -top-1.5 -right-1.5 z-10 p-1 rounded-full bg-white/20 backdrop-blur-sm text-white/70 hover:text-white hover:bg-white/30 transition-all opacity-0 group-hover:opacity-100"
+               className="absolute -top-1.5 -right-1.5 z-10 p-1 rounded-full bg-white/20 backdrop-blur-sm text-white/70 hover:text-white hover:bg-white/30 transition-all opacity-0 group-hover:opacity-100 max-sm:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                title={isPinned ? "取消固定" : "固定到主页"}
              >
                <svg 
@@ -118,7 +118,7 @@ export function PinnedLinkCard({
     <div className="group relative p-2.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
       <button
         onClick={(e) => { e.stopPropagation(); onUnpin(); }}
-        className="absolute -top-1.5 -right-1.5 z-10 p-0.5 rounded-full bg-red-500/70 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
+        className="absolute -top-1.5 -right-1.5 z-10 p-0.5 rounded-full bg-red-500/70 text-white opacity-0 group-hover:opacity-100 max-sm:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-red-500"
         title="取消固定"
       >
         <X className="h-3 w-3" />

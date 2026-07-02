@@ -1,6 +1,8 @@
 ﻿import type { NextConfig } from "next";
 import withSerwistInit from "@serwist/next";
 
+process.env.SERWIST_SUPPRESS_TURBOPACK_WARNING = "1";
+
 const isExportMode = process.env.DOCKER_BUILD !== "true" && !process.env.VERCEL;
 const isProduction = process.env.NODE_ENV === "production";
 

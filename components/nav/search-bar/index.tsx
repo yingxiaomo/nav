@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, ChevronDown } from "lucide-react";
+import { Search } from "lucide-react";
 import { motion } from "framer-motion";
-import { Input, Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui";
+import { Input, Button } from "@/components/ui";
 
 
 const ENGINES = [
@@ -24,105 +24,99 @@ interface SearchBarProps {
   ref?: React.RefObject<HTMLInputElement>;
 }
 
-export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(({ onLocalSearch }, ref) => {
-  const [query, setQuery] = useState("");
-  const [engine, setEngine] = useState(ENGINES[0]);
+export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
+  ({ onLocalSearch }, ref) => {
+    const [query, setQuery] = useState("");
+    const [engine, setEngine] = useState(ENGINES[0]);
 
-  const handleEngineChange = (newEngine: typeof ENGINES[0]) => {
-    setEngine(newEngine);
-    if (newEngine.url === "local") {
-      onLocalSearch?.(query);
-    } else {
-      onLocalSearch?.("");
-    }
-  };
+    const handleEngineChange = (newEngine: (typeof ENGINES)[0]) => {
+      setEngine(newEngine);
+      if (newEngine.url === "local") {
+        onLocalSearch?.(query);
+      } else {
+        onLocalSearch?.("");
+      }
+    };
 
-  const handleInputChange = (val: string) => {
-    setQuery(val);
-    if (engine.url === "local") {
-      onLocalSearch?.(val);
-    }
-  };
+    const handleInputChange = (val: string) => {
+      setQuery(val);
+      if (engine.url === "local") {
+        onLocalSearch?.(val);
+      }
+    };
 
-  const handleSearch = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (engine.url === "local") return;
-    if (!query.trim()) return;
-    
-    window.open(`${engine.url}${encodeURIComponent(query)}`, '_blank');
-  };
+    const handleSearch = (e?: React.FormEvent) => {
+      e?.preventDefault();
+      if (engine.url === "local") return;
+      if (!query.trim()) return;
 
-  return (
-    <motion.div 
-      className="relative w-full max-w-2xl mx-auto mb-12 z-40"
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
-    >
-      <form 
-        onSubmit={handleSearch}
-        className="relative flex items-center group"
+      window.open(`${engine.url}${encodeURIComponent(query)}`, "_blank");
+    };
+
+    return (
+      <motion.div
+        className="relative w-full max-w-2xl mx-auto mb-12 z-40"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
       >
-        <div className="absolute left-2 z-50">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                className="h-8 px-2 text-white/80 hover:text-white hover:bg-white/10 rounded-md transition-all duration-200 hover:scale-105 active:scale-98 gap-1"
-              >
-                {engine.name}
-                <ChevronDown className="h-3 w-3 opacity-50" />
-              </Button>
-            </DropdownMenuTrigger>
-            
-            <DropdownMenuContent 
-              align="start" 
-              className="w-40 bg-black/60 backdrop-blur-xl border-white/20 text-white p-0 overflow-hidden"
+        {/* 搜索引擎标签切换 */}
+        <div className="flex flex-wrap justify-center gap-1.5 mb-3">
+          {ENGINES.map((e) => (
+            <button
+              key={e.name}
+              onClick={() => handleEngineChange(e)}
+              className={[
+                "px-3 py-1 rounded-full text-xs font-medium transition-all duration-200",
+                "cursor-pointer hover:scale-105 active:scale-95",
+                engine.name === e.name
+                  ? "bg-white/25 text-white shadow-md"
+                  : "bg-white/10 text-white/60 hover:bg-white/15 hover:text-white/80",
+              ].join(" ")}
             >
-
-              <div className="h-64 overflow-y-auto p-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/40">
-                {ENGINES.map((e) => (
-                  <DropdownMenuItem 
-                    key={e.name} 
-                    onClick={() => handleEngineChange(e)}
-                    className="focus:bg-white/20 focus:text-white cursor-pointer transition-all duration-200 hover:bg-white/10 hover:scale-102 active:scale-98"
-                  >
-                    {e.name}
-                  </DropdownMenuItem>
-                ))}
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              {e.name}
+            </button>
+          ))}
         </div>
 
-        <motion.div
-          whileHover={{ scale: 1.01 }}
-          transition={{ duration: 0.2 }}
-          className="flex-1"
+        <form
+          onSubmit={handleSearch}
+          className="relative flex items-center group"
         >
-          <Input
-            ref={ref}
-            type="text"
-            value={query}
-            onChange={(e) => handleInputChange(e.target.value)}
-            placeholder={engine.url === 'local' ? "筛选我的链接..." : `在 ${engine.name} 中搜索...`}
-            className="h-14 pl-32 pr-14 rounded-2xl border-white/20 bg-white/10 dark:bg-black/20 backdrop-blur-xl text-white placeholder:text-white/50 focus-visible:ring-2 focus-visible:ring-white/30 shadow-xl transition-all hover:bg-white/15 text-lg"
-          />
-        </motion.div>
-        
-        <Button
-          type="submit" 
-          size="icon" 
-          variant="ghost" 
-          onClick={() => handleSearch()}
-          className="absolute right-2 top-2 h-10 w-10 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-110 hover:rotate-15 active:scale-95 active:rotate-0"
-        >
-          <Search className="h-5 w-5" />
-        </Button>
-      </form>
-    </motion.div>
-  );
-});
+          <motion.div
+            whileHover={{ scale: 1.01 }}
+            transition={{ duration: 0.2 }}
+            className="flex-1"
+          >
+            <Input
+              ref={ref}
+              type="text"
+              value={query}
+              onChange={(e) =>
+                handleInputChange(e.target.value)
+              }
+              placeholder={
+                engine.url === "local"
+                  ? "筛选我的链接..."
+                  : `在 ${engine.name} 中搜索...`
+              }
+              className="h-14 pl-6 pr-14 rounded-2xl border-white/20 bg-white/10 dark:bg-black/20 backdrop-blur-xl text-white placeholder:text-white/50 focus-visible:ring-2 focus-visible:ring-white/30 shadow-xl transition-all hover:bg-white/15 text-lg"
+            />
+          </motion.div>
+
+          <Button
+            type="submit"
+            size="icon"
+            variant="ghost"
+            onClick={() => handleSearch()}
+            className="absolute right-2 top-2 h-10 w-10 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-110 hover:rotate-15 active:scale-95 active:rotate-0"
+          >
+            <Search className="h-5 w-5" />
+          </Button>
+        </form>
+      </motion.div>
+    );
+  }
+);
 
 SearchBar.displayName = "SearchBar";

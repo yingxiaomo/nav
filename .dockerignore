@@ -34,5 +34,7 @@ pnpm-debug.log*
 .vscode
 .idea
 
-# Local logs
-.1.md
+# Server (exclude generated files, but keep source code for all-in-one Dockerfile)
+server/node_modules
+server/data
+server/.env

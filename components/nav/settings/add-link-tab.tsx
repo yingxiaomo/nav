@@ -17,6 +17,7 @@ import {
   sanitizeText
 } from "@/lib/utils/validation";
 import { convertToWebP } from "@/lib/utils/image-utils";
+import { STORAGE_CONFIG_KEY } from "@/lib/adapters/storage";
 
 interface AddLinkTabProps {
   localData: DataSchema;
@@ -43,23 +44,52 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
     };
   }, []);
   
- const handleSmartIdentify = (rawUrl: string, isAuto: boolean = false) => {
+ const handleSmartIdentify = async (rawUrl: string, isAuto: boolean = false) => {
     if (!rawUrl) {
       if (!isAuto) toast.error("请先输入 URL", { description: "请输入要添加的链接地址" });
       return;
     }
 
     const processedUrl = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
-    
+
     if (!isAuto) {
         setNewUrl(processedUrl);
     }
-    
+
     if (!isValidUrl(processedUrl)) {
         if (!isAuto) toast.error("URL 格式不正确", { description: "请输入有效的 URL 地址，如 https://example.com" });
         return;
     }
-    
+
+    // 如果配置了本地后端，优先使用元数据解析接口
+    if (!(isAuto && titleEditedManually.current)) {
+      try {
+        const configRaw = localStorage.getItem(STORAGE_CONFIG_KEY);
+        if (configRaw) {
+          const storageConfig = JSON.parse(configRaw);
+          if (storageConfig.type === 'api-server' && storageConfig.apiServer?.baseUrl) {
+            const baseUrl = storageConfig.apiServer.baseUrl.replace(/\/$/, '');
+            const token = storageConfig.apiServer.token;
+            const headers: Record<string, string> = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch(`${baseUrl}/api/v1/parse?url=${encodeURIComponent(processedUrl)}`, { headers });
+            if (res.ok) {
+              const meta = await res.json();
+              if (meta.title) setNewTitle(meta.title);
+              if (meta.icon) setNewIcon(meta.icon);
+              // description 可以在后续版本中用到
+              if (!isAuto) toast.success("已从网页获取标题和图标", { description: meta.title });
+              return;
+            }
+          }
+        }
+      } catch {
+        // 后端不可用，降级到客户端识别
+      }
+    }
+
+    // 降级：客户端 URL 解析
     try {
       const urlObj = new URL(processedUrl);
       const hostname = urlObj.hostname;

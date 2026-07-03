@@ -1,56 +1,52 @@
-FROM node:20-alpine AS base
+# ===== All-in-One 镜像 =====
+# 一个容器同时提供前端页面 + 后端 API
+# 前端构建为静态导出，由 Hono 直接 serve
 
-# 仅在需要时安装依赖
-FROM base AS deps
-# 查看 https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine 了解为什么可能需要 libc6-compat。
-RUN apk add --no-cache libc6-compat
+# ---- 阶段 1：构建前端静态文件 ----
+FROM node:20-alpine AS frontend
 WORKDIR /app
+RUN apk add --no-cache libc6-compat
 
-# 根据首选的包管理器安装依赖
+ENV NEXT_TELEMETRY_DISABLED=1
+
 COPY package.json package-lock.json* ./
 RUN npm ci
 
-# 仅在需要时重新构建源代码
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# Next.js 会收集有关常规使用的完全匿名遥测数据。
-# 在此处了解更多信息：https://nextjs.org/telemetry
-# 如果您想在构建期间禁用遥测，请取消注释以下行。
-ENV NEXT_TELEMETRY_DISABLED=1
-
-ENV DOCKER_BUILD=true
-
 RUN npm run build
 
-# 生产镜像，复制所有文件并运行 next
-FROM base AS runner
+# ---- 阶段 2：运行后端 ----
+FROM node:20-alpine AS runner
 WORKDIR /app
 
-ENV NODE_ENV=production
-# 如果您想在运行时禁用遥测，请取消注释以下行。
-ENV NEXT_TELEMETRY_DISABLED=1
-
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs && \
-    mkdir .next && \
-    chown nextjs:nodejs .next
+    adduser --system --uid 1001 node
 
-COPY --from=builder /app/public ./public
+# 后端依赖
+COPY server/package.json server/package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 
-# 自动利用输出跟踪来减小镜像大小
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# 前端静态文件（Hono 以 ./public/ 根目录 serve）
+COPY --from=frontend --chown=node:nodejs /app/out ./public
 
-USER nextjs
+# 管理后台页面（与前端静态文件不冲突）
+COPY --from=frontend --chown=node:nodejs /app/server/public ./public
 
-EXPOSE 20261
+# 后端代码
+COPY --from=frontend --chown=node:nodejs /app/server/src ./src
+COPY --from=frontend --chown=node:nodejs /app/server/drizzle ./drizzle
 
-ENV PORT=20261
+# 数据目录
+RUN mkdir -p /app/data/uploads && chown -R node:nodejs /app/data
 
-# server.js 是由 next build 从独立输出创建的
-# https://nextjs.org/docs/pages/api-reference/next-config-js/output
-CMD ["node", "server.js"]
+ENV NODE_ENV=production
+ENV PORT=8642
+ENV DATABASE_URL=/app/data/nav.db
+ENV UPLOAD_DIR=/app/data/uploads
+ENV CORS_ORIGIN=*
+
+EXPOSE 8642
+
+USER node
+
+CMD ["npx", "tsx", "src/index.ts"]

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DataSchema, DEFAULT_DATA, Category, Todo, Note, LinkItem } from "../types/types";
 import { GITHUB_CONFIG_KEY } from "../adapters/github";
-import { StorageAdapter, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, STORAGE_CONFIG_KEY, StorageConfig } from "../adapters/storage";
+import { StorageAdapter, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, ApiServerAdapter, STORAGE_CONFIG_KEY, StorageConfig } from "../adapters/storage";
 import { toast } from "sonner";
 import { convertToWebP } from '../utils/image-utils';
 import { deepEqual } from '../utils/common';
@@ -80,6 +80,10 @@ export function useNavData(initialWallpapers: string[]) {
         const settings = config.googledrive;
         return settings ? new GoogleDriveAdapter(settings) : null;
     }
+    if (config.type === 'api-server') {
+        const settings = config.apiServer;
+        return settings ? new ApiServerAdapter(settings) : null;
+    }
     return null;
   }, []);
 
@@ -105,6 +109,8 @@ export function useNavData(initialWallpapers: string[]) {
                 rawConfig.dropbox = oldSettings;
             } else if (rawConfig.type === 'googledrive' && !rawConfig.googledrive) {
                 rawConfig.googledrive = oldSettings;
+            } else if (rawConfig.type === 'api-server' && !rawConfig.apiServer) {
+                rawConfig.apiServer = oldSettings;
             }
                 delete rawConfig.settings;
                 localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(rawConfig));

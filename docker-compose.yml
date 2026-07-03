@@ -1,0 +1,32 @@
+services:
+  # 合体镜像：前端 + 后端 一个容器
+  nav:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nav
+    ports:
+      - "8642:8642"
+    volumes:
+      - nav-data:/app/data
+    restart: unless-stopped
+
+  # 独立后端（可选）
+  nav-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: nav-server
+    ports:
+      - "8642:8642"
+    volumes:
+      - nav-data:/app/data
+    environment:
+      - PORT=8642
+      - DATABASE_URL=/app/data/nav.db
+      - UPLOAD_DIR=/app/data/uploads
+      - CORS_ORIGIN=*
+    restart: unless-stopped
+
+volumes:
+  nav-data:

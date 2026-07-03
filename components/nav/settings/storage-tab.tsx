@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, DropboxSettings, GoogleDriveSettings, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter } from "@/lib/adapters/storage";
+import { StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, DropboxSettings, GoogleDriveSettings, ApiServerSettings, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, ApiServerAdapter } from "@/lib/adapters/storage";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ const DEFAULT_WEBDAV: WebDavSettings = { url: "", username: "", password: "", pa
 const DEFAULT_GIST: GistSettings = { token: "", gistId: "", filename: "nav-data.json" };
 const DEFAULT_DROPBOX: DropboxSettings = { token: "", path: "/nav-data.json" };
 const DEFAULT_GOOGLE_DRIVE: GoogleDriveSettings = { token: "", fileId: "", filename: "nav-data.json" };
+const DEFAULT_APISERVER: ApiServerSettings = { baseUrl: "", token: "" };
 
 export function StorageTab({ config, setConfig }: StorageTabProps) {
   const [isTesting, setIsTesting] = useState(false);
@@ -66,6 +67,11 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
   const updateGoogleDrive = (fields: Partial<GoogleDriveSettings>) => {
     const current = config.googledrive || DEFAULT_GOOGLE_DRIVE;
     setConfig({ ...config, googledrive: { ...current, ...fields } });
+  };
+
+  const updateApiServer = (fields: Partial<ApiServerSettings>) => {
+    const current = config.apiServer || DEFAULT_APISERVER;
+    setConfig({ ...config, apiServer: { ...current, ...fields } });
   };
 
   const handleTestConnection = async () => {
@@ -119,6 +125,14 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
           description: "已成功连接到 Google Drive",
           duration: 3000
         });
+      } else if (config.type === 'api-server') {
+        const settings = config.apiServer || DEFAULT_APISERVER;
+        const adapter = new ApiServerAdapter(settings);
+        if (adapter.testConnection) await adapter.testConnection();
+        toast.success("后端连接成功！", {
+          description: `已成功连接到 ${settings.baseUrl}`,
+          duration: 3000
+        });
       }
     } catch (error: unknown) {
       console.error("Test connection failed:", error);
@@ -135,6 +149,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
   const gistCfg = config.gist || DEFAULT_GIST;
   const dropboxCfg = config.dropbox || DEFAULT_DROPBOX;
   const googleDriveCfg = config.googledrive || DEFAULT_GOOGLE_DRIVE;
+  const apiServerCfg = config.apiServer || DEFAULT_APISERVER;
 
   return (
       <div className="space-y-4 py-4 overflow-y-auto h-full px-1">
@@ -151,6 +166,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
             <SelectItem value="gist">GitHub Gist</SelectItem>
             <SelectItem value="dropbox">Dropbox</SelectItem>
             <SelectItem value="googledrive">Google Drive</SelectItem>
+            <SelectItem value="api-server">本地服务器</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -399,35 +415,62 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
           <>
             <div className="space-y-2">
               <Label>Token (需要 drive.file 权限)</Label>
-              <Input 
-                type="password" 
-                value={googleDriveCfg.token || ""} 
-                onChange={e => updateGoogleDrive({ token: e.target.value })} 
-                placeholder="ya29.xxx..." 
-                className="h-9" 
+              <Input
+                type="password"
+                value={googleDriveCfg.token || ""}
+                onChange={e => updateGoogleDrive({ token: e.target.value })}
+                placeholder="ya29.xxx..."
+                className="h-9"
               />
             </div>
             <div className="space-y-2">
               <Label>文件 ID</Label>
-              <Input 
-                value={googleDriveCfg.fileId || ""} 
-                onChange={e => updateGoogleDrive({ fileId: e.target.value })} 
-                placeholder="Google Drive 文件 ID" 
-                className="h-9" 
+              <Input
+                value={googleDriveCfg.fileId || ""}
+                onChange={e => updateGoogleDrive({ fileId: e.target.value })}
+                placeholder="Google Drive 文件 ID"
+                className="h-9"
               />
             </div>
             <div className="space-y-2">
               <Label>文件名</Label>
-              <Input 
-                value={googleDriveCfg.filename || ""} 
-                onChange={e => updateGoogleDrive({ filename: e.target.value })} 
-                placeholder="nav-data.json" 
-                className="h-9" 
+              <Input
+                value={googleDriveCfg.filename || ""}
+                onChange={e => updateGoogleDrive({ filename: e.target.value })}
+                placeholder="nav-data.json"
+                className="h-9"
               />
             </div>
             <p className="text-[11px] text-muted-foreground">
               请创建一个 Google Drive 文件，并填入其文件 ID 和文件名。
             </p>
+          </>
+        )}
+
+        {config.type === 'api-server' && (
+          <>
+            <div className="space-y-2">
+              <Label>后端地址</Label>
+              <Input
+                value={apiServerCfg.baseUrl || ""}
+                onChange={e => updateApiServer({ baseUrl: e.target.value })}
+                placeholder="http://your-server:8642"
+                className="h-9"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>API 令牌</Label>
+              <Input
+                type="password"
+                value={apiServerCfg.token || ""}
+                onChange={e => updateApiServer({ token: e.target.value })}
+                placeholder="sk-..."
+                className="h-9"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                在管理后台 /admin/ 生成。不填则使用无需认证的后端。
+              </p>
+            </div>
           </>
         )}
       </div>

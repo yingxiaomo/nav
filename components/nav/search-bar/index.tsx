@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Search, Clock, X, Trash2, Link as LinkIcon, Globe } from "lucide-react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { Search, Clock, X, Trash2, Link as LinkIcon, Globe, Wifi } from "lucide-react";
 import { motion } from "framer-motion";
 import { Input, Button } from "@/components/ui";
 import { useSearchHistory } from "@/lib";
 import { LinkItem } from "@/lib/types/types";
 import Fuse, { type IFuseOptions } from "fuse.js";
+import { STORAGE_CONFIG_KEY } from "@/lib/adapters/storage";
 
 const ENGINES = [
   { name: "Google", url: "https://www.google.com/search?q=" },
@@ -33,7 +34,8 @@ interface SearchBarProps {
 /** 下拉面板中的一条候选 */
 type SuggestionItem =
   | { kind: "history"; query: string }
-  | { kind: "bookmark"; item: LinkItem };
+  | { kind: "bookmark"; item: LinkItem }
+  | { kind: "web"; text: string };
 
 const FUSE_OPTIONS: IFuseOptions<LinkItem> = {
   keys: [
@@ -51,6 +53,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
     const [engine, setEngine] = useState(ENGINES[0]);
     const [showDropdown, setShowDropdown] = useState(false);
     const [selectedIdx, setSelectedIdx] = useState(-1);
+    const [webSuggestions, setWebSuggestions] = useState<string[]>([]);
     const { history, addSearch, removeSearch, clearHistory } = useSearchHistory();
     const containerRef = useRef<HTMLDivElement>(null);
     const blurTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -81,8 +84,9 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
       const list: SuggestionItem[] = [];
       for (const h of filteredHistory) list.push({ kind: "history", query: h });
       for (const r of bookmarkMatches) list.push({ kind: "bookmark", item: r.item });
+      for (const w of webSuggestions) list.push({ kind: "web", text: w });
       return list;
-    }, [filteredHistory, bookmarkMatches]);
+    }, [filteredHistory, bookmarkMatches, webSuggestions]);
 
     // 输入框内的灰色联想预览（仅在首条为历史且前缀匹配时）
     const completionText =
@@ -95,6 +99,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
 
     const hasHistoryItems = suggestions.some((s) => s.kind === "history");
     const hasBookmarkItems = suggestions.some((s) => s.kind === "bookmark");
+    const hasWebItems = suggestions.some((s) => s.kind === "web");
 
     // ── 点击外部关闭 ──────────────────────────────────────
     useEffect(() => {
@@ -138,9 +143,40 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
     };
 
     // ── 输入变化 ──────────────────────────────────────────
-    const handleInputChange = (val: string) => {
+    const handleInputChange = async (val: string) => {
       setQuery(val);
       if (engine.url === "local") onLocalSearch?.(val);
+
+      // 获取网络搜索建议（后端已配置时）
+      if (val.trim().length >= 2) {
+        try {
+          const configRaw = localStorage.getItem(STORAGE_CONFIG_KEY);
+          if (configRaw) {
+            const sc = JSON.parse(configRaw);
+            if (sc.type === 'api-server' && sc.apiServer?.baseUrl) {
+              const baseUrl = sc.apiServer.baseUrl.replace(/\/$/, '');
+              const token = sc.apiServer.token;
+              const headers: Record<string, string> = {};
+              if (token) headers['Authorization'] = `Bearer ${token}`;
+              const res = await fetch(`${baseUrl}/api/v1/suggest?q=${encodeURIComponent(val.trim())}&source=duckduckgo`, { headers });
+              if (res.ok) {
+                const data = await res.json();
+                setWebSuggestions(data.suggestions || []);
+              } else {
+                setWebSuggestions([]);
+              }
+            } else {
+              setWebSuggestions([]);
+            }
+          } else {
+            setWebSuggestions([]);
+          }
+        } catch {
+          setWebSuggestions([]);
+        }
+      } else {
+        setWebSuggestions([]);
+      }
 
       if (val.trim()) {
         const matches = history.filter((h) =>
@@ -185,6 +221,17 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
         return;
       }
 
+      // 选中了网络建议 → 用当前搜索引擎搜索
+      if (selectedIdx >= 0 && suggestions[selectedIdx]?.kind === "web") {
+        const text = (suggestions[selectedIdx] as Extract<SuggestionItem, { kind: "web" }>).text;
+        closeDropdown();
+        addSearch(text);
+        if (engine.url !== "local") {
+          window.open(`${engine.url}${encodeURIComponent(text)}`, "_blank");
+        }
+        return;
+      }
+
       // 选中了历史 → 填入 + 搜索
       const searchQuery =
         selectedIdx >= 0
@@ -209,6 +256,11 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
       closeDropdown();
       if (item.kind === "bookmark") {
         if (item.item.url) onOpenLink?.(item.item.url);
+      } else if (item.kind === "web") {
+        addSearch(item.text);
+        if (engine.url !== "local") {
+          window.open(`${engine.url}${encodeURIComponent(item.text)}`, "_blank");
+        }
       } else {
         setQuery(item.query);
         if (engine.url === "local") onLocalSearch?.(item.query);
@@ -315,7 +367,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
             >
               <div className="py-1 max-h-72 overflow-y-auto">
                 {suggestions.map((s, idx) => (
-                  <React.Fragment key={`${s.kind}-${s.kind === "history" ? s.query : s.item.id}`}>
+                  <React.Fragment key={`${s.kind}-${s.kind === "history" ? s.query : s.kind === "web" ? s.text : s.item.id}`}>
                     {/* 分段头 */}
                     {idx === 0 && hasHistoryItems && (
                       <div className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-white/40 font-medium tracking-wider border-b border-white/5">
@@ -337,6 +389,12 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
                         书签
                       </div>
                     )}
+                    {idx > 0 && suggestions[idx - 1].kind === "bookmark" && s.kind === "web" && (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-white/40 font-medium tracking-wider border-t border-white/5">
+                        <Wifi className="h-3 w-3" />
+                        网络搜索
+                      </div>
+                    )}
 
                     {/* 候选行 */}
                     <div
@@ -347,11 +405,13 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
                       <span className="flex items-center gap-2 min-w-0 flex-1">
                         {s.kind === "bookmark" ? (
                           <Globe className="h-3.5 w-3.5 shrink-0 text-blue-400/70" />
+                        ) : s.kind === "web" ? (
+                          <Wifi className="h-3.5 w-3.5 shrink-0 text-green-400/70" />
                         ) : (
                           <Clock className="h-3.5 w-3.5 shrink-0 text-white/30" />
                         )}
                         <span className="text-sm truncate">
-                          {s.kind === "history" ? s.query : s.item.title}
+                          {s.kind === "history" ? s.query : s.kind === "web" ? s.text : s.item.title}
                         </span>
                         {s.kind === "bookmark" && (
                           <span className="text-[11px] text-white/30 truncate hidden sm:inline max-w-[40%] ml-auto">

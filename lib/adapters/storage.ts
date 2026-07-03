@@ -7,13 +7,14 @@ import { uint8ArrayToBase64 } from "../utils/common";
 
 export const STORAGE_CONFIG_KEY = "clean-nav-storage-config";
 export interface StorageConfig {
-  type: 'github' | 's3' | 'webdav' | 'gist' | 'dropbox' | 'googledrive';
+  type: 'github' | 's3' | 'webdav' | 'gist' | 'dropbox' | 'googledrive' | 'api-server';
   github?: GithubRepoSettings;
   s3?: S3Settings;
   webdav?: WebDavSettings;
   gist?: GistSettings;
   dropbox?: DropboxSettings;
   googledrive?: GoogleDriveSettings;
+  apiServer?: ApiServerSettings;
 }
 
 export interface StorageAdapter {
@@ -63,6 +64,11 @@ export interface GoogleDriveSettings {
   token: string;
   fileId: string;
   filename: string;
+}
+
+export interface ApiServerSettings {
+  baseUrl: string;
+  token?: string;
 }
 
 export class S3Adapter implements StorageAdapter {
@@ -707,5 +713,72 @@ export class GoogleDriveAdapter implements StorageAdapter {
     formData.append("file", new Blob([content], { type: mimeType }), filename);
     
     return formData;
+  }
+}
+
+// ===== 本地服务器适配器（Hono 后端 API）=====
+
+export class ApiServerAdapter implements StorageAdapter {
+  constructor(private config: ApiServerSettings) {}
+
+  private async request(path: string, options?: RequestInit): Promise<Response> {
+    const headers: Record<string, string> = {
+      ...(options?.headers as Record<string, string>),
+    };
+    if (this.config.token) {
+      headers['Authorization'] = `Bearer ${this.config.token}`;
+    }
+    // FormData 不需要手动设 Content-Type
+    if (!(options?.body instanceof FormData)) {
+      headers['Content-Type'] ??= 'application/json';
+    }
+    return fetch(`${this.config.baseUrl}${path}`, { ...options, headers });
+  }
+
+  async load(): Promise<DataSchema | null> {
+    try {
+      const res = await this.request('/api/v1/data');
+      if (!res.ok) return null;
+      return res.json() as Promise<DataSchema>;
+    } catch {
+      return null;
+    }
+  }
+
+  async save(data: DataSchema): Promise<boolean> {
+    try {
+      const res = await this.request('/api/v1/data', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async testConnection(): Promise<void> {
+    const res = await fetch(`${this.config.baseUrl}/api/v1/health`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) {
+      throw new Error(`后端连接失败 (${res.status})`);
+    }
+  }
+
+  async uploadFile(file: File, filename: string, onProgress?: (progress: number) => void): Promise<string> {
+    const formData = new FormData();
+    formData.append('file', file, filename);
+
+    onProgress?.(30);
+    const res = await this.request('/api/v1/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    onProgress?.(100);
+
+    if (!res.ok) throw new Error('上传失败');
+    const data = await res.json();
+    return data.url;
   }
 }

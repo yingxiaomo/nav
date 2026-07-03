@@ -43,3 +43,9 @@ next-env.d.ts
 .idea/
 *.swp
 *.swo
+
+# server (后端)
+server/node_modules
+server/data/
+server/.env
+server/drizzle/meta/

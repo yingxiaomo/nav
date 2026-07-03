@@ -202,7 +202,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
               opacity: imgLoaded ? 1 : 0 
           }}
         />
-        <div className="fixed inset-0 z-0 bg-black/20 pointer-events-none" />
+        <div className="fixed inset-0 z-0 bg-[rgba(0,0,0,var(--overlay-darkness,0.2))] pointer-events-none" />
         <div className="fixed top-4 right-4 z-50 flex gap-2">
           <Suspense fallback={
             <div className="flex items-center justify-center w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm">

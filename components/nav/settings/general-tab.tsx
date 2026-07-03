@@ -4,10 +4,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch" 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ImageIcon, Shuffle, Layers, Upload, Loader2, Sun, Moon, Monitor } from "lucide-react"; 
+import { ImageIcon, Shuffle, Layers, Upload, Loader2, Sun, Moon, Monitor, RotateCcw } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { useThemeStore } from "@/lib/stores";
+import { ACCENT_MAP } from "@/lib/stores/theme-store";
+
+const BLUR_OPTIONS = [
+  { value: 'low' as const, label: '低', px: '4px' },
+  { value: 'medium' as const, label: '中', px: '12px' },
+  { value: 'high' as const, label: '高', px: '24px' },
+];
+
+const ACCENT_COLORS = [
+  { key: 'blue',   label: '蓝', color: '#3b82f6' },
+  { key: 'purple', label: '紫', color: '#8b5cf6' },
+  { key: 'green',  label: '绿', color: '#10b981' },
+  { key: 'orange', label: '橙', color: '#f59e0b' },
+  { key: 'amber',  label: '琥珀', color: '#f97316' },
+];
+
+const FONT_OPTIONS = [
+  { value: 'system' as const, label: '系统字体' },
+  { value: 'mono' as const, label: '等宽字体' },
+];
+
+const BLUR_LABELS: Record<string, string> = { low: '低', medium: '中', high: '高' };
 
 interface GeneralTabProps {
   localData: DataSchema;
@@ -22,6 +45,7 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const themeStore = useThemeStore();
 
   // 防抖保存：避免快速切换时频繁触发云同步
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -243,6 +267,105 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
         </Select>
       </div>
 
+      {/* ── 强调色 ── */}
+      <div className="space-y-3 border border-border/50 p-4 rounded-xl bg-muted/30">
+        <Label>强调色</Label>
+        <div className="flex gap-2">
+          {ACCENT_COLORS.map((c) => (
+            <button
+              key={c.key}
+              onClick={() => themeStore.setAccentColor(c.key)}
+              className={`w-8 h-8 rounded-full transition-all border-2 ${
+                themeStore.accentColor === c.key
+                  ? 'border-white scale-110 shadow-md'
+                  : 'border-transparent hover:scale-105'
+              }`}
+              style={{ backgroundColor: c.color }}
+              aria-label={c.label}
+              title={c.label}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* ── 毛玻璃模糊程度 ── */}
+      <div className="space-y-3 border border-border/50 p-4 rounded-xl bg-muted/30">
+        <Label>毛玻璃模糊</Label>
+        <div className="flex gap-2">
+          {BLUR_OPTIONS.map((b) => (
+            <button
+              key={b.value}
+              onClick={() => themeStore.setBlurLevel(b.value)}
+              className={`flex-1 h-9 text-sm rounded-md font-medium transition-all ${
+                themeStore.blurLevel === b.value
+                  ? 'bg-primary text-primary-foreground shadow'
+                  : 'bg-background text-foreground/70 hover:bg-muted border border-border'
+              }`}
+            >
+              {b.label} ({b.px})
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 遮罩暗化 ── */}
+      <div className="space-y-3 border border-border/50 p-4 rounded-xl bg-muted/30">
+        <div className="flex items-center justify-between">
+          <Label>遮罩暗化</Label>
+          <span className="text-xs font-mono bg-background px-2 py-0.5 rounded border">
+            {themeStore.overlayDarkness}%
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={themeStore.overlayDarkness}
+          onChange={(e) => themeStore.setOverlayDarkness(Number(e.target.value))}
+          className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-[var(--theme-accent)]"
+        />
+        <p className="text-xs text-muted-foreground">控制壁纸上方黑色遮罩的深度</p>
+      </div>
+
+      {/* ── 卡片透明度 ── */}
+      <div className="space-y-3 border border-border/50 p-4 rounded-xl bg-muted/30">
+        <div className="flex items-center justify-between">
+          <Label>卡片透明度</Label>
+          <span className="text-xs font-mono bg-background px-2 py-0.5 rounded border">
+            {themeStore.cardOpacity}%
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={themeStore.cardOpacity}
+          onChange={(e) => themeStore.setCardOpacity(Number(e.target.value))}
+          className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-[var(--theme-accent)]"
+        />
+        <p className="text-xs text-muted-foreground">控制卡片背景的透明度（越低越透）</p>
+      </div>
+
+      {/* ── 字体 ── */}
+      <div className="space-y-3 border border-border/50 p-4 rounded-xl bg-muted/30">
+        <Label>字体</Label>
+        <div className="flex gap-2">
+          {FONT_OPTIONS.map((f) => (
+            <button
+              key={f.value}
+              onClick={() => themeStore.setFontFamily(f.value)}
+              className={`flex-1 h-9 text-sm rounded-md font-medium transition-all ${
+                themeStore.fontFamily === f.value
+                  ? 'bg-primary text-primary-foreground shadow'
+                  : 'bg-background text-foreground/70 hover:bg-muted border border-border'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="space-y-3 border border-border/50 p-4 rounded-xl bg-muted/30">
         <Label>壁纸模式</Label>
         <div className="flex gap-2">
@@ -382,6 +505,22 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
             
           </div>
         )}
+      </div>
+
+      {/* ── 恢复默认 ── */}
+      <div className="pt-2 border-t border-border/30">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            themeStore.resetTheme();
+            toast.success("视觉设置已恢复默认");
+          }}
+          className="w-full gap-2 h-9 text-xs"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          恢复视觉设置为默认值
+        </Button>
       </div>
     </div>
   );

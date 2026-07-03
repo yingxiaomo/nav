@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Category, LinkItem } from "@/lib/types/types";
 import { PanelLeft, PanelLeftClose, ChevronLeft, Pin } from "lucide-react";
 import { generateFaviconUrl } from "@/lib/utils/common";
@@ -76,6 +76,20 @@ export function BookmarkSidebar({ categories, pinnedLinks, onPinLink, onUnpinLin
   const canGoBack = navHistory.length > 1;
 
   const isLinkPinned = (linkId: string) => pinnedLinks.some((l) => l.id === linkId);
+
+  // Escape 折叠侧边栏
+  useEffect(() => {
+    if (sidebarCollapsed) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSidebarCollapsed(true);
+        setNavHistory([tree]);
+        setNavTitles(["书签"]);
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [sidebarCollapsed, tree]);
 
   const handleNodeClick = (node: TreeNode) => {
     if (node.type === "link" && node.url) {

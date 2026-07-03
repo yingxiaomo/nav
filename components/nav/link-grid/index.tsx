@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useEffect, useId } from "react";
+import { useState, useEffect, useId, forwardRef, useImperativeHandle } from "react";
 import { Category, LinkItem } from "@/lib/types/types";
 import { X, ChevronLeft, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -27,6 +27,40 @@ import { BookmarkSidebar } from "./bookmark-sidebar";
 
 import { arrayMove } from "@dnd-kit/sortable";
 
+/** 方向键 roving tabindex 导航 */
+function handleArrowNav(e: React.KeyboardEvent<HTMLElement>, selector: string) {
+  const target = e.target as HTMLElement;
+  const container = e.currentTarget;
+  const items = Array.from(container.querySelectorAll<HTMLElement>(selector));
+  const currentIndex = items.findIndex(item => item === target || item.contains(target));
+  if (currentIndex === -1) return;
+
+  let nextIndex: number;
+  switch (e.key) {
+    case 'ArrowRight':
+    case 'ArrowDown':
+      e.preventDefault();
+      nextIndex = (currentIndex + 1) % items.length;
+      break;
+    case 'ArrowLeft':
+    case 'ArrowUp':
+      e.preventDefault();
+      nextIndex = (currentIndex - 1 + items.length) % items.length;
+      break;
+    default:
+      return;
+  }
+
+  items[nextIndex]?.focus();
+}
+
+export interface FolderModalHandle {
+  /** 返回上一级文件夹；若已在根级则关闭模态框。返回是否实际执行了操作 */
+  back: () => boolean;
+  /** 直接关闭文件夹模态框 */
+  close: () => void;
+}
+
 interface LinkGridProps {
   categories: Category[];
   onReorder?: (categories: Category[]) => void;
@@ -39,7 +73,7 @@ interface LinkGridProps {
   onPinnedReorder?: (pinned: LinkItem[]) => void;
 }
 
-export function LinkGrid({
+export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function LinkGrid({
   categories,
   onReorder,
   onOpenChange,
@@ -49,7 +83,7 @@ export function LinkGrid({
   onPinLink,
   onUnpinLink,
   onPinnedReorder,
-}: LinkGridProps) {
+}: LinkGridProps, ref) {
 
   const dndContextId = useId();
   const [selectedId, setSelectedId] = useState<string | null>(null); 
@@ -59,8 +93,30 @@ export function LinkGrid({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const [navStack, setNavStack] = useState<LinkItem[]>([]); 
+  const [navStack, setNavStack] = useState<LinkItem[]>([]);
   const [allCollapsedState, setAllCollapsedState] = useState<Record<string, boolean>>({});
+
+  // 暴露给父组件的文件夹导航控制接口
+  useImperativeHandle(ref, () => ({
+    /** 返回上一级；若已在根级则关闭模态框。有操作返回 true，无操作（未打开）返回 false */
+    back: () => {
+      if (selectedId === null) return false;
+      if (navStack.length > 0) {
+        setNavStack(prev => prev.slice(0, -1));
+      } else {
+        const idToRestore = selectedId;
+        setSelectedId(null);
+        // 动画完成后将焦点归还到卡片
+        requestAnimationFrame(() => {
+          const card = document.querySelector(`[data-category-id="${idToRestore}"]`) as HTMLElement | null;
+          card?.focus();
+        });
+      }
+      return true;
+    },
+    /** 直接关闭文件夹模态框 */
+    close: closeModal,
+  }), [navStack.length, selectedId]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -116,6 +172,16 @@ export function LinkGrid({
     ? navStack[navStack.length - 1].icon || "FolderOpen"
     : selectedCategory?.icon || "FolderOpen";
 
+  // Modal opening or navStack change: auto focus first link item
+  useEffect(() => {
+    if (!selectedId || modalCurrentItems.length === 0) return;
+    const timer = setTimeout(() => {
+      const firstItem = document.querySelector('[data-link-id]') as HTMLElement | null;
+      firstItem?.focus();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [selectedId, navStack.length, modalCurrentItems.length]);
+
   const handleModalBack = () => {
       setNavStack(prev => prev.slice(0, -1));
   };
@@ -125,6 +191,19 @@ export function LinkGrid({
       if (item.type === 'folder') {
           setNavStack(prev => [...prev, item]);
       }
+  };
+
+  // 关闭模态框并将焦点返还给卡片
+  const closeModal = () => {
+    const idToRestore = selectedId;
+    setSelectedId(null);
+    setNavStack([]);
+    if (idToRestore) {
+      requestAnimationFrame(() => {
+        const card = document.querySelector(`[data-category-id="${idToRestore}"]`) as HTMLElement | null;
+        card?.focus();
+      });
+    }
   };
 
   const handleLinkDragEnd = (event: DragEndEvent) => {
@@ -225,7 +304,7 @@ export function LinkGrid({
         <DndContext id={dndContextId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <div className="w-full max-w-5xl mx-auto pb-6 px-4 relative z-30">
             <SortableContext items={categories.map(c => c.id)} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9 gap-2 sm:gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9 gap-2 sm:gap-3" onKeyDown={(e) => handleArrowNav(e, '[data-category-id]')}>
                 {categories.map((category) => (
                   <SortableCard key={category.id} category={category} onClick={() => setSelectedId(category.id)} />
                 ))}
@@ -256,7 +335,7 @@ export function LinkGrid({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              onClick={() => setSelectedId(null)}
+              onClick={closeModal}
               className="absolute inset-0 bg-black/60"
             />
 
@@ -281,7 +360,7 @@ export function LinkGrid({
                   </h2>
                 </div>
                 <button
-                  onClick={() => setSelectedId(null)}
+                  onClick={closeModal}
                   className="p-1.5 rounded-full bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <X className="h-5 w-5" />
@@ -298,7 +377,7 @@ export function LinkGrid({
               >
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleLinkDragEnd}>
                   <SortableContext items={modalCurrentItems.map(i => i.id)} strategy={rectSortingStrategy}>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4" onKeyDown={(e) => handleArrowNav(e, '[data-link-id]')}>
                       {modalCurrentItems.map((item) => (
                         <SortableLinkItemCard
                           key={item.id}
@@ -330,4 +409,4 @@ export function LinkGrid({
       </AnimatePresence>
     </>
   );
-}
+});

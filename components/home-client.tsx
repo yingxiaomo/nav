@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, Suspense, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ClockWidget } from "@/components/nav/clock";
 import { SearchBar } from "@/components/nav/search-bar";
-import { LinkGrid } from "@/components/nav/link-grid";
+import { LinkGrid, type FolderModalHandle } from "@/components/nav/link-grid";
 // 懒加载设置对话框组件
 const SettingsDialog = lazy(() => import("@/components/nav/settings").then(mod => ({ default: mod.SettingsDialog })));
 import { FeaturesLauncher } from "@/components/features/features-launcher";
@@ -12,6 +12,7 @@ import { ThemeProvider } from "@/components/ui/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
 import { useWallpaper, useNavData, useKeyboardShortcuts } from "@/lib";
+import { useUIStore } from "@/lib/stores";
 
 interface HomeClientProps {
   initialWallpapers: string[]; 
@@ -61,22 +62,65 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
   } = useWallpaper(initialWallpapers, data);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const folderNavRef = useRef<FolderModalHandle>(null);
+  const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels } = useUIStore();
 
-  // 使用键盘快捷键 Hook
-  useKeyboardShortcuts({
-    onSave: () => handleSave(data, initWallpaper),
-    onSearch: () => {
-      searchInputRef.current?.focus();
+  // 键盘快捷键注册表
+  useKeyboardShortcuts([
+    {
+      key: 'meta+s',
+      handler: () => handleSave(data, initWallpaper),
+      label: '保存并同步',
+      category: 'global',
+      allowInInputs: true,
     },
-    onAddLink: () => {
-      // 可以用于打开添加链接的弹窗
+    {
+      key: '/',
+      handler: () => searchInputRef.current?.focus(),
+      label: '搜索书签',
+      category: 'global',
     },
-    onToggleSettings: () => {
-      setSettingsOpen(!settingsOpen);
-    }
-  });
+    {
+      key: 'meta+n',
+      handler: () => setSettingsOpen(true),
+      label: '添加链接',
+      category: 'global',
+      allowInInputs: true,
+    },
+    {
+      key: 'meta+,',
+      handler: () => setSettingsOpen(!isSettingsOpen),
+      label: '打开设置',
+      category: 'global',
+      allowInInputs: true,
+    },
+    {
+      key: 'escape',
+      handler: () => {
+        // 层级 1：搜索框聚焦 → 失焦并清空搜索
+        if (document.activeElement === searchInputRef.current) {
+          searchInputRef.current?.blur();
+          setSearchQuery("");
+          return;
+        }
+        // 层级 2：文件夹模态框打开 → 返回上级或关闭
+        if (folderNavRef.current?.back()) {
+          return;
+        }
+        // 层级 3：有面板打开 → 关闭所有浮动 UI
+        if (activePanel !== null || isSettingsOpen) {
+          closeAllPanels();
+          return;
+        }
+        // 层级 4：设置对话框由 Radix Dialog 内部处理（事件不拦截）
+      },
+      label: '关闭面板 / 返回上级',
+      category: 'global',
+      allowInInputs: true,
+      preventDefault: false,
+    },
+  ]);
 
   useEffect(() => {
     console.log("%c Clean Nav ", "background: #3b82f6; color: #fff; border-radius: 4px; font-weight: bold;");
@@ -182,8 +226,9 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
             {data.settings.homeLayout !== 'list' && <div className="flex-grow" />}
 
             <div className={`w-full max-w-5xl flex flex-col items-center ${data.settings.homeLayout === 'list' ? 'mt-8 mb-20' : 'mb-10'}`}> 
-               <LinkGrid 
-                  categories={displayCategories} 
+               <LinkGrid
+                  ref={folderNavRef}
+                  categories={displayCategories}
                   onReorder={searchQuery ? undefined : handleReorder}
                   onLinkReorder={handleLinkReorder}
                   displayMode={data.settings.homeLayout}

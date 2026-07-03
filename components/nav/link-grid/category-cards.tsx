@@ -33,8 +33,17 @@ interface StaticCardProps {
 
 export function StaticCard({ category, onClick }: StaticCardProps) {
   return (
-    <motion.div 
+    <motion.div
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      data-category-id={category.id}
       className="cursor-pointer group relative p-4 transition-transform duration-200 hover:scale-105 active:scale-95 touch-none"
     >
       <CardContent category={category} />
@@ -65,12 +74,19 @@ export function SortableCard({ category, onClick }: SortableCardProps) {
   };
 
   return (
-    <motion.div 
+    <motion.div
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      data-category-id={category.id}
       className="cursor-pointer group relative p-4 transition-transform duration-200 hover:scale-105 active:scale-95 touch-none"
     >
       <CardContent category={category} />

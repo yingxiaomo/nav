@@ -17,6 +17,7 @@ import { DataSchema } from "@/lib/types";
 import { STORAGE_CONFIG_KEY, StorageConfig } from "@/lib/adapters/storage";
 import { GITHUB_CONFIG_KEY } from "@/lib/adapters/github";
 import { useLocalStorage } from "@/lib/hooks";
+import { useUIStore } from "@/lib/stores";
 
 import { AddLinkTab } from "./add-link-tab";
 import { ManageLinksTab } from "./manage-links-tab";
@@ -34,7 +35,7 @@ interface SettingsDialogProps {
 }
 
 export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRefreshWallpaper, syncError, uploadWallpaper }: SettingsDialogProps) {
-  const [open, setOpen] = useState(false);
+  const { isSettingsOpen, setSettingsOpen } = useUIStore();
   const [localData, setLocalData] = useState<DataSchema>(data);
   // 定义需要加密的敏感字段路径
   const sensitiveFields = [
@@ -64,7 +65,7 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
   }, sensitiveFields);
 
   const handleOpenChange = (isOpen: boolean) => {
-    setOpen(isOpen);
+    setSettingsOpen(isOpen);
     if (isOpen) {
       setLocalData(data);
     }
@@ -79,11 +80,11 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
       }
     };
     await onSave(finalData);
-    setOpen(false);
+    setSettingsOpen(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={isSettingsOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="fixed bottom-4 right-4 z-50 rounded-full text-white/80 hover:text-white hover:bg-white/10 shadow-lg backdrop-blur-sm">
           <Settings className="h-5 w-5" />

@@ -19,19 +19,38 @@ interface LinkItemCardProps {
   isPinned?: boolean;
   /** 点击固定/取消固定按钮的回调 */
   onPinToggle?: () => void;
+  /** 禁用键盘焦点（当外层已有关注式包装时使用，如 SortableLinkItemCard） */
+  noKeyboard?: boolean;
 }
 
-export function LinkItemCard({ item, onClick, className, showPinButton, isPinned, onPinToggle }: LinkItemCardProps) {
+export function LinkItemCard({ item, onClick, className, showPinButton, isPinned, onPinToggle, noKeyboard }: LinkItemCardProps) {
     const isFolder = item.type === 'folder';
     const [imgError, setImgError] = useState(false);
 
     const icon = imgError ? null : getLinkIcon(item.icon, item.url, item.type);
     const showImg = isImageIcon(icon);
     const fallbackName = item.icon || (isFolder ? "FolderOpen" : "Link");
-                    
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (isFolder) {
+          onClick?.(item);
+        } else if (item.url) {
+          window.open(item.url, '_blank', 'noopener,noreferrer');
+        }
+      }
+    };
+
+    const commonProps = noKeyboard ? {} : {
+      tabIndex: 0,
+      role: "button" as const,
+      onKeyDown: handleKeyDown,
+    };
+
     if (isFolder) {
         return (
-           <div className={`group block relative ${className || ''}`} onClick={() => onClick?.(item)}>
+           <div className={`group block relative ${className || ''}`} onClick={() => onClick?.(item)} {...commonProps}>
                <div className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition-colors cursor-pointer">
                    <div className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center border border-white/20 overflow-hidden bg-yellow-500/10 text-yellow-500">
                        <IconRender name={item.icon || "FolderOpen"} className="h-4 w-4" />
@@ -56,11 +75,11 @@ export function LinkItemCard({ item, onClick, className, showPinButton, isPinned
                className="absolute -top-1.5 -right-1.5 z-10 p-1 rounded-full bg-white/20 backdrop-blur-sm text-white/70 hover:text-white hover:bg-white/30 transition-all opacity-0 group-hover:opacity-100 max-sm:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                title={isPinned ? "取消固定" : "固定到主页"}
              >
-               <svg 
-                 xmlns="http://www.w3.org/2000/svg" 
-                 viewBox="0 0 24 24" 
-                 fill={isPinned ? "currentColor" : "none"} 
-                 stroke="currentColor" 
+               <svg
+                 xmlns="http://www.w3.org/2000/svg"
+                 viewBox="0 0 24 24"
+                 fill={isPinned ? "currentColor" : "none"}
+                 stroke="currentColor"
                  strokeWidth={2}
                  className="h-3 w-3"
                >
@@ -68,7 +87,7 @@ export function LinkItemCard({ item, onClick, className, showPinButton, isPinned
                </svg>
              </button>
            )}
-           <div className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition-colors cursor-pointer" onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}>
+           <div className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition-colors cursor-pointer" onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')} {...commonProps}>
                <div className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center overflow-hidden ${showImg ? '' : 'border border-white/20 bg-blue-500/10 text-blue-500'}`}>
                    {showImg ? (
                      <img src={icon!} alt="" className="h-8 w-8 object-cover" onError={() => setImgError(true)} />
@@ -111,8 +130,24 @@ export function SortableLinkItemCard({ item, onClick, showPinButton, isPinned, o
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <LinkItemCard item={item} onClick={onClick} showPinButton={showPinButton} isPinned={isPinned} onPinToggle={onPinToggle} />
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      data-link-id={item.id}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (item.type === 'folder') {
+            onClick?.(item);
+          } else if (item.url) {
+            window.open(item.url, '_blank', 'noopener,noreferrer');
+          }
+        }
+      }}
+    >
+      <LinkItemCard item={item} onClick={onClick} showPinButton={showPinButton} isPinned={isPinned} onPinToggle={onPinToggle} noKeyboard />
     </div>
   );
 }

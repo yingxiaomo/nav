@@ -81,6 +81,12 @@
 ### 6. Google Drive
 支持使用 Google Drive 存储数据，适合已有 Google 账号的用户。
 
+### 7. 本地服务器（推荐自部署）
+
+如果你不想依赖第三方服务，可以使用配套的后端 API 服务，将数据持久化到本地 SQLite 数据库。后端还提供网页元数据解析、搜索联想等增强功能。
+
+需要部署后端服务，详情见下方 Docker 部署章节。
+
 ### 📘 详细配置指南
 
 请参考 [云同步配置指南](./docs/storage-guide.md) 获取完整的配置步骤和示例。
@@ -99,6 +105,62 @@
 ## 数据安全
 
 🔐 **安全提示**: 您的所有配置信息（包括访问令牌）**只会被安全地存储在您浏览器本地的缓存** 中，它不会被上传到任何服务器。这意味着只有您自己能接触到这些配置，他人无法获取，非常安全！但是更换浏览器或者清除缓存后需要重新输入。
+
+## 🐳 Docker 部署
+
+本项目提供两个 Docker 镜像，按需选择:
+
+| 镜像 | 地址 | 包含 |
+|------|------|------|
+| **合体镜像** | `ghcr.io/yingxiaomo/nav` | 前端页面 + 后端 API + 管理后台 |
+| **后端镜像** | `ghcr.io/yingxiaomo/nav-server` | 后端 API + 管理后台 |
+
+### 方式一: 合体镜像 (推荐)
+
+一个容器包含前端和全部后端功能，适合小白:
+
+```bash
+docker run -p 8642:8642 -v nav-data:/app/data ghcr.io/yingxiaomo/nav:latest
+```
+
+打开 http://localhost:8642 即可看到导航页，http://localhost:8642/admin/ 进入管理后台。
+
+### 方式二: 独立后端
+
+前端部署到 Vercel / Cloudflare Pages，后端单独运行:
+
+```bash
+docker run -p 8642:8642 -v nav-data:/app/data ghcr.io/yingxiaomo/nav-server:latest
+```
+
+前端设置 → 云同步 → 选择「本地服务器」，填入后端地址和 API 令牌。
+
+### 方式三: docker-compose
+
+项目根目录提供了两份配置:
+
+**合体模式** (`docker-compose.yml`):
+
+```bash
+docker compose up -d
+# 打开 http://localhost:8642
+```
+
+**纯后端模式** (`server/docker-compose.yml`):
+
+```bash
+docker compose -f server/docker-compose.yml up -d
+```
+
+### 首次启动
+
+首次打开 /admin/ 管理后台时，页面会引导你:
+
+1. 设置管理员密码
+2. 自动生成 API 令牌 (**仅显示一次，请保存**)
+3. 在前端设置中填入后端地址 + 令牌，完成连接
+
+---
 
 
 
@@ -143,116 +205,6 @@ npm run dev
 6. 点击 **保存** 完成配置。
 
 现在，你在网页上进行的任何修改都会直接同步到你配置的存储服务中！
-
-## 🐳 Docker 部署
-
-如果您更习惯使用 Docker 进行部署，可以使用以下方法。
-
-### 1. 使用 Docker Hub 镜像 (推荐)
-
-直接运行以下命令即可启动服务：
-
-```bash
-docker run -d \
-  -p 20261:20261 \
-  --name clean-nav \
-  --restart always \
-  yingxiaomo/clean-nav:latest
-```
-
-启动后，访问 `http://localhost:20261` 即可使用。
-
-### 2. 使用 Docker Compose
-
-创建 `docker-compose.yml` 文件：
-
-```yaml
-version: '3'
-services:
-  clean-nav:
-    image: yingxiaomo/clean-nav:latest
-    container_name: clean-nav
-    ports:
-      - "20261:20261"
-    restart: always
-```
-
-然后运行：
-```bash
-docker-compose up -d
-```
-
-### 3. 本地构建
-
-如果您对源码进行了修改，可以构建自己的镜像：
-
-```bash
-# 构建镜像
-docker build -t clean-nav .
-
-# 运行容器
-docker run -d -p 20261:20261 --name clean-nav clean-nav
-```
-
-### 4. 自动构建镜像脚本
-
-您可以创建一个自动构建脚本，方便快速构建和部署镜像：
-
-```bash
-#!/bin/bash
-
-# 定义变量
-IMAGE_NAME="clean-nav"
-IMAGE_TAG="latest"
-CONTAINER_NAME="clean-nav"
-PORT=20261
-
-# 停止并删除旧容器
-docker stop $CONTAINER_NAME 2>/dev/null || true
-docker rm $CONTAINER_NAME 2>/dev/null || true
-
-# 构建新镜像
-docker build -t $IMAGE_NAME:$IMAGE_TAG .
-
-# 运行新容器
-docker run -d \
-  -p $PORT:$PORT \
-  --name $CONTAINER_NAME \
-  --restart always \
-  $IMAGE_NAME:$IMAGE_TAG
-
-# 查看容器状态
-docker ps | grep $CONTAINER_NAME
-```
-
-### 5. 环境变量
-
-在构建和运行Docker镜像时，可以使用以下环境变量：
-
-| 环境变量 | 说明 | 默认值 | 使用阶段 |
-|----------|------|--------|----------|
-| `NEXT_TELEMETRY_DISABLED` | 禁用Next.js遥测 | `1` | 构建和运行 |
-| `DOCKER_BUILD` | 标记为Docker构建 | `true` | 构建 |
-| `NODE_ENV` | 运行环境 | `production` | 运行 |
-| `PORT` | 应用监听端口 | `20261` | 运行 |
-
-**使用示例：**
-
-```bash
-# 构建时设置环境变量
-docker build --build-arg NEXT_TELEMETRY_DISABLED=1 -t clean-nav .
-
-# 运行时设置环境变量
-docker run -d \
-  -p 20261:20261 \
-  -e PORT=3000 \
-  --name clean-nav \
-  clean-nav
-```
-
-
-
-
 
 ### 🔖 如何导入浏览器书签？
 

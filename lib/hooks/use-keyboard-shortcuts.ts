@@ -28,6 +28,15 @@ export interface Shortcut {
   preventDefault?: boolean;
 }
 
+// ── Module-level shortcut registry ──────────────────────────────────
+// 允许外部组件（如 CheatSheet）读取当前注册的快捷键列表
+let _shortcutRegistry: Shortcut[] = [];
+
+/** 获取当前注册的全部快捷键（用于 CheatSheet 面板） */
+export function getRegisteredShortcuts(): Shortcut[] {
+  return _shortcutRegistry;
+}
+
 /**
  * 匹配按键事件与快捷键定义
  */
@@ -62,6 +71,9 @@ function matchesKey(event: KeyboardEvent, keyDef: string): boolean {
  * ]);
  */
 export function useKeyboardShortcuts(shortcuts: Shortcut[]) {
+  // 同步到模块级注册表（CheatSheet 读取用）
+  _shortcutRegistry = shortcuts;
+
   const shortcutsRef = useRef(shortcuts);
   shortcutsRef.current = shortcuts;
 

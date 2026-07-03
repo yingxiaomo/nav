@@ -7,6 +7,8 @@ import { SearchBar } from "@/components/nav/search-bar";
 import { LinkGrid, type FolderModalHandle } from "@/components/nav/link-grid";
 // 懒加载设置对话框组件
 const SettingsDialog = lazy(() => import("@/components/nav/settings").then(mod => ({ default: mod.SettingsDialog })));
+// 懒加载快捷键帮助面板
+const CheatSheet = lazy(() => import("@/components/features/cheat-sheet").then(mod => ({ default: mod.CheatSheet })));
 import { FeaturesLauncher } from "@/components/features/features-launcher";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -64,7 +66,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const folderNavRef = useRef<FolderModalHandle>(null);
-  const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels } = useUIStore();
+  const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels, isCheatSheetOpen, setCheatSheetOpen } = useUIStore();
 
   // 键盘快捷键注册表
   useKeyboardShortcuts([
@@ -108,17 +110,36 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
         if (folderNavRef.current?.back()) {
           return;
         }
-        // 层级 3：有面板打开 → 关闭所有浮动 UI
+        // 层级 3：快捷键帮助面板打开 → 关闭
+        if (isCheatSheetOpen) {
+          closeAllPanels();
+          return;
+        }
+        // 层级 4：有面板打开 → 关闭所有浮动 UI
         if (activePanel !== null || isSettingsOpen) {
           closeAllPanels();
           return;
         }
-        // 层级 4：设置对话框由 Radix Dialog 内部处理（事件不拦截）
+        // 层级 5：设置对话框由 Radix Dialog 内部处理（事件不拦截）
       },
       label: '关闭面板 / 返回上级',
       category: 'global',
       allowInInputs: true,
       preventDefault: false,
+    },
+    // 快捷键帮助面板
+    {
+      key: '?',
+      handler: () => setCheatSheetOpen(!isCheatSheetOpen),
+      label: '快捷键速查',
+      category: 'global',
+    },
+    {
+      key: 'meta+/',
+      handler: () => setCheatSheetOpen(!isCheatSheetOpen),
+      label: '快捷键速查',
+      category: 'global',
+      allowInInputs: true,
     },
   ]);
 
@@ -250,6 +271,9 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
         </div>
         
         <Toaster position="top-center" />
+        <Suspense fallback={null}>
+          <CheatSheet />
+        </Suspense>
       </main>
     </ThemeProvider>
   );

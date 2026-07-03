@@ -21,9 +21,12 @@ WORKDIR /app
 
 # node:alpine 镜像已内置 node 用户，复用即可
 
-# 后端依赖
+# 后端依赖（better-sqlite3 需要编译，需安装 Python）
 COPY server/package.json server/package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN apk add --no-cache python3 make g++ && \
+    npm ci --omit=dev && \
+    apk del python3 make g++ && \
+    npm cache clean --force
 
 # 前端静态文件（Hono 以 ./public/ 根目录 serve）
 COPY --from=frontend --chown=node /app/out ./public

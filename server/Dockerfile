@@ -2,7 +2,7 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache python3 make g++ libc6-compat
 
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -13,9 +13,9 @@ COPY . .
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# 只安装生产依赖
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+# 从构建阶段复制编译好的依赖（better-sqlite3 需要编译）
+COPY --from=builder /app/node_modules ./node_modules
+RUN npm prune --omit=dev && npm cache clean --force
 
 # 从构建阶段复制源码和迁移文件
 COPY --from=builder /app/src ./src

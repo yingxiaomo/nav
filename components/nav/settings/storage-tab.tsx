@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, DropboxSettings, GoogleDriveSettings, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter } from "@/lib/adapters/storage";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,12 +24,14 @@ const DEFAULT_GOOGLE_DRIVE: GoogleDriveSettings = { token: "", fileId: "", filen
 
 export function StorageTab({ config, setConfig }: StorageTabProps) {
   const [isTesting, setIsTesting] = useState(false);
-  
+  const configRef = useRef(config);
+  configRef.current = config;
+
   useEffect(() => {
-    if (!config.type) {
-      setConfig({ ...config, type: 'github' });
+    if (!configRef.current.type) {
+      setConfig({ ...configRef.current, type: 'github' });
     }
-  }, [config, setConfig]);
+  }, [setConfig]);
 
   const handleTypeChange = (type: string) => {
     const newType = type as StorageConfig['type'];

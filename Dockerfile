@@ -33,14 +33,12 @@ ENV NODE_ENV=production
 # 如果您想在运行时禁用遥测，请取消注释以下行。
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs && \
+    mkdir .next && \
+    chown nextjs:nodejs .next
 
 COPY --from=builder /app/public ./public
-
-# 为预渲染缓存设置正确的权限
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
 
 # 自动利用输出跟踪来减小镜像大小
 # https://nextjs.org/docs/advanced-features/output-file-tracing

@@ -64,6 +64,12 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   const [batchMoveTarget, setBatchMoveTarget] = useState<string | null>(null);
   const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+
+  // SSR 安全：延迟 portal 渲染到客户端
+  useEffect(() => {
+    setPortalTarget(document.body);
+  }, []);
 
   // 搜索结果：平铺所有匹配链接，附带所属分类路径
   const searchResults = useMemo(() => {
@@ -565,14 +571,16 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   }, [setLocalData]);
 
   const handleCategoryIconChange = useCallback((catId: string, icon: string) => {
-    const newData = JSON.parse(JSON.stringify(localData)) as DataSchema;
-    const catIndex = newData.categories.findIndex(c => c.id === catId);
-    if (catIndex !== -1) {
-        newData.categories[catIndex].icon = icon;
-        newData.categories[catIndex].updatedAt = Date.now();
-        setLocalData(newData);
-    }
-  }, [localData, setLocalData]);
+    setLocalData(prev => {
+        const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
+        const catIndex = newData.categories.findIndex(c => c.id === catId);
+        if (catIndex !== -1) {
+            newData.categories[catIndex].icon = icon;
+            newData.categories[catIndex].updatedAt = Date.now();
+        }
+        return newData;
+    });
+  }, [setLocalData]);
 
   const handleRenameCategory = useCallback((id: string, title: string) => {
     setLocalData(prev => {
@@ -587,24 +595,28 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   }, [setLocalData]);
 
   const handleDeleteCategory = useCallback((catId: string) => {
-    const newData = { ...localData };
-    const catIndex = newData.categories.findIndex(c => c.id === catId);
-    if (catIndex === -1) return;
-    if (newData.categories[catIndex].links.length > 0) {
-        setConfirmDeleteCategory({ id: catId, hasLinks: true });
-        return;
-    }
-    newData.categories = newData.categories.filter((_, i) => i !== catIndex);
-    setLocalData(newData);
-  }, [localData, setLocalData]);
+    setLocalData(prev => {
+        const newData = { ...prev };
+        const catIndex = newData.categories.findIndex(c => c.id === catId);
+        if (catIndex === -1) return prev;
+        if (newData.categories[catIndex].links.length > 0) {
+            setConfirmDeleteCategory({ id: catId, hasLinks: true });
+            return prev;
+        }
+        newData.categories = newData.categories.filter((_, i) => i !== catIndex);
+        return newData;
+    });
+  }, [setLocalData]);
 
   const handleConfirmDeleteCategory = useCallback(() => {
     if (!confirmDeleteCategory) return;
-    const newData = { ...localData };
-    newData.categories = newData.categories.filter(c => c.id !== confirmDeleteCategory.id);
-    setLocalData(newData);
+    setLocalData(prev => {
+        const newData = { ...prev };
+        newData.categories = newData.categories.filter(c => c.id !== confirmDeleteCategory.id);
+        return newData;
+    });
     setConfirmDeleteCategory(null);
-  }, [confirmDeleteCategory, localData, setLocalData]);
+  }, [confirmDeleteCategory, setLocalData]);
 
   const toggleCollapse = useCallback((catId: string) => {
     const newSet = new Set(collapsedCats);
@@ -924,7 +936,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
         </DialogContent>
       </Dialog>
 
-        {createPortal(
+        {portalTarget && createPortal(
             <DragOverlay dropAnimation={dropAnimation}>
                 {activeCategory && (
                      <div className="p-2 bg-background border rounded-lg shadow-xl opacity-90 w-[300px]">
@@ -943,7 +955,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
                     </div>
                 )}
             </DragOverlay>,
-            document.body
+            portalTarget
         )}
       </DndContext>
       )}

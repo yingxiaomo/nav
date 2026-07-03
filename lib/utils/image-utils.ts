@@ -77,7 +77,7 @@ export const convertToWebP = (file: File, quality: number = 85): Promise<File> =
 export const isWebPSupported = (): boolean => {
   // 检查是否在浏览器环境中
   if (typeof window === 'undefined') {
-    return true; // 服务器端默认支持
+    return false; // 服务端默认不支持，保持保守策略
   }
 
   // 检查Canvas是否支持WebP转换

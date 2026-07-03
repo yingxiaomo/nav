@@ -3,6 +3,7 @@ import { Octokit } from "@octokit/rest";
 import { S3Client, GetObjectCommand, PutObjectCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
 import { createClient, WebDAVClient } from "webdav";
 import { parseNetscapeBookmarks } from "../parsers/bookmark-parser";
+import { uint8ArrayToBase64 } from "../utils/common";
 
 export const STORAGE_CONFIG_KEY = "clean-nav-storage-config";
 export interface StorageConfig {
@@ -237,7 +238,7 @@ export class GithubRepoAdapter implements StorageAdapter {
 
       const encoder = new TextEncoder();
       const encoded = encoder.encode(JSON.stringify(data, null, 2));
-      const content = btoa(String.fromCharCode(...encoded));
+      const content = uint8ArrayToBase64(encoded);
 
       await octokit.repos.createOrUpdateFileContents({
         owner,
@@ -269,7 +270,7 @@ export class GithubRepoAdapter implements StorageAdapter {
       // 将文件转换为 Base64
       onProgress?.(10);
       const arrayBuffer = await file.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      const base64 = uint8ArrayToBase64(new Uint8Array(arrayBuffer));
       onProgress?.(50);
       
       // 保存 Base64 内容到 GitHub

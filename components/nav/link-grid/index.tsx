@@ -96,6 +96,12 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
   const [navStack, setNavStack] = useState<LinkItem[]>([]);
   const [allCollapsedState, setAllCollapsedState] = useState<Record<string, boolean>>({});
 
+  // displayMode 切换时清理 modal 状态
+  useEffect(() => {
+    setSelectedId(null);
+    setNavStack([]);
+  }, [displayMode]);
+
   // 暴露给父组件的文件夹导航控制接口
   useImperativeHandle(ref, () => ({
     /** 返回上一级；若已在根级则关闭模态框。有操作返回 true，无操作（未打开）返回 false */
@@ -143,6 +149,7 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
 
   
   useEffect(() => {
+    const original = document.body.style.overflow;
     if (selectedId) {
       document.body.style.overflow = "hidden";
       onOpenChange?.(true);
@@ -150,8 +157,8 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
       document.body.style.overflow = "auto";
       onOpenChange?.(false);
     }
-    return () => { 
-      document.body.style.overflow = "auto";
+    return () => {
+      document.body.style.overflow = original || "auto";
       onOpenChange?.(false);
     };
   }, [selectedId, onOpenChange]);

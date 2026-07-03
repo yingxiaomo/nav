@@ -98,7 +98,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
     },
     {
       key: 'meta+,',
-      handler: () => setSettingsOpen(!isSettingsOpen),
+      handler: () => setSettingsOpen(!useUIStore.getState().isSettingsOpen),
       label: '打开设置',
       category: 'global',
       allowInInputs: true,
@@ -136,13 +136,13 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
     // 快捷键帮助面板
     {
       key: '?',
-      handler: () => setCheatSheetOpen(!isCheatSheetOpen),
+      handler: () => setCheatSheetOpen(!useUIStore.getState().isCheatSheetOpen),
       label: '快捷键速查',
       category: 'global',
     },
     {
       key: 'meta+/',
-      handler: () => setCheatSheetOpen(!isCheatSheetOpen),
+      handler: () => setCheatSheetOpen(!useUIStore.getState().isCheatSheetOpen),
       label: '快捷键速查',
       category: 'global',
       allowInInputs: true,
@@ -150,24 +150,26 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
   ]);
 
   useEffect(() => {
-    console.log("%c Clean Nav ", "background: #3b82f6; color: #fff; border-radius: 4px; font-weight: bold;");
-    console.log("%c✨ 欢迎来到我的导航页 | 项目已开源", "color: #3b82f6;");
-    console.log("%cGithub: https://github.com/yingxiaomo/nav", "color: #aaa; font-size: 12px; font-family: monospace;");
-    console.log("%c主页: https://ovoxo.cc", "color: #aaa; font-size: 12px; font-family: monospace;");
+    if (process.env.NODE_ENV === 'development') {
+      console.log("%c Clean Nav ", "background: #3b82f6; color: #fff; border-radius: 4px; font-weight: bold;");
+      console.log("%c✨ 欢迎来到我的导航页 | 项目已开源", "color: #3b82f6;");
+      console.log("%cGithub: https://github.com/yingxiaomo/nav", "color: #aaa; font-size: 12px; font-family: monospace;");
+      console.log("%c主页: https://ovoxo.cc", "color: #aaa; font-size: 12px; font-family: monospace;");
+    }
   }, []);
 
-  const getFilteredCategories = () => {
+  const getFilteredCategories = useMemo(() => {
     if (!searchQuery) return data.categories;
     return data.categories.map(cat => ({
         ...cat,
-        links: cat.links.filter(l => 
-            l.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        links: cat.links.filter(l =>
+            l.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             l.url.toLowerCase().includes(searchQuery.toLowerCase())
         )
     })).filter(cat => cat.links.length > 0);
-  };
+  }, [data.categories, searchQuery]);
 
-  const displayCategories = getFilteredCategories();
+  const displayCategories = getFilteredCategories;
 
   if (!isReady) {
     return (

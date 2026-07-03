@@ -19,15 +19,27 @@ export function useWallpaper(initialWallpapers: string[], initialData: DataSchem
   const [imgLoaded, setImgLoaded] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
-  // 预加载壁纸的函数
+  // 预加载壁纸的函数，支持取消
   const preloadWallpaper = useCallback((url: string) => {
     if (!url) return Promise.resolve();
-    
+
+    let cancelled = false;
     return new Promise<void>((resolve, reject) => {
       const img = new Image();
       img.src = url;
-      img.onload = () => resolve();
-      img.onerror = reject;
+      img.onload = () => {
+        if (cancelled) resolve();
+        else resolve();
+      };
+      img.onerror = () => {
+        if (cancelled) resolve();
+        else reject(new Error('Image load failed'));
+      };
+      // 返回清理函数，组件卸载时取消预加载
+      return () => {
+        cancelled = true;
+        img.src = '';
+      };
     });
   }, []);
 

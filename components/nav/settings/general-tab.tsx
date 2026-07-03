@@ -62,15 +62,12 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
     }, 500);
   }, [onSave]);
 
-  // 组件卸载时执行最后一次待处理的保存
+  // 组件卸载时清除定时器
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      if (pendingDataRef.current && onSave) {
-        onSave(pendingDataRef.current);
-      }
     };
-  }, [onSave]);
+  }, []);
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
@@ -277,7 +274,7 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
               onClick={() => themeStore.setAccentColor(c.key)}
               className={`w-8 h-8 rounded-full transition-all border-2 ${
                 themeStore.accentColor === c.key
-                  ? 'border-white scale-110 shadow-md'
+                  ? 'border-foreground scale-110 shadow-md'
                   : 'border-transparent hover:scale-105'
               }`}
               style={{ backgroundColor: c.color }}

@@ -19,7 +19,6 @@ interface LinkItemCardProps {
 
 export function LinkItemCard({ item, onClick, className, showPinButton, isPinned, onPinToggle, noKeyboard }: LinkItemCardProps) {
     const isFolder = item.type === 'folder';
-    const fallbackName = item.icon || (isFolder ? "FolderOpen" : "Link");
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -147,8 +146,6 @@ export function PinnedLinkCard({
   item: LinkItem;
   onUnpin: () => void;
 }) {
-  const fallbackName = item.icon || "Link";
-
   return (
     <div className="group relative p-2.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
       <button

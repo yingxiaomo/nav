@@ -47,11 +47,25 @@ export const extractSiteName = (url: string): string => {
 };
 
 /**
+ * 将 Uint8Array 转换为 Base64 字符串
+ * 使用循环而非 spread operator，避免大文件（>65KB）时的 RangeError
+ * @param arr 要转换的 Uint8Array
+ * @returns Base64 编码的字符串
+ */
+export const uint8ArrayToBase64 = (arr: Uint8Array): string => {
+  let binary = '';
+  for (let i = 0; i < arr.length; i++) {
+    binary += String.fromCharCode(arr[i]);
+  }
+  return btoa(binary);
+};
+
+/**
  * 生成随机ID
- * @returns 随机ID字符串
+ * @returns 随机ID字符串（UUID v4）
  */
 export const generateId = (): string => {
-  return Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
+  return crypto.randomUUID();
 };
 
 /**
@@ -101,11 +115,40 @@ export const formatTime = (date: Date | number): string => {
 
 /**
  * 深拷贝对象
+ * 使用 structuredClone 支持 Date、Map、Set、RegExp 等复杂类型
  * @param obj 要拷贝的对象
  * @returns 拷贝后的对象
  */
 export const deepCopy = <T>(obj: T): T => {
-  return JSON.parse(JSON.stringify(obj));
+  return structuredClone(obj);
+};
+
+/**
+ * 深度比较两个对象是否相等
+ * @param a 第一个对象
+ * @param b 第二个对象
+ * @returns 如果两个对象深度相等则返回 true
+ */
+export const deepEqual = <T>(a: T, b: T): boolean => {
+  if (a === b) return true;
+  if (a === null || b === null) return false;
+  if (typeof a !== typeof b) return false;
+  if (typeof a !== 'object') return false;
+
+  const keysA = Object.keys(a as Record<string, unknown>);
+  const keysB = Object.keys(b as Record<string, unknown>);
+
+  if (keysA.length !== keysB.length) return false;
+
+  for (const key of keysA) {
+    if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+    if (!deepEqual(
+      (a as Record<string, unknown>)[key],
+      (b as Record<string, unknown>)[key]
+    )) return false;
+  }
+
+  return true;
 };
 
 /**
@@ -335,10 +378,10 @@ export const toKebabCase = (str: string): string => {
 
 /**
  * 生成唯一的临时ID
- * @returns 唯一的临时ID字符串
+ * @returns 唯一的临时ID字符串（UUID v4）
  */
 export const generateTempId = (): string => {
-  return `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  return `temp-${crypto.randomUUID()}`;
 };
 
 /**
@@ -401,6 +444,7 @@ export const setSafe = <T extends Record<string, unknown>>(obj: T, path: string,
 
 /**
  * 从数组中移除指定元素
+ * @deprecated 请使用原生 Array.filter() 方法
  * @param array 要处理的数组
  * @param condition 移除条件
  * @returns 处理后的数组
@@ -411,6 +455,7 @@ export const removeFromArray = <T>(array: T[], condition: (item: T) => boolean):
 
 /**
  * 查找数组中符合条件的元素
+ * @deprecated 请使用原生 Array.find() 方法
  * @param array 要查找的数组
  * @param condition 查找条件
  * @returns 符合条件的元素或undefined
@@ -421,6 +466,7 @@ export const findInArray = <T>(array: T[], condition: (item: T) => boolean): T |
 
 /**
  * 查找数组中符合条件的元素的索引
+ * @deprecated 请使用原生 Array.findIndex() 方法
  * @param array 要查找的数组
  * @param condition 查找条件
  * @returns 符合条件的元素的索引或-1
@@ -463,6 +509,7 @@ export const replaceInArray = <T>(array: T[], condition: (item: T) => boolean, r
 
 /**
  * 检查数组是否包含符合条件的元素
+ * @deprecated 请使用原生 Array.some() 方法
  * @param array 要检查的数组
  * @param condition 检查条件
  * @returns 布尔值，表示数组是否包含符合条件的元素
@@ -473,6 +520,7 @@ export const containsInArray = <T>(array: T[], condition: (item: T) => boolean):
 
 /**
  * 计算数组中符合条件的元素数量
+ * @deprecated 请使用原生 Array.filter().length
  * @param array 要计算的数组
  * @param condition 计算条件
  * @returns 符合条件的元素数量
@@ -483,6 +531,7 @@ export const countInArray = <T>(array: T[], condition: (item: T) => boolean): nu
 
 /**
  * 对数组进行排序
+ * @deprecated 请使用原生 Array.toSorted() 方法（不修改原数组）
  * @param array 要排序的数组
  * @param compare 比较函数
  * @returns 排序后的数组

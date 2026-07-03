@@ -7,6 +7,7 @@ import { GITHUB_CONFIG_KEY } from "../adapters/github";
 import { StorageAdapter, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, STORAGE_CONFIG_KEY, StorageConfig } from "../adapters/storage";
 import { toast } from "sonner";
 import { convertToWebP } from '../utils/image-utils';
+import { deepEqual } from '../utils/common';
 
 const LOCAL_DATA_KEY = "clean-nav-local-data";
 
@@ -324,7 +325,7 @@ export function useNavData(initialWallpapers: string[]) {
         notes: mergedNotes 
       };
 
-      if (JSON.stringify(finalData) !== JSON.stringify(currentData)) {
+      if (!deepEqual(finalData, currentData)) {
         if (initialWallpapersRef.current.length > 0) {
           finalData.settings.wallpaperList = [...initialWallpapersRef.current];
         }

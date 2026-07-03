@@ -21,18 +21,16 @@ export function ClockWidget() {
       transition={{ duration: 0.6, ease: "easeOut" }}
       whileHover={{ scale: 1.02 }}
     >
-      <motion.div 
+      <motion.div
         className="text-6xl md:text-8xl font-light tracking-tighter"
-        key={format(time, "HH:mm")}
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.3 }}
       >
         {format(time, "HH:mm")}
       </motion.div>
-      <motion.div 
+      <motion.div
         className="text-xl md:text-2xl mt-2 font-medium opacity-90"
-        key={format(time, "yyyy年MM月dd日 EEEE")}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.2 }}

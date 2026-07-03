@@ -62,13 +62,20 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
     );
 
     // ── 过滤历史 + Fuse 书签匹配 → 合并候选列表 ──────────
-    const filteredHistory = query.trim()
-      ? history.filter((h) => h.toLowerCase().includes(query.toLowerCase()))
-      : history;
+    const trimmedQuery = query.trim();
+    const filteredHistory = useMemo(
+      () => trimmedQuery
+        ? history.filter((h) => h.toLowerCase().includes(trimmedQuery.toLowerCase()))
+        : history,
+      [history, trimmedQuery]
+    );
 
-    const bookmarkMatches = query.trim().length >= 1
-      ? fuse.search(query.trim()).slice(0, 5)
-      : [];
+    const bookmarkMatches = useMemo(
+      () => trimmedQuery.length >= 1
+        ? fuse.search(trimmedQuery).slice(0, 5)
+        : [],
+      [fuse, trimmedQuery]
+    );
 
     const suggestions = useMemo<SuggestionItem[]>(() => {
       const list: SuggestionItem[] = [];

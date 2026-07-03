@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, KeyboardEvent, useCallback } from "react"
+import { useState, useRef, KeyboardEvent, useCallback } from "react"
 import { Trash2, CheckCircle2, Circle } from "lucide-react" 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,10 +17,12 @@ interface TodoWidgetProps {
 
 export function TodoWidget({ todos = [], onUpdate }: TodoWidgetProps) {
   const [newTodo, setNewTodo] = useState("")
+  const todosRef = useRef(todos)
+  todosRef.current = todos
 
   const addTodo = useCallback(() => {
     if (!newTodo.trim()) return
-    
+
     const timestamp = Date.now()
     const newItem: Todo = {
       id: crypto.randomUUID(),
@@ -28,9 +30,9 @@ export function TodoWidget({ todos = [], onUpdate }: TodoWidgetProps) {
       completed: false,
       createdAt: timestamp,
     }
-    onUpdate([newItem, ...todos])
+    onUpdate([newItem, ...todosRef.current])
     setNewTodo("")
-  }, [newTodo, todos, onUpdate])
+  }, [newTodo, onUpdate])
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {

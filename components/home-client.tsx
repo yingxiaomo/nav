@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, Suspense, lazy } from "react";
+import { useEffect, useState, useRef, useMemo, Suspense, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ClockWidget } from "@/components/nav/clock";
 import { SearchBar } from "@/components/nav/search-bar";
@@ -67,6 +67,12 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const folderNavRef = useRef<FolderModalHandle>(null);
   const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels, isCheatSheetOpen, setCheatSheetOpen } = useUIStore();
+
+  // 拍平所有书签（用于 Fuse.js 模糊搜索）
+  const allBookmarks = useMemo(
+    () => data.categories.flatMap((cat) => cat.links),
+    [data.categories],
+  );
 
   // 键盘快捷键注册表
   useKeyboardShortcuts([
@@ -230,7 +236,12 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
                   )}
                   
                   <div className={data.settings.homeLayout === 'list' ? "mt-8 w-full" : "w-full"}>
-                  <SearchBar ref={searchInputRef} onLocalSearch={setSearchQuery} />
+                  <SearchBar
+                    ref={searchInputRef}
+                    onLocalSearch={setSearchQuery}
+                    bookmarks={allBookmarks}
+                    onOpenLink={(url) => window.open(url, '_blank', 'noopener,noreferrer')}
+                  />
                 </div>
                   
                   {data.settings.homeLayout !== 'list' && !searchQuery && data.settings.showFeatures !== false && (

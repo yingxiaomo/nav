@@ -13,10 +13,6 @@ COPY . .
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# 创建非 root 用户
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 node
-
 # 只安装生产依赖
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
@@ -26,7 +22,7 @@ COPY --from=builder /app/src ./src
 COPY --from=builder /app/drizzle ./drizzle
 
 # 数据目录
-RUN mkdir -p /app/data/uploads && chown -R node:nodejs /app/data
+RUN mkdir -p /app/data/uploads
 
 # ---- 环境变量 ----
 ENV NODE_ENV=production

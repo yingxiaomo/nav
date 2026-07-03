@@ -19,25 +19,24 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 node
+# node:alpine 镜像已内置 node 用户，复用即可
 
 # 后端依赖
 COPY server/package.json server/package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 # 前端静态文件（Hono 以 ./public/ 根目录 serve）
-COPY --from=frontend --chown=node:nodejs /app/out ./public
+COPY --from=frontend --chown=node /app/out ./public
 
 # 管理后台页面（与前端静态文件不冲突）
-COPY --from=frontend --chown=node:nodejs /app/server/public ./public
+COPY --from=frontend --chown=node /app/server/public ./public
 
 # 后端代码
-COPY --from=frontend --chown=node:nodejs /app/server/src ./src
-COPY --from=frontend --chown=node:nodejs /app/server/drizzle ./drizzle
+COPY --from=frontend --chown=node /app/server/src ./src
+COPY --from=frontend --chown=node /app/server/drizzle ./drizzle
 
 # 数据目录
-RUN mkdir -p /app/data/uploads && chown -R node:nodejs /app/data
+RUN mkdir -p /app/data/uploads && chown -R node /app/data
 
 ENV NODE_ENV=production
 ENV PORT=8642

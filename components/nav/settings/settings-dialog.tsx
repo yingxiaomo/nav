@@ -95,18 +95,7 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
       </DialogTrigger>
       <DialogContent
         className="sm:max-w-[700px] h-[85vh] max-h-[800px] flex flex-col backdrop-blur-xl overflow-hidden"
-        onPointerDownOutside={(e) => {
-          // 防止关闭：点击嵌套 Radix 弹窗（下拉菜单、选择器、弹出框）时不关闭主对话框
-          const target = e.target as HTMLElement;
-          if (
-            target.closest('[data-radix-popper-content-wrapper]') ||
-            target.closest('[role="listbox"]') ||
-            target.closest('[role="menu"]') ||
-            target.closest('[data-side]')
-          ) {
-            e.preventDefault();
-          }
-        }}
+        onPointerDownOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
           <DialogTitle>设置</DialogTitle>

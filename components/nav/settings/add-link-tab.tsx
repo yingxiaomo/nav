@@ -7,6 +7,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/compon
 import { Wand2, Plus, FolderPlus, Upload, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { IconRender, PRESET_ICONS } from "./shared";
+import { generateFaviconUrl } from "@/lib/utils/common";
+import { extractTitleFromUrl } from "@/lib/utils/favicon";
 import {
   isValidUrl,
   isValidFolderName,
@@ -61,16 +63,14 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
     try {
       const urlObj = new URL(processedUrl);
       const hostname = urlObj.hostname;
-      
-      const iconUrl = `https://www.google.com/s2/favicons?domain=${hostname}&sz=128`;
+
+      const iconUrl = generateFaviconUrl(hostname);
       if (!(isAuto && titleEditedManually.current)) {
         setNewIcon(iconUrl);
       }
 
-      let name = hostname.replace(/^www\./, "").split(".")[0];
-      if (name && !(isAuto && titleEditedManually.current)) {
-          name = name.charAt(0).toUpperCase() + name.slice(1);
-          setNewTitle(name);
+      if (!(isAuto && titleEditedManually.current)) {
+          setNewTitle(extractTitleFromUrl(processedUrl));
       }
 
       if (!isAuto) toast.success("已刷新标题和图标", { description: "已从 URL 中提取并更新标题和图标" });
@@ -263,7 +263,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
                                 id: crypto.randomUUID(),
                                 title: a.innerText,
                                 url: a.href,
-                                icon: `https://www.google.com/s2/favicons?domain=${new URL(a.href).hostname}&sz=128`,
+                                icon: generateFaviconUrl(new URL(a.href).hostname),
                                 type: 'link'
                             });
                             totalLinks++;

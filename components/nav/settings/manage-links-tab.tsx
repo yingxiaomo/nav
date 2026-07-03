@@ -28,7 +28,8 @@ import { IconRender } from "./shared";
 import { LinkEditor } from "./link-editor";
 import { FolderNavigator } from "./folder-navigator";
 import { Button } from "@/components/ui/button";
-import { Folder } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Folder, Trash2, FolderInput, Search } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -40,6 +41,7 @@ import {
 import { toast } from "sonner";
 import { isValidUrl, sanitizeText } from "@/lib/utils/validation";
 import { generateFaviconUrl } from "@/lib/utils/common";
+import { FaviconImage, extractTitleFromUrl } from "@/lib/utils/favicon";
 
 interface ManageLinksTabProps {
   localData: DataSchema;
@@ -58,6 +60,172 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   const [editingLink, setEditingLink] = useState<LinkItem | null>(null);
   const [movingLink, setMovingLink] = useState<LinkItem | null>(null);
   const [confirmDeleteCategory, setConfirmDeleteCategory] = useState<{ id: string; hasLinks: boolean } | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchMoveTarget, setBatchMoveTarget] = useState<string | null>(null);
+  const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // 搜索结果：平铺所有匹配链接，附带所属分类路径
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return null;
+    const q = searchQuery.toLowerCase();
+    type Hit = { link: LinkItem; path: string; catId: string };
+    const hits: Hit[] = [];
+    const searchItems = (items: (Category | LinkItem)[], path: string) => {
+      for (const item of items) {
+        const children = getChildren(item);
+        if (children) {
+          for (const child of children) {
+            if (
+              child.title.toLowerCase().includes(q) ||
+              (child.url && child.url.toLowerCase().includes(q))
+            ) {
+              hits.push({ link: child, path, catId: item.id });
+            }
+            if (child.children) searchItems(child.children, `${path} / ${child.title}`);
+          }
+        }
+      }
+    };
+    for (const cat of localData.categories) {
+      searchItems([cat], cat.title);
+    }
+    return hits;
+  }, [searchQuery, localData.categories]);
+
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(getVisibleLinkIds()));
+  };
+
+  const deselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  // 获取当前可见的所有链接 ID（function 声明，会被提升）
+  function getVisibleLinkIds(): string[] {
+    const ids: string[] = [];
+    const collect = (items: (Category | LinkItem)[]) => {
+      for (const item of items) {
+        const children = getChildren(item);
+        if (children) {
+          for (const child of children) {
+            ids.push(child.id);
+          }
+          collect(children);
+        }
+      }
+    };
+    for (const cat of localData.categories) {
+      if (!collapsedCats.has(cat.id)) {
+        for (const link of cat.links) {
+          ids.push(link.id);
+          if (link.children) collect(link.children);
+        }
+      }
+    }
+    return ids;
+  }
+
+  const handleBatchDelete = () => {
+    setLocalData((prev) => {
+      const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
+      const deleteRecursive = (items: (Category | LinkItem)[]) => {
+        for (const item of items) {
+          const children = getChildren(item);
+          if (children) {
+            const filtered = children.filter((l) => !selectedIds.has(l.id));
+            if ('links' in item) (item as Category).links = filtered;
+            else (item as LinkItem).children = filtered;
+            deleteRecursive(children);
+          }
+        }
+      };
+      deleteRecursive(newData.categories);
+      return newData;
+    });
+    setSelectedIds(new Set());
+    setConfirmBatchDelete(false);
+    toast.success(`已删除 ${selectedIds.size} 个链接`);
+  };
+
+  const handleBatchMove = (targetId: string) => {
+
+    setLocalData((prev) => {
+      const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
+
+      // Remove selected items from all locations
+      const removed: LinkItem[] = [];
+      const removeRecursive = (items: (Category | LinkItem)[]) => {
+        for (const item of items) {
+          const children = getChildren(item);
+          if (children) {
+            let i = children.length;
+            while (i--) {
+              if (selectedIds.has(children[i].id)) {
+                removed.push(children[i]);
+                children.splice(i, 1);
+              }
+            }
+            if ('links' in item) (item as Category).links = children;
+            else (item as LinkItem).children = children;
+            removeRecursive(children);
+          }
+        }
+      };
+      removeRecursive(newData.categories);
+
+      // Add to target
+      const addToTarget = (items: (Category | LinkItem)[]): boolean => {
+        for (const item of items) {
+          if (item.id === targetId) {
+            const children = getChildren(item);
+            if (children) {
+              children.push(...removed);
+              if ('links' in item) (item as Category).links = children;
+              else (item as LinkItem).children = children;
+            }
+            return true;
+          }
+          const children = getChildren(item);
+          if (children && addToTarget(children)) return true;
+        }
+        return false;
+      };
+      addToTarget(newData.categories);
+      return newData;
+    });
+
+    setSelectedIds(new Set());
+    setBatchMoveTarget(null);
+    toast.success(`已移动 ${selectedIds.size} 个链接`);
+  };
+
+  const batchMoveOptions = useMemo(() => {
+    const options: { id: string; title: string; level: number }[] = [];
+    const traverse = (items: (Category | LinkItem)[], level: number) => {
+      for (const item of items) {
+        const isCategory = 'links' in item;
+        const isFolder = 'type' in item && item.type === 'folder';
+        if (isCategory || isFolder) {
+          options.push({ id: item.id, title: item.title, level });
+          const children = getChildren(item);
+          if (children) traverse(children, level + 1);
+        }
+      }
+    };
+    traverse(localData.categories, 0);
+    return options;
+  }, [localData.categories]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -70,16 +238,11 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
     const processedUrl = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
     
     try {
-      const urlObj = new URL(processedUrl);
-      const hostname = urlObj.hostname;
-      const iconUrl = `https://www.google.com/s2/favicons?domain=${hostname}&sz=128`;
+      const iconUrl = generateFaviconUrl(new URL(processedUrl).hostname);
       
       let title = editingLink.title;
       if (!title) {
-          const name = hostname.replace(/^www\./, "").split(".")[0];
-          if (name) {
-              title = name.charAt(0).toUpperCase() + name.slice(1);
-          }
+          title = extractTitleFromUrl(processedUrl);
       }
 
       setEditingLink({ ...editingLink, url: processedUrl, icon: iconUrl, title: title });
@@ -487,16 +650,139 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
   return (
     <div className="flex-1 flex flex-col min-h-0 py-4">
-      <div className="flex items-center justify-between mb-4 px-1">
-          <div className="text-xs text-muted-foreground">
-             长按调整排序，支持跨文件夹移动链接
+      <div className="flex items-center justify-between mb-4 px-1 min-h-[20px]">
+          <div className="flex items-center gap-3">
+            {selectedIds.size > 0 ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-primary">
+                  已选 {selectedIds.size} 项
+                </span>
+                <button
+                  onClick={deselectAll}
+                  className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+                >
+                  取消选择
+                </button>
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                {currentFolder ? '管理文件夹内链接' : '长按调整排序，支持跨文件夹移动链接'}
+              </span>
+            )}
           </div>
-          <div className="text-xs text-muted-foreground">
-             {localData.categories.length} 个分类
+          <div className="flex items-center gap-2">
+            {selectedIds.size === 0 ? (
+              <div className="text-xs text-muted-foreground">
+                {localData.categories.length} 个分类
+              </div>
+            ) : null}
+            {!currentFolder && selectedIds.size === 0 && (
+              <button
+                onClick={() => {
+                  const ids = getVisibleLinkIds();
+                  if (ids.length > 0) setSelectedIds(new Set(ids));
+                }}
+                className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+              >
+                全选
+              </button>
+            )}
           </div>
       </div>
-      
-      <DndContext 
+
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-2 mb-3 px-3 py-2.5 rounded-lg bg-primary/5 border border-primary/20">
+          <span className="text-sm font-medium text-primary flex-1">
+            已选择 {selectedIds.size} 个链接
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => setBatchMoveTarget("start")}
+          >
+            <FolderInput className="h-3.5 w-3.5" />
+            批量移动
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => setConfirmBatchDelete(true)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            批量删除
+          </Button>
+        </div>
+      )}
+
+      {/* 搜索框 */}
+      {!currentFolder && (
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 pointer-events-none" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="搜索书签标题或 URL..."
+            className="h-9 pl-9 pr-4 text-sm rounded-lg border-muted-foreground/20 bg-muted/20"
+          />
+        </div>
+      )}
+
+      {searchResults !== null ? (
+        /* ── 搜索结果视图 ── */
+        <div className="flex-1 border rounded-xl bg-muted/10 overflow-y-auto min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40">
+          <div className="p-2 pb-10 space-y-0.5">
+            {searchResults.length === 0 ? (
+              <div className="py-10 text-center text-sm text-muted-foreground/50">
+                没有找到匹配的书签
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                <div className="px-3 py-1.5 text-xs text-muted-foreground/50">
+                  找到 {searchResults.length} 个匹配结果
+                </div>
+                {searchResults.map(({ link, path, catId }) => (
+                  <div key={link.id} className="flex items-center gap-2 p-2 rounded-lg transition-all group border border-transparent hover:border-border/40 hover:bg-muted/20">
+                    <div
+                      className="flex items-center justify-center w-6 h-6 shrink-0"
+                      onClick={(e) => { e.stopPropagation(); toggleSelect(link.id); }}
+                    >
+                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all cursor-pointer ${
+                        selectedIds.has(link.id) ? 'bg-primary border-primary' : 'border-muted-foreground/40 hover:border-muted-foreground/70'
+                      }`}>
+                        {selectedIds.has(link.id) && (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" className="w-3 h-3">
+                            <path d="M5 12l5 5l9-9" />
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0 flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium truncate block">{link.title}</span>
+                        <span className="text-[11px] text-muted-foreground/60 truncate block">{path}</span>
+                      </div>
+                      {link.url && (
+                        <span className="text-[11px] text-muted-foreground/40 truncate hidden md:block max-w-[200px]">{link.url}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => setEditingLink(link)} title="编辑">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteLink(catId, link.id)} title="删除">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+      <DndContext
         sensors={sensors} 
         collisionDetection={closestCenter} 
         onDragStart={handleDragStart}
@@ -527,7 +813,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
                                                 items={cat.links.map(l => l.id)} 
                                                 strategy={rectSortingStrategy}
                                             >
-                                                                                            <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                                                                            <div className="grid grid-cols-1 gap-2">
                                                                                                 {cat.links.map((link) => (
                                                                                                     <SortableLinkItem
                                                                                                         key={link.id}
@@ -537,6 +823,8 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
                                                                                                         onEditFolder={(f) => setFolderPath([...folderPath, f])}
                                                                                                         onEdit={(link) => setEditingLink(link)}
                                                                                                         onMove={(link) => setMovingLink(link)}
+                                                                                                        isSelected={selectedIds.has(link.id)}
+                                                                                                        onToggleSelect={toggleSelect}
                                                                                                     />
                                                                                                 ))}
                                                                                                 {cat.links.length === 0 && (
@@ -564,7 +852,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
                             items={itemsToShow.map(l => l.id)} 
                             strategy={rectSortingStrategy}
                         >
-                             <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 p-2">
+                             <div className="grid grid-cols-1 gap-2 p-2">
                                 {itemsToShow.map((link) => (
                                     <SortableLinkItem
                                         key={link.id}
@@ -574,6 +862,8 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
                                         onEditFolder={(f) => setFolderPath([...folderPath, f])}
                                         onEdit={(link) => setEditingLink(link)}
                                         onMove={(link) => setMovingLink(link)}
+                                        isSelected={selectedIds.has(link.id)}
+                                        onToggleSelect={toggleSelect}
                                     />
                                 ))}
                                 {itemsToShow.length === 0 && (
@@ -647,7 +937,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
                 {activeLink && (
                     <div className="flex items-center gap-2 p-2 rounded-lg bg-background border shadow-xl opacity-90 w-[200px]">
                         <div className="p-1.5 rounded-md bg-muted text-foreground shrink-0">
-                            <IconRender name={(() => { try { return (activeLink.icon && activeLink.icon !== "Link" && !activeLink.icon.includes('google.com/s2/favicons')) ? activeLink.icon : generateFaviconUrl(new URL(activeLink.url).hostname); } catch { return "Link"; }})()} className="h-4 w-4" />
+                            <FaviconImage icon={activeLink.icon} url={activeLink.url} className="h-4 w-4" />
                         </div>
                         <span className="text-sm font-medium truncate">{activeLink.title}</span>
                     </div>
@@ -656,6 +946,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
             document.body
         )}
       </DndContext>
+      )}
 
       {/* 确认删除分类对话框 */}
       <Dialog open={!!confirmDeleteCategory} onOpenChange={(open) => !open && setConfirmDeleteCategory(null)}>
@@ -669,6 +960,53 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setConfirmDeleteCategory(null)}>取消</Button>
             <Button variant="destructive" onClick={handleConfirmDeleteCategory}>确认删除</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 批量删除确认 */}
+      <Dialog open={confirmBatchDelete} onOpenChange={(open) => !open && setConfirmBatchDelete(false)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>确认批量删除</DialogTitle>
+            <DialogDescription>
+              确定要删除选中的 {selectedIds.size} 个链接吗？此操作无法撤销。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmBatchDelete(false)}>取消</Button>
+            <Button variant="destructive" onClick={handleBatchDelete}>删除 {selectedIds.size} 项</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 批量移动 */}
+      <Dialog open={batchMoveTarget !== null} onOpenChange={(open) => !open && setBatchMoveTarget(null)}>
+        <DialogContent className="h-[50vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>批量移动到...</DialogTitle>
+            <DialogDescription>
+              将 {selectedIds.size} 个链接移动到所选位置。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto py-2 -mx-2 px-2">
+            <div className="space-y-1">
+              {batchMoveOptions.map((option) => (
+                <Button
+                  key={option.id}
+                  variant="ghost"
+                  className="w-full justify-start font-normal"
+                  style={{ paddingLeft: `${option.level * 1.5 + 1}rem` }}
+                  onClick={() => handleBatchMove(option.id)}
+                >
+                  <Folder className="mr-2 h-4 w-4 text-muted-foreground" />
+                  {option.title}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBatchMoveTarget(null)}>取消</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

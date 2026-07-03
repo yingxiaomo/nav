@@ -1,34 +1,24 @@
 "use client";
 
-import { useState } from "react";
 import { LinkItem } from "@/lib/types/types";
 import { ChevronLeft, X } from "lucide-react";
 import { IconRender } from "@/components/nav/settings/shared";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { getLinkIcon, isImageIcon } from "@/lib/utils/favicon";
-
+import { FaviconImage } from "@/lib/utils/favicon";
 
 interface LinkItemCardProps {
   item: LinkItem;
   onClick?: (item: LinkItem) => void;
   className?: string;
-  /** 是否显示固定/取消固定按钮 */
   showPinButton?: boolean;
-  /** 当前链接是否已被固定 */
   isPinned?: boolean;
-  /** 点击固定/取消固定按钮的回调 */
   onPinToggle?: () => void;
-  /** 禁用键盘焦点（当外层已有关注式包装时使用，如 SortableLinkItemCard） */
   noKeyboard?: boolean;
 }
 
 export function LinkItemCard({ item, onClick, className, showPinButton, isPinned, onPinToggle, noKeyboard }: LinkItemCardProps) {
     const isFolder = item.type === 'folder';
-    const [imgError, setImgError] = useState(false);
-
-    const icon = imgError ? null : getLinkIcon(item.icon, item.url, item.type);
-    const showImg = isImageIcon(icon);
     const fallbackName = item.icon || (isFolder ? "FolderOpen" : "Link");
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -88,12 +78,8 @@ export function LinkItemCard({ item, onClick, className, showPinButton, isPinned
              </button>
            )}
            <div className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition-colors cursor-pointer" onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')} {...commonProps}>
-               <div className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center overflow-hidden ${showImg ? '' : 'border border-white/20 bg-blue-500/10 text-blue-500'}`}>
-                   {showImg ? (
-                     <img src={icon!} alt="" className="h-8 w-8 object-cover" onError={() => setImgError(true)} />
-                   ) : (
-                     <IconRender name={fallbackName} className="h-4 w-4" />
-                   )}
+               <div className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center overflow-hidden border border-white/20 bg-blue-500/10 text-blue-500">
+                 <FaviconImage icon={item.icon} url={item.url} className="h-8 w-8 object-cover" />
                </div>
                <div className="min-w-0 flex-1">
                    <h4 className="text-white font-medium text-sm truncate" title={item.title}>
@@ -161,11 +147,7 @@ export function PinnedLinkCard({
   item: LinkItem;
   onUnpin: () => void;
 }) {
-  const [imgError, setImgError] = useState(false);
-
-  const icon = imgError ? null : getLinkIcon(item.icon, item.url, item.type);
-  const showImg = isImageIcon(icon);
-  const fallbackName = item.icon || (item.type === 'folder' ? "FolderOpen" : "Link");
+  const fallbackName = item.icon || "Link";
 
   return (
     <div className="group relative p-2.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
@@ -180,12 +162,8 @@ export function PinnedLinkCard({
         className="flex flex-col items-center gap-1.5"
         onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
       >
-        <div className={`p-1.5 rounded-lg ${showImg ? 'bg-transparent' : 'bg-white/5 border border-white/10'}`}>
-          {showImg ? (
-            <img src={icon!} alt="" className="h-5 w-5 object-contain" onError={() => setImgError(true)} />
-          ) : (
-            <IconRender name={fallbackName} className="h-6 w-6 text-blue-200/90" />
-          )}
+        <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
+          <FaviconImage icon={item.icon} url={item.url} className="h-5 w-5 object-contain" />
         </div>
         <span className="text-white text-[11px] font-medium truncate max-w-full text-center leading-tight">
           {item.title}
@@ -199,8 +177,8 @@ export function PinnedLinkCard({
 export function SortablePinnedLinkCard({
   item,
   onUnpin
-}: { 
-  item: LinkItem; 
+}: {
+  item: LinkItem;
   onUnpin: () => void;
 }) {
   const {

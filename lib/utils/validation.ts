@@ -74,6 +74,8 @@ export const isValidIconName = (icon: string): boolean => {
  */
 export const sanitizeText = (text: string): string => {
   if (!text) return '';
+  // SSR 环境下 document 不存在，直接返回原文本
+  if (typeof document === 'undefined') return text;
   const temp = document.createElement('div');
   temp.textContent = text;
   return temp.innerHTML;

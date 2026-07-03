@@ -132,7 +132,7 @@ export function CheatSheet() {
             <div className="px-5 py-3 border-t border-white/10 text-center">
               <p className="text-xs text-white/30">
                 按 <kbd className="px-1 py-0.5 rounded bg-white/10 text-white/50 font-mono text-[10px]">?</kbd>{" "}
-                或 <kbd className="px-1 py-0.5 rounded bg-white/10 text-white/50 font-mono text-[10px]">{navigator.platform.includes("Mac") ? "⌘" : "Ctrl"}+/</kbd> 随时打开此面板
+                或 <kbd className="px-1 py-0.5 rounded bg-white/10 text-white/50 font-mono text-[10px]">{typeof navigator !== 'undefined' && navigator.platform.includes("Mac") ? "⌘" : "Ctrl"}+/</kbd> 随时打开此面板
               </p>
             </div>
           </motion.div>

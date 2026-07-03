@@ -48,6 +48,8 @@ export const LinkEditor: React.FC<LinkEditorProps> = ({
     setIsUploadingIcon(true);
     setIconUploadProgress(0);
 
+    let progressInterval: ReturnType<typeof setInterval> | null = null;
+
     try {
       // 先将图片转换为WebP格式，然后再转换为Base64
       setIconUploadProgress(10);
@@ -67,7 +69,7 @@ export const LinkEditor: React.FC<LinkEditorProps> = ({
 
       // 模拟上传进度
       let progress = 50;
-      const progressInterval = setInterval(() => {
+      progressInterval = setInterval(() => {
         progress += 5;
         if (progress < 90) {
           setIconUploadProgress(progress);
@@ -75,7 +77,7 @@ export const LinkEditor: React.FC<LinkEditorProps> = ({
       }, 100);
 
       reader.onloadend = () => {
-        clearInterval(progressInterval);
+        if (progressInterval) clearInterval(progressInterval);
         setIsUploadingIcon(false);
       };
 
@@ -83,6 +85,7 @@ export const LinkEditor: React.FC<LinkEditorProps> = ({
     } catch (error) {
       console.error("Icon upload error:", error);
       toast.error("图标上传失败", { description: "请重试或选择其他图标" });
+      if (progressInterval) clearInterval(progressInterval);
       setIsUploadingIcon(false);
     }
   };

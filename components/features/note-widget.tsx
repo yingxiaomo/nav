@@ -139,7 +139,7 @@ export function NoteWidget({ notes = [], onUpdate }: NoteWidgetProps) {
                 <Textarea 
                   value={activeNote.content}
                   onChange={(e) => updateNote(activeNote.id, 'content', e.target.value)}
-                  className="flex-1 resize-none border-none shadow-none px-0 focus-visible:ring-0 bg-transparent text-foreground leading-relaxed custom-scrollbar"
+                  className="flex-1 resize-none border-none shadow-none px-0 focus-visible:ring-0 bg-transparent text-foreground leading-relaxed"
                   placeholder="在此输入内容..."
                 />
               </motion.div>

@@ -1,6 +1,8 @@
 // 敏感数据加密/解密工具
 // 用于保护存储在localStorage中的敏感信息
 
+import { uint8ArrayToBase64 } from './common';
+
 // 加密密钥生成 - 使用浏览器的crypto API
 const generateEncryptionKey = async (): Promise<CryptoKey> => {
   if (typeof crypto === 'undefined') {
@@ -20,7 +22,7 @@ const exportKeyToBase64 = async (key: CryptoKey): Promise<string> => {
     throw new Error('Web Crypto API is not available');
   }
   const exported = await crypto.subtle.exportKey('raw', key);
-  return btoa(String.fromCharCode(...new Uint8Array(exported)));
+  return uint8ArrayToBase64(new Uint8Array(exported));
 };
 
 // 从字符串恢复CryptoKey
@@ -99,8 +101,8 @@ export const encryptData = async (data: string): Promise<string> => {
     return uint8ArrayToBase64(combined);
   } catch (error) {
     console.error('Encryption failed:', error);
-    // 在加密失败时，返回原始数据（降级处理）
-    return data;
+    // 加密失败时抛出错误，由调用方决定如何处理
+    throw error;
   }
 };
 
@@ -221,10 +223,8 @@ export const safeLocalStorageSet = async <T>(
     window.localStorage.setItem(key, JSON.stringify(clone));
   } catch (error) {
     console.error('Safe localStorage set failed:', error);
-    // 失败时，降级为直接存储（如果在浏览器环境中）
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(key, JSON.stringify(data));
-    }
+    // 加密失败时抛出错误，不再静默降级存储明文敏感数据
+    throw error;
   }
 };
 

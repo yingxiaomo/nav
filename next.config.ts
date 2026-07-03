@@ -33,8 +33,8 @@ const nextConfig: NextConfig = {
   
   // 静态资源优化
   generateBuildId: async () => {
-    // 使用固定的构建ID，除非有环境变量指定
-    return process.env.BUILD_ID || 'development';
+    // 使用时间戳作为默认构建ID，确保每次部署生成不同的缓存键
+    return process.env.BUILD_ID || `build-${Date.now().toString(36)}`;
   },
   
   // Turbopack configuration
@@ -44,23 +44,40 @@ const nextConfig: NextConfig = {
   ...(!isExportMode && {
     headers: async () => [
       {
+        source: "/_next/static/(.*)",
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: "/icon/(.*)",
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400',
+          },
+        ],
+      },
+      {
         source: "/(.*)",
         headers: [
           {
             key: "Content-Security-Policy",
             value: [
+              // 'unsafe-inline' 是 Next.js hydration 和 PWA 注册所必需的
+              // TODO: 未来可考虑迁移到 nonce-based CSP 以增强安全性
               `script-src 'self' 'unsafe-inline'${!isProduction ? " 'unsafe-eval'" : ""} https://fonts.googleapis.com https://api.github.com https://*.vercel.com https://cdnjs.cloudflare.com https://static.cloudflareinsights.com`,
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
-              "img-src 'self' data: https://*.githubusercontent.com https://*.imgur.com https://*.cloudflare.com https://*.vercel.com https://raw.githubusercontent.com https://iconapi.396638.xyz",
+              // img-src: GitHub avatars/raw, Imgur, Cloudflare, Vercel, favicon API
+              "img-src 'self' data: https://raw.githubusercontent.com https://avatars.githubusercontent.com https://*.githubusercontent.com https://*.imgur.com https://*.cloudflare.com https://*.vercel.com https://iconapi.396638.xyz",
               "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com",
               "connect-src 'self' https://api.github.com https://*.githubusercontent.com https://api.dropboxapi.com https://www.googleapis.com https://iconapi.396638.xyz",
               "form-action 'self'",
               "frame-src 'self'"
             ].join(";")
-          },
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
           },
         ],
       },

@@ -1,7 +1,7 @@
 {
   "name": "clean-nav",
   "version": "0.1.0",
-  "private": false,
+  "private": true,
   "description": "A minimalist, serverless navigation startpage built with Next.js and Tailwind CSS. Syncs data via GitHub API.",
   "keywords": [
     "nextjs",

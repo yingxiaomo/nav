@@ -8,7 +8,7 @@
 
   <p>
     <a href="https://github.com/yingxiaomo/nav/blob/main/LICENSE">
-      <img src="https://img.shields.io/github/license/yingxiaomo/nav?style=flat-square" alt="license" />
+      <img src="https://img.shields.io/github/license/yingxiaomo/nav?color=green&style=flat-square" alt="license" />
     </a>
     <a href="https://github.com/yingxiaomo/nav/stargazers">
       <img src="https://img.shields.io/github/stars/yingxiaomo/nav?style=flat-square" alt="stars" />
@@ -237,4 +237,4 @@ npm run dev
 
 
 ## 📄 License:
-[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

@@ -94,7 +94,7 @@ export function useNavData(initialWallpapers: string[]) {
     if (storageConfigStr) {
         try {
             const rawConfig = JSON.parse(storageConfigStr);
-            
+
             if (rawConfig.settings && Object.keys(rawConfig.settings).length > 0) {
                 const oldSettings = rawConfig.settings;
                 if (rawConfig.type === 'github' && !rawConfig.github) {
@@ -198,35 +198,35 @@ export function useNavData(initialWallpapers: string[]) {
     initData();
   }, [getEffectiveConfig]);
 
-  // 数据合并函数
+  // 数据合并函数：远程优先，本地有但远程没有的不补回
   const mergeItems = useCallback(<T extends { id: string; updatedAt?: number }>(
-      remoteItems: T[] = [], 
-      localItems: T[] = [], 
+      remoteItems: T[] = [],
+      localItems: T[] = [],
       nestedMergeFn?: (remoteItem: T, localItem: T) => T
   ): T[] => {
       const merged = [...remoteItems];
       const remoteMap = new Map(remoteItems.map(i => [i.id, i]));
-      
+
+      // 本地有、远程也有 → 按 updatedAt 取新版本
       for (const localItem of localItems) {
           const remoteItem = remoteMap.get(localItem.id);
-          if (!remoteItem) {
-              merged.push(localItem);
-          } else {
+          if (remoteItem) {
               const localTime = localItem.updatedAt || 0;
               const remoteTime = remoteItem.updatedAt || 0;
-              
+
               let updatedItem = remoteItem;
               if (localTime > remoteTime) {
                   updatedItem = localItem;
               } else if (nestedMergeFn) {
                   updatedItem = nestedMergeFn(remoteItem, localItem);
               }
-              
+
               const index = merged.findIndex(i => i.id === localItem.id);
               if (index !== -1) {
                   merged[index] = updatedItem;
               }
           }
+          // 本地有、远程没有 → 信任远程，不补回（后端删了就是删了）
       }
       return merged;
   }, []);

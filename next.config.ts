@@ -40,6 +40,18 @@ const nextConfig: NextConfig = {
   // Turbopack configuration
   turbopack: {},
   
+  // 开发环境：将 /api/v1 代理到后端，避免浏览器跨域问题
+  ...(isExportMode && !process.env.VERCEL && !process.env.DOCKER_BUILD ? {
+    async rewrites() {
+      return [
+        {
+          source: '/api/:path*',
+          destination: 'http://localhost:8642/api/:path*',
+        },
+      ];
+    },
+  } : {}),
+
   // 添加内容安全策略 (CSP) 和 CDN缓存策略 - 仅在非export模式下生效
   ...(!isExportMode && {
     headers: async () => [
@@ -74,7 +86,7 @@ const nextConfig: NextConfig = {
               // img-src: GitHub avatars/raw, Imgur, Cloudflare, Vercel, favicon API
               "img-src 'self' data: https://raw.githubusercontent.com https://avatars.githubusercontent.com https://*.githubusercontent.com https://*.imgur.com https://*.cloudflare.com https://*.vercel.com https://iconapi.396638.xyz",
               "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com",
-              "connect-src 'self' https://api.github.com https://*.githubusercontent.com https://api.dropboxapi.com https://www.googleapis.com https://iconapi.396638.xyz",
+              "connect-src 'self' https://api.github.com https://*.githubusercontent.com https://api.dropboxapi.com https://www.googleapis.com https://iconapi.396638.xyz http://localhost:* http://127.0.0.1:*",
               "form-action 'self'",
               "frame-src 'self'"
             ].join(";")

@@ -15,7 +15,7 @@ npm run dev
 ### Docker
 
 ```bash
-docker compose up -d
+docker compose -f server/docker-compose.yml up -d
 ```
 
 ## API 概览
@@ -115,6 +115,20 @@ docker compose up -d
 3. API 令牌填入上一步保存的密钥
 4. 所有数据读写将通过 API 令牌进行认证
 
+> **合体镜像用户**：如果你使用的是合体镜像（前端+后端同一容器），前端和后端同源，自动免令牌认证，无需额外配置。
+
+### API 端点
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/v1/health | 健康检查（无需认证） |
+| POST | /api/v1/auth/setup | 首次配置管理员密码和 API 令牌 |
+| POST | /api/v1/auth/login | 管理员登录 |
+| POST | /api/v1/auth/logout | 退出登录 |
+| GET | /api/v1/auth/status | 检查配置和登录状态 |
+| GET | /api/v1/auth/api-token | 查看当前 API 令牌（需登录） |
+| POST | /api/v1/auth/api-token | 重新生成 API 令牌（需登录） |
+
 ### HTTPS 要求
 
 公网部署**必须使用 HTTPS**，否则 API Token 明文传输无安全意义。推荐：
@@ -128,7 +142,7 @@ docker compose up -d
 后端默认允许跨域（`CORS_ORIGIN=*`）。生产环境建议：
 
 1. 设置 `CORS_ORIGIN=https://你的前端域名.com`
-2. 用防火墙限制后端口（`3001`）的来源 IP，不直接暴露给公网
+2. 用防火墙限制端口（`8642`）的来源 IP，不直接暴露给公网
 3. 推荐架构：用户 → CDN（前端静态文件）→ 反向代理 → 后端 API
 
 ## 技术栈

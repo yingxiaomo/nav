@@ -1,6 +1,6 @@
 ﻿services:
   nav-server:
-    image: ghcr.io/yingxiaomo/nav-server:latest
+    image: ghcr.nju.edu.cn/yingxiaomo/nav-server:latest
     container_name: nav-server
     ports:
       - "8642:8642"

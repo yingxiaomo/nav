@@ -16,8 +16,23 @@ export const authMiddleware = createMiddleware(async (c, next) => {
     return;
   }
 
-  // Auth 端点（登录、状态等）不要求 Bearer token
-  if (path.startsWith('/api/v1/auth/')) {
+  // Auth 端点和管理 API（登录、状态等）不要求 Bearer token
+  if (path.startsWith('/api/v1/auth/') || path.startsWith('/api/v1/admin/')) {
+    await next();
+    return;
+  }
+
+  // 合体镜像模式：同源请求（前端页面 → 后端 API）免令牌
+  // 检查 Origin 或 Referer 是否与服务器地址匹配
+  const host = c.req.header('Host') ?? '';
+  const origin = c.req.header('Origin');
+  const referer = c.req.header('Referer');
+
+  const isSameOrigin =
+    (origin && (origin.includes(`://${host}`) || origin.includes('://localhost'))) ||
+    (referer && referer.includes(`://${host}`));
+
+  if (isSameOrigin) {
     await next();
     return;
   }

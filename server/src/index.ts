@@ -14,6 +14,7 @@ import dataRoutes from './routes/data.ts';
 import parseRoutes from './routes/parse.ts';
 import suggestRoutes from './routes/suggest.ts';
 import authRoutes from './routes/auth.ts';
+import adminRoutes from './routes/admin.ts';
 
 const app = new Hono();
 
@@ -36,10 +37,21 @@ app.get('/api/v1/health', (c) => {
 });
 
 // ===== 认证中间件 =====
+// 请求日志（方便排查）
+app.use('/api/v1/*', async (c, next) => {
+  const start = Date.now();
+  await next();
+  const ms = Date.now() - start;
+  if (c.res.status >= 400) {
+    console.log(`[${c.req.method}] ${c.req.path} → ${c.res.status} (${ms}ms)`);
+  }
+});
+
 // API 级认证：保护所有 /api/v1/* 路由，/api/v1/auth/* 和 /health 免检
 app.use('/api/v1/*', authMiddleware);
-// 管理后台认证：保护 /api/v1/auth/* 中的管理端点
+// 管理后台认证：保护 /api/v1/auth/* 和 /api/v1/admin/* 中的管理端点
 app.use('/api/v1/auth/*', adminAuthMiddleware);
+app.use('/api/v1/admin/*', adminAuthMiddleware);
 
 // ===== 注册路由 =====
 app.route('/api/v1/auth', authRoutes);
@@ -52,6 +64,7 @@ app.route('/api/v1/upload', uploadRoutes);
 app.route('/api/v1/data', dataRoutes);
 app.route('/api/v1/parse', parseRoutes);
 app.route('/api/v1/suggest', suggestRoutes);
+app.route('/api/v1/admin', adminRoutes);
 
 // ===== 前端静态文件（合体镜像模式，未匹配 API 的请求走这里）=====
 app.use('/*', serveStatic({ root: './public' }));

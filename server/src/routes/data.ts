@@ -51,7 +51,6 @@ const siteSettingsSchema = z.object({
   wallpaperType: z.enum(['custom', 'local', 'bing', 'url']),
   wallpaperList: z.array(z.string()),
   blurLevel: z.enum(['low', 'medium', 'high']),
-  maxPackedWallpapers: z.number().optional(),
   showFeatures: z.boolean().optional(),
   homeLayout: z.enum(['folder', 'list', 'sidebar']).optional(),
   theme: z.enum(['light', 'dark', 'system']).optional(),

@@ -719,7 +719,16 @@ export class GoogleDriveAdapter implements StorageAdapter {
 // ===== 本地服务器适配器（Hono 后端 API）=====
 
 export class ApiServerAdapter implements StorageAdapter {
-  constructor(private config: ApiServerSettings) {}
+  private baseUrl: string;
+
+  constructor(private config: ApiServerSettings) {
+    // 自动补全协议
+    let url = (config.baseUrl || "").trim();
+    if (url && !/^https?:\/\//i.test(url)) {
+      url = `http://${url}`;
+    }
+    this.baseUrl = url.replace(/\/+$/, '');
+  }
 
   private async request(path: string, options?: RequestInit): Promise<Response> {
     const headers: Record<string, string> = {
@@ -728,11 +737,11 @@ export class ApiServerAdapter implements StorageAdapter {
     if (this.config.token) {
       headers['Authorization'] = `Bearer ${this.config.token}`;
     }
-    // FormData 不需要手动设 Content-Type
     if (!(options?.body instanceof FormData)) {
       headers['Content-Type'] ??= 'application/json';
     }
-    return fetch(`${this.config.baseUrl}${path}`, { ...options, headers });
+    const url = this.baseUrl ? `${this.baseUrl}${path}` : path;
+    return fetch(url, { ...options, headers });
   }
 
   async load(): Promise<DataSchema | null> {
@@ -758,9 +767,13 @@ export class ApiServerAdapter implements StorageAdapter {
   }
 
   async testConnection(): Promise<void> {
-    const res = await fetch(`${this.config.baseUrl}/api/v1/health`, {
-      signal: AbortSignal.timeout(5000),
-    });
+    const headers: Record<string, string> = {};
+    if (this.config.token) {
+      headers['Authorization'] = `Bearer ${this.config.token}`;
+    }
+    const url = `${this.baseUrl}/api/v1/health`;
+    console.log('[ApiServerAdapter] testConnection:', url);
+    const res = await fetch(url, { headers });
     if (!res.ok) {
       throw new Error(`后端连接失败 (${res.status})`);
     }

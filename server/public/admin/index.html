@@ -5,239 +5,158 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nav Server 管理</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #0f0f13; color: #e4e4e7; min-height: 100vh; display: flex;
-    align-items: center; justify-content: center; line-height: 1.6;
-  }
-  .card {
-    background: #18181b; border: 1px solid #27272a; border-radius: 12px;
-    padding: 40px; width: 440px; max-width: 94vw;
-    box-shadow: 0 25px 50px rgba(0,0,0,.4);
-  }
-  h1 { font-size: 20px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-  .subtitle { color: #a1a1aa; font-size: 13px; margin-bottom: 24px; margin-top: 4px; }
-  label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: #d4d4d8; }
-  input[type="text"], input[type="password"] {
-    width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid #3f3f46;
-    background: #09090b; color: #e4e4e7; font-size: 14px; outline: none;
-    transition: border-color .15s;
-  }
-  input:focus { border-color: #6366f1; }
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    width: 100%; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500;
-    cursor: pointer; border: none; transition: all .15s; margin-top: 12px;
-  }
-  .btn-primary { background: #6366f1; color: #fff; }
-  .btn-primary:hover { background: #5558e6; }
-  .btn-danger { background: #dc2626; color: #fff; }
-  .btn-danger:hover { background: #b91c1c; }
-  .btn-outline { background: none; border: 1px solid #3f3f46; color: #e4e4e7; }
-  .btn-outline:hover { background: #27272a; }
-  .btn-sm { padding: 6px 12px; font-size: 12px; width: auto; margin: 0; }
-  .btn:disabled { opacity: .5; cursor: not-allowed; }
-  .token-box {
-    background: #09090b; border: 1px solid #3f3f46; border-radius: 8px;
-    padding: 14px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px;
-    word-break: break-all; margin: 8px 0 16px; color: #a5b4fc; line-height: 1.5;
-    position: relative;
-  }
-  .token-box .copy-btn {
-    position: absolute; top: 8px; right: 8px; background: #27272a; border: none;
-    color: #a1a1aa; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 11px;
-  }
-  .token-box .copy-btn:hover { background: #3f3f46; color: #e4e4e7; }
-  .alert {
-    background: rgba(234,179,8,.1); border: 1px solid rgba(234,179,8,.3); border-radius: 8px;
-    padding: 12px 14px; font-size: 12px; color: #fbbf24; margin: 16px 0;
-  }
-  .alert-danger { background: rgba(239,68,68,.1); border-color: rgba(239,68,68,.3); color: #f87171; }
-  .alert-success { background: rgba(34,197,94,.1); border-color: rgba(34,197,94,.3); color: #4ade80; }
-  .spinner {
-    display: inline-block; width: 16px; height: 16px;
-    border: 2px solid rgba(255,255,255,.2); border-top-color: #fff;
-    border-radius: 50%; animation: spin .6s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .hidden { display: none !important; }
-  .info-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #27272a; font-size: 13px; }
-  .info-label { color: #a1a1aa; }
-  .badge-green { background: rgba(34,197,94,.15); color: #4ade80; padding: 2px 8px; border-radius: 999px; font-size: 11px; }
-  .mt-2 { margin-top: 12px; } .mt-4 { margin-top: 24px; } .mb-2 { margin-bottom: 8px; }
-  .flex { display: flex; } .gap-2 { gap: 8px; }
-  .step { background: #27272a; border-radius: 999px; padding: 2px 10px; font-size: 11px; font-weight: 600; color: #a1a1aa; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f0f13;color:#e4e4e7;line-height:1.6}
+.card{background:#18181b;border:1px solid #27272a;border-radius:12px;padding:32px;width:960px;max-width:94vw;margin:40px auto;box-shadow:0 25px 50px rgba(0,0,0,.4)}
+.card-narrow{width:440px;margin:80px auto}
+input,select,textarea{width:100%;padding:8px 12px;border-radius:6px;border:1px solid #3f3f46;background:#09090b;color:#e4e4e7;font-size:13px;outline:none;transition:border-color .15s}
+input:focus,textarea:focus{border-color:#6366f1}
+textarea{resize:vertical;font-family:monospace;font-size:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:none;transition:all .1s}
+.btn-primary{background:#6366f1;color:#fff}.btn-primary:hover{background:#5558e6}
+.btn-danger{background:#dc2626;color:#fff}.btn-danger:hover{background:#b91c1c}
+.btn-outline{background:none;border:1px solid #3f3f46;color:#e4e4e7}.btn-outline:hover{background:#27272a}
+.btn-success{background:#16a34a;color:#fff}.btn-success:hover{background:#15803d}
+.btn-sm{padding:3px 8px;font-size:11px}.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-block{width:100%;margin-top:8px}
+label{display:block;font-size:12px;font-weight:500;margin-bottom:4px;color:#d4d4d8;margin-top:10px}
+.alert{background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.3);border-radius:8px;padding:10px 14px;font-size:12px;color:#fbbf24;margin:12px 0}
+.alert-danger{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#f87171}
+.alert-success{background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.3);color:#4ade80}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+.hidden{display:none!important}
+h1{font-size:20px;font-weight:600}
+.subtitle{color:#a1a1aa;font-size:13px;margin:4px 0 20px}
+.tabs{display:flex;gap:2px;background:#27272a;border-radius:8px;padding:3px;margin-bottom:20px;flex-wrap:wrap}
+.tab{padding:7px 12px;border-radius:6px;font-size:13px;cursor:pointer;color:#a1a1aa;border:none;background:transparent;white-space:nowrap;transition:all .15s}
+.tab:hover{color:#e4e4e7}
+.tab.active{background:#6366f1;color:#fff}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px;color:#a1a1aa;font-weight:500;border-bottom:1px solid #27272a;font-size:12px}
+td{padding:6px 8px;border-bottom:1px solid #1f1f23;vertical-align:middle}
+tr:hover td{background:rgba(99,102,241,.04)}
+.empty-cell{color:#52525b;text-align:center;padding:24px;font-size:13px}
+.url-cell{max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin:16px 0}
+.stat-card{background:#09090b;border:1px solid #27272a;border-radius:8px;padding:14px;text-align:center}
+.stat-card .num{font-size:26px;font-weight:700;color:#6366f1}
+.stat-card .label{font-size:12px;color:#a1a1aa;margin-top:2px}
+.backup-section{border:1px solid #27272a;border-radius:8px;padding:16px;margin-bottom:10px}
+.backup-section h3{font-size:14px;margin-bottom:2px}
+.backup-section p{font-size:12px;color:#a1a1aa;margin-bottom:10px}
+.log-line{padding:3px 0;font-family:monospace;font-size:11px;border-bottom:1px solid #1a1a1e;color:#a1a1aa;line-height:1.4}
+.log-line.log-ERROR{color:#f87171}
+.log-line.log-WARN{color:#fbbf24}
+.log-line.log-INFO{color:#a5b4fc}
+.inline-edit{display:flex;gap:4px;align-items:center}
+.inline-edit input,.inline-edit select{width:auto;flex:1;min-width:60px;padding:4px 8px;font-size:12px}
+.action-bar{display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap}
+.action-bar .btn{white-space:nowrap}
 </style>
 </head>
-<body>
-<div class="card" id="app">
-  <div id="content"></div>
-</div>
-
+<body><div id="app"></div>
 <script>
-const API = '/api/v1/auth';
+const API='/api/v1';const AUTH=`${API}/auth`
+async function req(m,p,b){const r=await fetch(p,{method:m,headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined});const d=await r.json().catch(()=>({}));return{ok:r.ok,status:r.status,data:d}}
+function $(i){return document.getElementById(i)}
+function es(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+async function copyText(t){try{await navigator.clipboard.writeText(t);return true}catch{const e=document.createElement('textarea');e.value=t;e.style.position='fixed';e.style.left='-9999px';document.body.appendChild(e);e.select();const o=document.execCommand('copy');document.body.removeChild(e);return o}}
 
-async function req(method, path, body) {
-  const res = await fetch(`${API}${path}`, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await res.json().catch(() => ({}));
-  return { ok: res.ok, status: res.status, data };
+function renderSetup(){
+  document.getElementById('app').innerHTML=`<div class="card card-narrow"><h1>⚙️ Nav Server</h1><div class="subtitle">首次配置</div><label>管理员密码</label><input type=password id=pw1 placeholder="至少6位" autocomplete=new-password><label>确认密码</label><input type=password id=pw2 placeholder="再次输入" autocomplete=new-password><button class="btn btn-primary btn-block" id=setupBtn>创建管理员密码</button><div id=setupMsg class=hidden></div></div>`;
+  $('setupBtn').onclick=async()=>{const p1=$('pw1').value,p2=$('pw2').value;if(p1.length<6){$('setupMsg').className='alert alert-danger';$('setupMsg').textContent='密码至少6位';return}if(p1!==p2){$('setupMsg').className='alert alert-danger';$('setupMsg').textContent='两次密码不一致';return}const b=$('setupBtn');b.disabled=true;b.innerHTML='<span class=spinner></span> 配置中...';const{ok,data}=await req('POST',`${AUTH}/setup`,{password:p1});if(ok)location.reload();else{b.disabled=false;b.textContent='创建管理员密码';$('setupMsg').className='alert alert-danger';$('setupMsg').textContent=data.error||'配置失败'}}
 }
 
-function $(id) { return document.getElementById(id); }
+function renderLogin(){
+  document.getElementById('app').innerHTML=`<div class="card card-narrow"><h1>🔑 Nav Server</h1><div class=subtitle>管理员登录</div><label>管理员密码</label><input type=password id=loginPw placeholder="输入管理员密码" autocomplete=current-password><button class="btn btn-primary btn-block" id=loginBtn>登录</button><div id=loginMsg class=hidden style="margin-top:12px;color:#f87171;font-size:13px"></div></div>`;
+  $('loginBtn').onclick=doLogin;$('loginPw').onkeydown=e=>{if(e.key==='Enter')doLogin()}
+}
+async function doLogin(){const pw=$('loginPw').value;if(!pw)return;const b=$('loginBtn');b.disabled=true;b.innerHTML='<span class=spinner></span> 登录中...';const{ok,data}=await req('POST',`${AUTH}/login`,{password:pw});if(ok)location.reload();else{b.disabled=false;b.textContent='登录';$('loginMsg').className='';$('loginMsg').textContent=data.error||'登录失败'}}
 
-// ===== 页面渲染 =====
+async function doLogout(){await req('POST',`${AUTH}/logout`);location.reload()}
 
-function renderSetup() {
-  $('content').innerHTML = `
-    <h1>⚙️ Nav Server</h1>
-    <div class="subtitle">首次配置</div>
-    <p style="font-size:13px;color:#a1a1aa;margin-bottom:16px;">
-      设置管理员密码并生成 API 令牌。前端连接后端需要用到此令牌。
-    </p>
-    <label>管理员密码</label>
-    <input type="password" id="pw1" placeholder="至少 6 位" autocomplete="new-password">
-    <label class="mt-2">确认密码</label>
-    <input type="password" id="pw2" placeholder="再次输入" autocomplete="new-password">
-    <div class="alert" style="margin-top:20px">
-      设置后系统将自动生成一个 API 令牌，前端通过「后端地址 + API 令牌」连接。
-    </div>
-    <button class="btn btn-primary" id="setupBtn">🚀 完成初始配置</button>
-    <div id="setupErr" class="hidden"></div>
-  `;
-
-  $('setupBtn').onclick = async () => {
-    const p1 = $('pw1').value, p2 = $('pw2').value;
-    if (p1.length < 6) { $('setupErr').className = 'alert alert-danger'; $('setupErr').textContent = '密码至少 6 位'; return; }
-    if (p1 !== p2) { $('setupErr').className = 'alert alert-danger'; $('setupErr').textContent = '两次密码不一致'; return; }
-    const btn = $('setupBtn'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> 配置中...';
-
-    const { ok, data } = await req('POST', '/setup', { password: p1 });
-    if (ok) {
-      renderSetupResult(data.token);
-    } else {
-      btn.disabled = false; btn.textContent = '🚀 完成初始配置';
-      $('setupErr').className = 'alert alert-danger'; $('setupErr').textContent = data.error || '配置失败';
-    }
-  };
+function renderDashboard(tab){
+  const tabs=[
+    {id:'overview',label:'📊 概览'},{id:'cats',label:'📁 分类'},{id:'bms',label:'🔗 书签'},
+    {id:'todos',label:'✅ 待办'},{id:'notes',label:'📝 笔记'},{id:'backup',label:'💾 备份'},
+    {id:'logs',label:'📋 日志'}
+  ];
+  document.getElementById('app').innerHTML=`<div class=card><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h1>⚙️ Nav Server</h1><button class="btn btn-outline btn-sm" onclick=doLogout()>🚪 退出</button></div><div class=tabs id=tabBar>${tabs.map(t=>`<button class="tab${t.id===tab?' active':''}" onclick="renderDashboard('${t.id}')">${t.label}</button>`).join('')}</div><div id=tabContent></div></div>`;
+  const cmds={overview:renderOverview,cats:renderCats,bms:renderBms,todos:renderTodos,notes:renderNotes,backup:renderBackup,logs:renderLogs};
+  (cmds[tab]||renderOverview)();
 }
 
-function renderSetupResult(token) {
-  $('content').innerHTML = `
-    <h1>✅ 配置完成</h1>
-    <div class="subtitle">请保存下方的 API 令牌</div>
-    <div class="alert alert-success">管理员密码已设置</div>
-    <label>API 令牌（用于前端连接）</label>
-    <div class="token-box">
-      ${escapeHtml(token)}
-      <button class="copy-btn" onclick="navigator.clipboard.writeText('${escapeHtml(token)}');this.textContent='已复制'">复制</button>
-    </div>
-    <div class="alert">⚠️ 令牌不会再次完整显示</div>
-    <div style="font-size:13px;color:#a1a1aa;background:#09090b;border-radius:8px;padding:14px;margin:16px 0;line-height:1.8">
-      <strong>前端连接方式：</strong><br>
-      1. 在导航页设置 → 云同步 → 选择「本地服务器」<br>
-      2. 后端地址填入 <code style="background:#27272a;padding:1px 6px;border-radius:4px">http://你的IP:3001</code><br>
-      3. API 令牌填入上方的密钥<br>
-      4. 点击保存，数据将持久化到本地 SQLite
-    </div>
-    <button class="btn btn-primary" onclick="location.reload()">进入管理面板 →</button>
-  `;
+// ====== 概览 ======
+async function renderOverview(){$('tabContent').innerHTML='<div class=spinner style="margin:20px auto"></div>';
+  const[c,t,n,tk]=await Promise.all([req('GET',`${API}/categories`),req('GET',`${API}/todos`),req('GET',`${API}/notes`),req('GET',`${AUTH}/api-token`)]);
+  const cats=c.data||[],todos=t.data||[],notes=n.data||[],bm=cats.reduce((s,c)=>s+(c.links?.length||0),0);
+  $('tabContent').innerHTML=`<div class=stats>${[{v:cats.length,l:'分类'},{v:bm,l:'书签'},{v:todos.length,l:'待办'},{v:notes.length,l:'笔记'}].map(s=>`<div class=stat-card><div class=num>${s.v}</div><div class=label>${s.l}</div></div>`).join('')}</div>`}
+// ====== 分类 ======
+async function renderCats(){$('tabContent').innerHTML='<div class=spinner style="margin:20px auto"></div>';
+  const r=await req('GET',`${API}/categories`);const cats=r.data||[];
+  const bmCount=c=>c.links?.length||0;
+  $('tabContent').innerHTML=`${cats.length===0?'<p class=empty-cell>暂无分类</p>':`<table><thead><tr><th>标题</th><th>书签数</th><th>操作</th></tr></thead><tbody>${cats.map(c=>`<tr id=cat-${c.id}><td>${es(c.title)}</td><td>${bmCount(c)}</td><td><button class="btn btn-outline btn-sm" onclick=editCat('${c.id}')>✏️</button> <button class="btn btn-danger btn-sm" onclick=delCat('${c.id}')>🗑️</button></td></tr>`).join('')}</tbody></table>`}<div class=action-bar style="margin-top:12px"><input id=newCatTitle style="width:200px" placeholder="新分类名称"><button class="btn btn-primary btn-sm" onclick=addCat()>➕ 添加</button></div>`;
+}
+async function addCat(){const v=$('newCatTitle').value.trim();if(!v)return;const{ok}=await req('POST',`${API}/categories`,{title:v});if(ok)renderCats()}
+async function delCat(id){if(!confirm('确定删除此分类？书签也会一起删除'))return;await req('DELETE',`${API}/categories/${id}`);renderCats()}
+async function editCat(id){const r=await req('GET',`${API}/categories`);const c=r.data?.find(c=>c.id===id);if(!c)return;
+  document.getElementById(`cat-${id}`).innerHTML=`<td colspan=3><div class=inline-edit><input id=editCatTitle-${id} value="${es(c.title)}" placeholder=标题><input id=editCatIcon-${id} value="${es(c.icon||'')}" placeholder=图标 style=width:80px><button class="btn btn-success btn-sm" onclick=saveCat('${id}')>💾 保存</button><button class="btn btn-outline btn-sm" onclick=renderCats()>取消</button></div></td>`
+}
+async function saveCat(id){const t=$(`editCatTitle-${id}`).value.trim(),i=$(`editCatIcon-${id}`).value.trim();if(!t)return;await req('PUT',`${API}/categories/${id}`,{title:t,icon:i||undefined});renderCats()}
+
+// ====== 书签 ======
+async function renderBms(){$('tabContent').innerHTML='<div class=spinner style="margin:20px auto"></div>';
+  const r=await req('GET',`${API}/bookmarks`);const bms=r.data||[];
+  const catsR=await req('GET',`${API}/categories`);const cats=catsR.data||[];
+  $('tabContent').innerHTML=`${bms.length===0?'<p class=empty-cell>暂无书签</p>':`<table><thead><tr><th>标题</th><th>URL</th><th>操作</th></tr></thead><tbody>${bms.map(b=>`<tr id=bm-${b.id}><td>${es(b.title)}</td><td class=url-cell><a href="${es(b.url)}" target=_blank style=color:#6366f1;text-decoration:none>${es(b.url)}</a></td><td><button class="btn btn-outline btn-sm" onclick=editBm('${b.id}')>✏️</button> <button class="btn btn-danger btn-sm" onclick=delBm('${b.id}')>🗑️</button></td></tr>`).join('')}</tbody></table>`}
+  <div class=action-bar style="margin-top:12px"><select id=newBmCat style=width:150px>${cats.map(c=>`<option value="${c.id}">${es(c.title)}</option>`).join('')}</select><input id=newBmTitle placeholder=标题 style=width:150px><input id=newBmUrl placeholder=https://... style=width:200px><button class="btn btn-primary btn-sm" onclick=addBm()>➕ 添加</button></div>`;
+}
+async function addBm(){const c=$('newBmCat').value,t=$('newBmTitle').value.trim(),u=$('newBmUrl').value.trim();if(!c||!t||!u)return;await req('POST',`${API}/bookmarks`,{categoryId:c,title:t,url:u});renderBms()}
+async function delBm(id){if(!confirm('确定删除此书签？'))return;await req('DELETE',`${API}/bookmarks/${id}`);renderBms()}
+async function editBm(id){const r=await req('GET',`${API}/bookmarks`);const b=r.data?.find(x=>x.id===id);if(!b)return;
+  document.getElementById(`bm-${id}`).innerHTML=`<td colspan=3><div class=inline-edit><input id=editBmTitle-${id} value="${es(b.title)}" placeholder=标题 style=min-width:100px><input id=editBmUrl-${id} value="${es(b.url)}" placeholder=https://... style=min-width:150px><button class="btn btn-success btn-sm" onclick=saveBm('${id}')>💾</button><button class="btn btn-outline btn-sm" onclick=renderBms()>取消</button></div></td>`
+}
+async function saveBm(id){const t=$(`editBmTitle-${id}`).value.trim(),u=$(`editBmUrl-${id}`).value.trim();if(!t||!u)return;await req('PUT',`${API}/bookmarks/${id}`,{title:t,url:u});renderBms()}
+
+// ====== 待办 ======
+async function renderTodos(){$('tabContent').innerHTML='<div class=spinner style="margin:20px auto"></div>';
+  const r=await req('GET',`${API}/todos`);const todos=r.data||[];
+  $('tabContent').innerHTML=`${todos.length===0?'<p class=empty-cell>暂无待办</p>':`<table><thead><tr><th style=width:40px>状态</th><th>内容</th><th style=width:80px>操作</th></tr></thead><tbody>${todos.map(t=>`<tr id=todo-${t.id}><td><input type=checkbox ${t.completed?'checked':''} onchange=toggleTodo('${t.id}')></td><td style="${t.completed?'text-decoration:line-through;color:#52525b':''}">${es(t.text)}</td><td><button class="btn btn-danger btn-sm" onclick=delTodo('${t.id}')>🗑️</button></td></tr>`).join('')}</tbody></table>`}<div class=action-bar style="margin-top:12px"><input id=newTodoText placeholder="新待办..." style=width:300px><button class="btn btn-primary btn-sm" onclick=addTodo()>➕ 添加</button></div>`;
+}
+async function addTodo(){const t=$('newTodoText').value.trim();if(!t)return;await req('POST',`${API}/todos`,{text:t});renderTodos()}
+async function delTodo(id){await req('DELETE',`${API}/todos/${id}`);renderTodos()}
+async function toggleTodo(id){const r=await req('GET',`${API}/todos`);const t=r.data?.find(x=>x.id===id);if(!t)return;await req('PUT',`${API}/todos/${id}`,{completed:!t.completed});renderTodos()}
+
+// ====== 笔记 ======
+async function renderNotes(){$('tabContent').innerHTML='<div class=spinner style="margin:20px auto"></div>';
+  const r=await req('GET',`${API}/notes`);const notes=r.data||[];
+  $('tabContent').innerHTML=`${notes.length===0?'<p class=empty-cell>暂无笔记</p>':`<table><thead><tr><th>标题</th><th>内容</th><th style=width:80px>操作</th></tr></thead><tbody>${notes.map(n=>`<tr id=note-${n.id}><td>${es(n.title)}</td><td class=url-cell style=color:#a1a1aa>${n.content?es(n.content):'-'}</td><td><button class="btn btn-outline btn-sm" onclick=editNote('${n.id}')>✏️</button> <button class="btn btn-danger btn-sm" onclick=delNote('${n.id}')>🗑️</button></td></tr>`).join('')}</tbody></table>`}<div class=action-bar style="margin-top:12px"><input id=newNoteTitle placeholder="笔记标题" style=width:150px><input id=newNoteContent placeholder="笔记内容" style=width:250px><button class="btn btn-primary btn-sm" onclick=addNote()>➕ 添加</button></div>`;
+}
+async function addNote(){const t=$('newNoteTitle').value.trim(),c=$('newNoteContent').value.trim();if(!t)return;await req('POST',`${API}/notes`,{title:t,content:c});renderNotes()}
+async function delNote(id){if(!confirm('确定删除此笔记？'))return;await req('DELETE',`${API}/notes/${id}`);renderNotes()}
+async function editNote(id){const r=await req('GET',`${API}/notes`);const n=r.data?.find(x=>x.id===id);if(!n)return;
+  document.getElementById(`note-${id}`).innerHTML=`<td colspan=3><div class=inline-edit><input id=editNoteTitle-${id} value="${es(n.title)}" placeholder=标题><input id=editNoteContent-${id} value="${es(n.content||'')}" placeholder=内容 style=flex:2><button class="btn btn-success btn-sm" onclick=saveNote('${id}')>💾</button><button class="btn btn-outline btn-sm" onclick=renderNotes()>取消</button></div></td>`
+}
+async function saveNote(id){const t=$(`editNoteTitle-${id}`).value.trim(),c=$(`editNoteContent-${id}`).value.trim();if(!t)return;await req('PUT',`${API}/notes/${id}`,{title:t,content:c});renderNotes()}
+
+// ====== 备份 ======
+async function renderBackup(){$('tabContent').innerHTML=`
+  <div class=backup-section><h3>📥 导出</h3><p>导出全部数据为 JSON 文件</p><button class="btn btn-primary" id=exportBtn>导出全部数据</button></div>
+  <div class=backup-section><h3>📤 导入</h3><p>从 JSON 文件恢复数据，会覆盖现有数据</p><input type=file id=importFile accept=.json style="margin-bottom:8px;font-size:13px"><button class="btn btn-danger" id=importBtn disabled>恢复数据</button><div id=importMsg></div></div>
+  <div class=backup-section><h3>🔄 重置</h3><p style=color:#f87171>清空全部数据，不可撤销</p><button class="btn btn-danger" id=resetBtn>清空全部数据</button></div>`;
+  $('exportBtn').onclick=async()=>{const r=await fetch(`${API}/data`,{headers:{}});if(!r.ok)return;const d=await r.json();const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`nav-${new Date().toISOString().slice(0,10)}.json`;a.click()};
+  $('importFile').onchange=()=>{$('importBtn').disabled=false};$('resetBtn').onclick=async()=>{if(!confirm('确定清空全部数据？')||!confirm('再次确认！'))return;const e={settings:{title:'Clean Nav',wallpaper:'',wallpaperType:'local',wallpaperList:[],blurLevel:'medium'},categories:[],todos:[],notes:[]};await req('PUT',`${API}/data`,e);alert('✅ 已清空')};
+  $('importBtn').onclick=async()=>{const f=$('importFile').files[0];if(!f)return;if(!confirm('导入将覆盖现有数据，确定？'))return;const t=await f.text();const b=$('importBtn');b.disabled=true;b.textContent='恢复中...';const{ok,data}=await req('PUT',`${API}/data`,JSON.parse(t));b.disabled=false;b.textContent='恢复数据';$('importMsg').className=ok?'alert alert-success':'alert alert-danger';$('importMsg').textContent=ok?'✅ 已恢复':'❌ '+(data.error||'')};
 }
 
-function renderLogin() {
-  $('content').innerHTML = `
-    <h1>🔑 Nav Server</h1>
-    <div class="subtitle">管理员登录</div>
-    <label>管理员密码</label>
-    <input type="password" id="loginPw" placeholder="输入管理员密码" autocomplete="current-password">
-    <button class="btn btn-primary" id="loginBtn">登录</button>
-    <div id="loginErr" class="hidden" style="margin-top:12px;color:#f87171;font-size:13px;"></div>
-  `;
-  $('loginBtn').onclick = doLogin;
-  $('loginPw').onkeydown = e => { if (e.key === 'Enter') doLogin(); };
+// ====== 日志 ======
+async function renderLogs(){$('tabContent').innerHTML='<div class=spinner style="margin:20px auto"></div>';
+  const r=await req('GET',`${API}/admin/logs?lines=300`);const l=r.data?.lines||[];
+  $('tabContent').innerHTML=`<div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style=font-size:12px;color:#a1a1aa>最近${l.length}条</span><button class="btn btn-outline btn-sm" onclick=renderLogs()>🔄</button></div><div style=background:#09090b;border:1px solid #27272a;border-radius:8px;padding:10px;max-height:500px;overflow-y:auto>${l.length===0?'<p style=color:#52525b;text-align:center>暂无日志</p>':l.map(x=>{const m=x.match(/\[(INFO|WARN|ERROR)\]/);return `<div class="log-line ${m?`log-${m[1]}`:''}">${es(x)}</div>`}).join('')}</div>`;
 }
 
-async function doLogin() {
-  const pw = $('loginPw').value;
-  if (!pw) return;
-  const btn = $('loginBtn'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> 登录中...';
-  const { ok, data } = await req('POST', '/login', { password: pw });
-  if (ok) { location.reload(); }
-  else {
-    btn.disabled = false; btn.textContent = '登录';
-    $('loginErr').className = ''; $('loginErr').textContent = data.error === '密码错误' ? '密码错误' : (data.error || '登录失败');
-  }
-}
-
-function renderDashboard(token) {
-  $('content').innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:flex-start">
-      <div>
-        <h1>⚙️ Nav Server</h1>
-        <div class="subtitle" style="margin-bottom:0">管理面板</div>
-      </div>
-      <button class="btn btn-outline btn-sm" onclick="doLogout()">退出</button>
-    </div>
-
-    <div style="background:#27272a;border-radius:8px;padding:14px;margin:20px 0 16px">
-      <div class="info-row"><span class="info-label">服务状态</span><span class="badge-green">运行中</span></div>
-      <div class="info-row"><span class="info-label">API 端点</span><code style="color:#a5b4fc;font-size:12px">/api/v1</code></div>
-    </div>
-
-    <label>API 令牌（前端连接用）</label>
-    <div class="token-box">
-      ${escapeHtml(token)}
-      <button class="copy-btn" onclick="navigator.clipboard.writeText('${escapeHtml(token)}');this.textContent='已复制'">复制</button>
-    </div>
-
-    <button class="btn btn-danger" id="regenBtn">🔄 重新生成令牌</button>
-    <div id="regenMsg" class="hidden"></div>
-  `;
-
-  $('regenBtn').onclick = async () => {
-    if (!confirm('重新生成后，旧令牌立即失效，前端需要更新配置。确定吗？')) return;
-    const btn = $('regenBtn'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> 生成中...';
-    const { ok, data } = await req('POST', '/api-token');
-    if (ok) {
-      $('regenMsg').className = 'alert alert-success';
-      $('regenMsg').innerHTML = `✅ 新令牌：<strong>${escapeHtml(data.token)}</strong>（已自动复制）`;
-      navigator.clipboard.writeText(data.token);
-      renderDashboard(data.token);
-    } else {
-      btn.disabled = false; btn.textContent = '🔄 重新生成令牌';
-      $('regenMsg').className = 'alert alert-danger';
-      $('regenMsg').textContent = data.error || '操作失败';
-    }
-  };
-}
-
-async function doLogout() {
-  await req('POST', '/logout');
-  location.reload();
-}
-
-function escapeHtml(str) {
-  const d = document.createElement('div'); d.textContent = str; return d.innerHTML;
-}
-
-// ===== 启动 =====
-
-(async () => {
-  const { data } = await req('GET', '/status');
-
-  if (data.setupRequired) {
-    renderSetup();
-  } else if (!data.loggedIn) {
-    renderLogin();
-  } else {
-    const tokRes = await req('GET', '/api-token');
-    renderDashboard(tokRes.data.token || '(无法获取)');
-  }
+// ====== 启动 ======
+(async()=>{const{data}=await req('GET',`${AUTH}/status`);
+  if(data.setupRequired)renderSetup();else if(!data.loggedIn)renderLogin();else renderDashboard('overview')
 })();
-</script>
-</body>
-</html>
+</script></body></html>

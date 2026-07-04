@@ -1,7 +1,7 @@
 import { createMiddleware } from 'hono/factory';
 import { getCookie } from 'hono/cookie';
 import { createHmac, randomBytes } from 'node:crypto';
-import { hasAdminPassword, getApiToken } from '../services/admin-service.ts';
+import { hasAdminPassword, getApiToken, getSessionSecret } from '../services/admin-service.ts';
 
 // 启动时生成随机 fallback secret，容器重启后旧 session 失效
 const SESSION_SECRET = process.env.SESSION_SECRET ?? randomBytes(32).toString('hex');
@@ -17,7 +17,7 @@ export function signAdminSession(value: string): string {
 }
 
 /** 验证会话签名，通过返回 true，过期或无效返回 false */
-function verifySession(cookieValue: string, secret: string): boolean {
+export function verifySession(cookieValue: string, secret: string): boolean {
   const parts = cookieValue.split(':');
   if (parts.length !== 2) return false;
   const [expiresStr, hmac] = parts;
@@ -65,6 +65,13 @@ export const adminAuthMiddleware = createMiddleware(async (c, next) => {
   }
 
   // 验证 session
+  const sessionSecret = getSessionSecret();
+  if (sessionSecret && verifySession(cookieValue, sessionSecret)) {
+    await next();
+    return;
+  }
+
+  // 兼容旧版：用 API token 验证
   const apiToken = getApiToken();
   if (apiToken && verifySession(cookieValue, apiToken)) {
     await next();

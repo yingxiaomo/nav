@@ -23,9 +23,9 @@ WORKDIR /app
 
 # 后端依赖（better-sqlite3 需要编译，需安装 Python）
 COPY server/package.json server/package-lock.json ./
-RUN apk add --no-cache python3 make g++ && \
+RUN apk add --no-cache --virtual .build-deps python3 make g++ && \
     npm ci --omit=dev && \
-    apk del python3 make g++ && \
+    apk del .build-deps && \
     npm cache clean --force
 
 # 前端静态文件（Hono 以 ./public/ 根目录 serve）

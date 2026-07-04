@@ -2,11 +2,13 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
-import { signAdminSession } from '../middleware/admin-auth.ts';
+import { signAdminSession, verifySession } from '../middleware/admin-auth.ts';
 import {
   hasAdminPassword, verifyAdminPassword, saveAdminPassword,
   hasApiToken, getApiToken, verifyApiToken, generateApiToken, saveApiToken,
+  rotateSessionSecret, getSessionSecret,
 } from '../services/admin-service.ts';
+import { info, warn } from '../services/logger.ts';
 
 const authRoutes = new Hono();
 const SESSION_COOKIE = 'admin_web_session';
@@ -44,14 +46,20 @@ function checkSession(c: Parameters<typeof authRoutes.get>[1] extends (...a: inf
   const cookieValue = getCookie(c, SESSION_COOKIE);
   if (!cookieValue) return false;
 
-  // 对比环境变量密码
-  if (process.env.ROOT_PASSWORD && cookieValue === signAdminSession(process.env.ROOT_PASSWORD)) {
+  // 用 DB 中的会话密钥验证 session
+  const sessionSecret = getSessionSecret();
+  if (sessionSecret && verifySession(cookieValue, sessionSecret)) {
     return true;
   }
 
-  // 对比 API token（作为 session 签名因子）
+  // 用 API token 验证 session（兼容旧版）
   const apiToken = getApiToken();
-  if (apiToken && cookieValue === signAdminSession(apiToken)) {
+  if (apiToken && verifySession(cookieValue, apiToken)) {
+    return true;
+  }
+
+  // 用环境变量密码验证 session
+  if (process.env.ROOT_PASSWORD && verifySession(cookieValue, process.env.ROOT_PASSWORD)) {
     return true;
   }
 
@@ -72,41 +80,23 @@ authRoutes.get('/status', async (c) => {
   });
 });
 
-// ===== POST /api/v1/auth/setup — 首次配置（创建管理员密码 + API 令牌）=====
+// ===== POST /api/v1/auth/setup — 首次配置（仅创建管理员密码）=====
 
 const setupSchema = z.object({
   password: z.string().min(6, '密码至少 6 位'),
-  token: z.string().optional(), // 可选：自定义 API 令牌
 });
 
 authRoutes.post('/setup', zValidator('json', setupSchema), async (c) => {
   if (hasAdminPassword()) {
+    warn(`setup rejected — already configured`);
     return c.json({ error: '管理员密码已配置，不能重复初始化' }, 400);
   }
 
-  const body = c.req.valid('json');
+  const { password } = c.req.valid('json');
+  saveAdminPassword(password);
+  info('[auth] setup complete — admin password saved');
 
-  // 创建管理员密码
-  saveAdminPassword(body.password);
-
-  // 生成 API 令牌
-  const apiToken = body.token ?? generateApiToken();
-  saveApiToken(apiToken);
-
-  // 自动登录
-  setCookie(c, SESSION_COOKIE, signAdminSession(apiToken), {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'Lax',
-    path: '/',
-    maxAge: 86400 * 7,
-  });
-
-  return c.json({
-    success: true,
-    token: apiToken,
-    message: '管理员密码和 API 令牌已配置，请保存此令牌',
-  }, 201);
+  return c.json({ success: true }, 201);
 });
 
 // ===== POST /api/v1/auth/login — 管理员登录 =====
@@ -117,29 +107,32 @@ const loginSchema = z.object({
 
 authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
   const { password } = c.req.valid('json');
+  const ip = c.req.header('x-forwarded-for') ?? c.req.header('cf-connecting-ip') ?? 'unknown';
 
   if (!hasAdminPassword()) {
+    warn(`[auth] login failed — no admin password configured (ip=${ip})`);
     return c.json({ error: '管理员密码未配置，请先完成初始化', setupRequired: true }, 400);
   }
 
   // 限流检查
-  const ip = c.req.header('x-forwarded-for') ?? c.req.header('cf-connecting-ip') ?? 'unknown';
   if (!checkRateLimit(ip)) {
+    warn(`[auth] login rate limited (ip=${ip})`);
     return c.json({ error: '登录尝试过于频繁，请 15 分钟后再试' }, 429);
   }
 
   if (!verifyAdminPassword(password)) {
     recordAttempt(ip, false);
+    warn(`[auth] login failed — wrong password (ip=${ip})`);
     return c.json({ error: '密码错误' }, 401);
   }
 
   recordAttempt(ip, true);
 
-  // 用 API token 签名 session
-  const apiToken = getApiToken();
-  const sessionValue = apiToken ? signAdminSession(apiToken) : signAdminSession(password);
+  // 生成会话密钥并签名
+  const secret = rotateSessionSecret();
+  info(`[auth] login success (ip=${ip})`);
 
-  setCookie(c, SESSION_COOKIE, sessionValue, {
+  setCookie(c, SESSION_COOKIE, signAdminSession(secret), {
     httpOnly: true,
     secure: true,
     sameSite: 'Lax',
@@ -153,6 +146,7 @@ authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
 // ===== POST /api/v1/auth/logout =====
 
 authRoutes.post('/logout', async (c) => {
+  rotateSessionSecret(); // 使所有现有 session 失效
   deleteCookie(c, SESSION_COOKIE, { path: '/' });
   return c.json({ success: true });
 });
@@ -175,15 +169,7 @@ authRoutes.post('/api-token', async (c) => {
 
   const newToken = generateApiToken();
   saveApiToken(newToken);
-
-  // 刷新 session
-  setCookie(c, SESSION_COOKIE, signAdminSession(newToken), {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'Lax',
-    path: '/',
-    maxAge: 86400 * 7,
-  });
+  info('[auth] API token regenerated');
 
   return c.json({
     success: true,

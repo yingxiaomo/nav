@@ -127,6 +127,10 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
         });
       } else if (config.type === 'api-server') {
         const settings = config.apiServer || DEFAULT_APISERVER;
+        if (!settings.baseUrl) {
+          toast.error("连接失败", { description: "请填写后端地址" });
+          return;
+        }
         const adapter = new ApiServerAdapter(settings);
         if (adapter.testConnection) await adapter.testConnection();
         toast.success("后端连接成功！", {
@@ -141,6 +145,33 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
     } finally {
       setIsTesting(false);
     }
+  };
+
+  const handleResetDefault = async () => {
+    if (!confirm("确定恢复默认模板？所有当前书签将被默认模板覆盖。")) return;
+    if (!confirm("再次确认：当前数据将被替换！")) return;
+    try {
+      const res = await fetch("/data.json");
+      if (!res.ok) { toast.error("无法加载默认模板"); return; }
+      const template = await res.json();
+      const clean = { ...template, todos: [], notes: [] };
+      localStorage.setItem("clean-nav-local-data", JSON.stringify(clean));
+      toast.success("默认模板已加载，请点击上方的「保存」按钮同步到云端");
+      window.location.reload();
+    } catch {
+      toast.error("恢复失败");
+    }
+  };
+  const handleClearAll = () => {
+    if (!confirm("将清空模板文件在内的所有书签，此操作不可撤销，确定吗？")) return;
+    if (!confirm("再次确认：所有书签、待办、笔记将被永久删除！")) return;
+    const empty = {
+      settings: { title: "Clean Nav", wallpaper: "", wallpaperType: "local", blurLevel: "medium", wallpaperList: [], showFeatures: true, homeLayout: "folder" },
+      categories: [], todos: [], notes: [],
+    };
+    localStorage.setItem("clean-nav-local-data", JSON.stringify(empty));
+    toast.success("已清空全部数据，点击上方的「保存」同步到云端");
+    window.location.reload();
   };
 
   const githubCfg = config.github || DEFAULT_GITHUB;
@@ -501,6 +532,27 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
             )}
             {isTesting ? "正在测试连接..." : "测试连接配置"}
         </Button>
+
+        <div className="pt-2">
+            <Button
+                variant="outline"
+                className="w-full gap-2 text-red-500 hover:text-red-400 border-red-500/30 hover:border-red-500/50"
+                onClick={handleResetDefault}
+            >
+                <AlertCircle className="w-4 h-4" />
+                恢复默认模板
+            </Button>
+        </div>
+        <div className="pt-2">
+            <Button
+                variant="outline"
+                className="w-full gap-2 text-destructive hover:text-destructive border-destructive/30"
+                onClick={handleClearAll}
+            >
+                <AlertCircle className="w-4 h-4" />
+                清空所有书签
+            </Button>
+        </div>
       </div>
     </div>
   );

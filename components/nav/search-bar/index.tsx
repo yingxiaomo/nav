@@ -159,7 +159,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
               const token = sc.apiServer.token;
               const headers: Record<string, string> = {};
               if (token) headers['Authorization'] = `Bearer ${token}`;
-              const res = await fetch(`${baseUrl}/api/v1/suggest?q=${encodeURIComponent(val.trim())}&source=duckduckgo`, { headers });
+              const res = await fetch(`${baseUrl}/api/v1/suggest?q=${encodeURIComponent(val.trim())}&source=google`, { headers });
               if (res.ok) {
                 const data = await res.json();
                 setWebSuggestions(data.suggestions || []);
@@ -293,6 +293,8 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
                 if (e.url === "local") onLocalSearch?.(query);
                 else onLocalSearch?.("");
                 closeDropdown();
+                // 切换引擎后聚焦回输入框，支持回车搜索
+                setTimeout(() => (ref as React.RefObject<HTMLInputElement>)?.current?.focus(), 0);
               }}
               aria-label={`切换搜索引擎为 ${e.name}`}
               aria-pressed={engine.name === e.name}

@@ -6,6 +6,25 @@ import { randomBytes, createHash } from 'node:crypto';
 const ADMIN_PW_KEY = 'admin_password_hash';
 const API_TOKEN_KEY = 'api_token';
 const SALT_KEY = 'admin_salt';
+const SESSION_KEY = 'admin_session_secret';
+
+// ===== 会话密钥（管理后台登录用）=====
+
+/** 生成并持久化会话密钥，返回密钥值 */
+export function rotateSessionSecret(): string {
+  const secret = randomBytes(32).toString('hex');
+  db.insert(settings)
+    .values({ key: SESSION_KEY, value: secret })
+    .onConflictDoUpdate({ target: settings.key, set: { value: secret } })
+    .run();
+  return secret;
+}
+
+/** 获取当前会话密钥 */
+export function getSessionSecret(): string | null {
+  const row = db.select().from(settings).where(eq(settings.key, SESSION_KEY)).get();
+  return row?.value ?? null;
+}
 
 // ===== 管理后台密码（用于登录管理页面）=====
 

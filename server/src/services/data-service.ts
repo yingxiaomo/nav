@@ -67,7 +67,6 @@ function toSiteSettings(rows: Array<typeof settingsTable.$inferSelect>): SiteSet
     wallpaperType: (map.get('wallpaperType') as SiteSettings['wallpaperType']) ?? 'local',
     wallpaperList: (map.get('wallpaperList') as string[]) ?? [],
     blurLevel: (map.get('blurLevel') as SiteSettings['blurLevel']) ?? 'medium',
-    maxPackedWallpapers: map.get('maxPackedWallpapers') as number | undefined,
     showFeatures: map.get('showFeatures') as boolean | undefined,
     homeLayout: map.get('homeLayout') as SiteSettings['homeLayout'] | undefined,
     theme: map.get('theme') as SiteSettings['theme'] | undefined,

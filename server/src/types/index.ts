@@ -61,7 +61,6 @@ export interface SiteSettings {
   wallpaperType: 'custom' | 'local' | 'bing' | 'url';
   wallpaperList: string[];
   blurLevel: 'low' | 'medium' | 'high';
-  maxPackedWallpapers?: number;
   showFeatures?: boolean;
   homeLayout?: 'folder' | 'list' | 'sidebar';
   theme?: 'light' | 'dark' | 'system';

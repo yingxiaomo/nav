@@ -467,7 +467,6 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
                <div className="flex items-center justify-between">
                  <Label className="text-xs text-muted-foreground">随机打包数量</Label>
                  <span className="text-xs font-mono bg-background px-2 py-0.5 rounded border">
-                    当前: {localData.settings.maxPackedWallpapers || 10} 张
                  </span>
                </div>
                <div className="flex gap-2 items-center">
@@ -475,11 +474,9 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
                     type="number"
                     min={1}
                     max={50}
-                    value={localData.settings.maxPackedWallpapers || 10}
                     onChange={e => {
                       const val = parseInt(e.target.value);
                       if (!isNaN(val) && val > 0) {
-                        setLocalData({...localData, settings: {...localData.settings, maxPackedWallpapers: val}})
                       }
                     }}
                     className="h-8 text-sm"

@@ -20,6 +20,7 @@ RUN npm prune --omit=dev && npm cache clean --force
 # 从构建阶段复制源码和迁移文件
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/drizzle ./drizzle
+COPY --from=builder /app/public ./public
 
 # 数据目录
 RUN mkdir -p /app/data/uploads

@@ -1,7 +1,7 @@
 ﻿import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import { db } from '../db/index.ts';
+import { db, sqlite } from '../db/index.ts';
 import { bookmarks, categories } from '../db/schema.ts';
 import { eq, and, asc } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
@@ -11,7 +11,10 @@ const bookmarkRoutes = new Hono();
 const createSchema = z.object({
   categoryId: z.string().min(1),
   title: z.string().min(1, '标题不能为空'),
-  url: z.string().min(1, '链接不能为空'),
+  url: z.string().url('链接格式无效').refine(
+    (u) => u.startsWith('http://') || u.startsWith('https://'),
+    { message: '仅允许 http/https 链接' },
+  ),
   icon: z.string().optional(),
   description: z.string().optional(),
 });
@@ -97,6 +100,12 @@ bookmarkRoutes.put('/:id', zValidator('json', updateSchema), async (c) => {
 
   if (!existing) return c.json({ error: '书签不存在' }, 404);
 
+  // 如果更换了分类，验证目标分类存在
+  if (body.categoryId && body.categoryId !== existing.categoryId) {
+    const cat = await db.select().from(categories).where(eq(categories.id, body.categoryId)).get();
+    if (!cat) return c.json({ error: '目标分类不存在' }, 400);
+  }
+
   await db
     .update(bookmarks)
     .set({
@@ -138,16 +147,19 @@ bookmarkRoutes.patch('/reorder', zValidator('json', z.object({
   items: z.array(z.object({
     id: z.string(),
     order: z.number(),
-  })),
+  })).max(500, '单次排序数量不能超过 500'),
 })), async (c) => {
   const { items } = c.req.valid('json');
 
-  for (const item of items) {
-    await db
-      .update(bookmarks)
-      .set({ order: item.order })
-      .where(eq(bookmarks.id, item.id));
-  }
+  sqlite.transaction(() => {
+    for (const item of items) {
+      db
+        .update(bookmarks)
+        .set({ order: item.order })
+        .where(eq(bookmarks.id, item.id))
+        .run();
+    }
+  })();
 
   return c.json({ success: true });
 });

@@ -1,4 +1,4 @@
-﻿import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
+﻿import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
 
 // ===== 分类表 =====
 export const categories = sqliteTable('categories', {
@@ -7,7 +7,9 @@ export const categories = sqliteTable('categories', {
   icon: text('icon'),
   order: integer('order').notNull().default(0),
   createdAt: integer('created_at').notNull(),
-});
+}, (table) => ({
+  orderIdx: index('idx_categories_order').on(table.order),
+}));
 
 // ===== 书签表 =====
 export const bookmarks = sqliteTable('bookmarks', {
@@ -21,7 +23,10 @@ export const bookmarks = sqliteTable('bookmarks', {
   description: text('description'),
   order: integer('order').notNull().default(0),
   createdAt: integer('created_at').notNull(),
-});
+}, (table) => ({
+  categoryIdx: index('idx_bookmarks_category').on(table.categoryId),
+  categoryOrderIdx: index('idx_bookmarks_cat_order').on(table.categoryId, table.order),
+}));
 
 // ===== 配置表（键值对，值统一存 JSON 字符串）=====
 export const settings = sqliteTable('settings', {

@@ -1,14 +1,39 @@
 import { createMiddleware } from 'hono/factory';
 import { getCookie } from 'hono/cookie';
-import { createHmac } from 'node:crypto';
-import { hasAdminPassword } from '../services/admin-service.ts';
+import { createHmac, randomBytes } from 'node:crypto';
+import { hasAdminPassword, getApiToken } from '../services/admin-service.ts';
 
-const SESSION_SECRET = process.env.SESSION_SECRET ?? 'nav-admin-web-session';
+// 启动时生成随机 fallback secret，容器重启后旧 session 失效
+const SESSION_SECRET = process.env.SESSION_SECRET ?? randomBytes(32).toString('hex');
 const SESSION_COOKIE = 'admin_web_session';
+const SESSION_TTL = 7 * 24 * 60 * 60 * 1000; // 7 天
 
-/** 生成会话签名 */
-export function signAdminSession(password: string): string {
-  return createHmac('sha256', SESSION_SECRET).update(password).digest('hex');
+/** 生成会话签名（内嵌过期时间） */
+export function signAdminSession(value: string): string {
+  const expires = Date.now() + SESSION_TTL;
+  const payload = `${expires}:${value}`;
+  const hmac = createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+  return `${expires}:${hmac}`;
+}
+
+/** 验证会话签名，通过返回 true，过期或无效返回 false */
+function verifySession(cookieValue: string, secret: string): boolean {
+  const parts = cookieValue.split(':');
+  if (parts.length !== 2) return false;
+  const [expiresStr, hmac] = parts;
+  const expires = parseInt(expiresStr, 10);
+  if (isNaN(expires) || Date.now() > expires) return false;
+
+  const payload = `${expiresStr}:${secret}`;
+  const expected = createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+  if (hmac.length !== expected.length) return false;
+
+  // 恒定时间比较
+  let result = 0;
+  for (let i = 0; i < hmac.length; i++) {
+    result |= hmac.charCodeAt(i) ^ expected.charCodeAt(i);
+  }
+  return result === 0;
 }
 
 /**
@@ -39,16 +64,14 @@ export const adminAuthMiddleware = createMiddleware(async (c, next) => {
     return c.json({ error: '未登录，请先登录管理后台' }, 401);
   }
 
-  // 验证 session（从 DB 或 env 读取密码来签名比对）
-  const { getApiToken } = await import('../services/admin-service.ts');
-  const token = getApiToken();
-  if (token && cookieValue === signAdminSession(token)) {
+  // 验证 session
+  const apiToken = getApiToken();
+  if (apiToken && verifySession(cookieValue, apiToken)) {
     await next();
     return;
   }
 
-  // 也允许通过环境变量密码登录的会话
-  if (process.env.ROOT_PASSWORD && cookieValue === signAdminSession(process.env.ROOT_PASSWORD)) {
+  if (process.env.ROOT_PASSWORD && verifySession(cookieValue, process.env.ROOT_PASSWORD)) {
     await next();
     return;
   }

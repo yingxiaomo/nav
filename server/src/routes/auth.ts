@@ -11,6 +11,34 @@ import {
 const authRoutes = new Hono();
 const SESSION_COOKIE = 'admin_web_session';
 
+// ===== 登录频率限制（内存中，重启重置）=====
+const loginAttempts = new Map<string, { count: number; until: number }>();
+const MAX_ATTEMPTS = 5;
+const BLOCK_DURATION = 15 * 60 * 1000; // 15 分钟
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (entry && entry.until > now) return false; // 还处于封锁期
+  if (entry && entry.until <= now) loginAttempts.delete(ip); // 封锁期过了
+  return true;
+}
+
+function recordAttempt(ip: string, success: boolean): void {
+  if (success) {
+    loginAttempts.delete(ip);
+    return;
+  }
+  const now = Date.now();
+  const entry = loginAttempts.get(ip) ?? { count: 0, until: now };
+  entry.count++;
+  if (entry.count >= MAX_ATTEMPTS) {
+    entry.until = now + BLOCK_DURATION;
+    entry.count = 0;
+  }
+  loginAttempts.set(ip, entry);
+}
+
 /** 检查当前请求的 admin session 是否有效 */
 function checkSession(c: Parameters<typeof authRoutes.get>[1] extends (...a: infer A) => unknown ? A[0] : never): boolean {
   const cookieValue = getCookie(c, SESSION_COOKIE);
@@ -68,6 +96,7 @@ authRoutes.post('/setup', zValidator('json', setupSchema), async (c) => {
   // 自动登录
   setCookie(c, SESSION_COOKIE, signAdminSession(apiToken), {
     httpOnly: true,
+    secure: true,
     sameSite: 'Lax',
     path: '/',
     maxAge: 86400 * 7,
@@ -93,9 +122,18 @@ authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
     return c.json({ error: '管理员密码未配置，请先完成初始化', setupRequired: true }, 400);
   }
 
+  // 限流检查
+  const ip = c.req.header('x-forwarded-for') ?? c.req.header('cf-connecting-ip') ?? 'unknown';
+  if (!checkRateLimit(ip)) {
+    return c.json({ error: '登录尝试过于频繁，请 15 分钟后再试' }, 429);
+  }
+
   if (!verifyAdminPassword(password)) {
+    recordAttempt(ip, false);
     return c.json({ error: '密码错误' }, 401);
   }
+
+  recordAttempt(ip, true);
 
   // 用 API token 签名 session
   const apiToken = getApiToken();
@@ -103,6 +141,7 @@ authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
 
   setCookie(c, SESSION_COOKIE, sessionValue, {
     httpOnly: true,
+    secure: true,
     sameSite: 'Lax',
     path: '/',
     maxAge: 86400 * 7,
@@ -140,6 +179,7 @@ authRoutes.post('/api-token', async (c) => {
   // 刷新 session
   setCookie(c, SESSION_COOKIE, signAdminSession(newToken), {
     httpOnly: true,
+    secure: true,
     sameSite: 'Lax',
     path: '/',
     maxAge: 86400 * 7,

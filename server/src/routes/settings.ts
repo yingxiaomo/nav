@@ -1,11 +1,21 @@
 ﻿import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import { db } from '../db/index.ts';
+import { db, sqlite } from '../db/index.ts';
 import { settings } from '../db/schema.ts';
 import { eq } from 'drizzle-orm';
 
 const settingRoutes = new Hono();
+
+/** 禁止通过 API 覆盖的内部键 */
+const PROTECTED_KEYS = new Set(['api_token', 'admin_password_hash', 'admin_salt']);
+
+function stripProtected(body: Record<string, unknown>): Record<string, unknown> {
+  for (const key of Object.keys(body)) {
+    if (PROTECTED_KEYS.has(key)) delete body[key];
+  }
+  return body;
+}
 
 // ===== GET /api/v1/settings - 获取所有配置 =====
 settingRoutes.get('/', async (c) => {
@@ -42,15 +52,16 @@ settingRoutes.get('/:key', async (c) => {
 
 // ===== PUT /api/v1/settings - 批量更新配置 =====
 settingRoutes.put('/', zValidator('json', z.record(z.unknown())), async (c) => {
-  const body = c.req.valid('json');
+  const body = stripProtected(c.req.valid('json'));
 
-  for (const [key, value] of Object.entries(body)) {
-    const valueStr = JSON.stringify(value);
-    await db
-      .insert(settings)
-      .values({ key, value: valueStr })
-      .onConflictDoUpdate({ target: settings.key, set: { value: valueStr } });
-  }
+  sqlite.transaction(() => {
+    for (const [key, value] of Object.entries(body)) {
+      const valueStr = JSON.stringify(value);
+      db.insert(settings).values({ key, value: valueStr })
+        .onConflictDoUpdate({ target: settings.key, set: { value: valueStr } })
+        .run();
+    }
+  })();
 
   return c.json({ success: true });
 });
@@ -58,6 +69,9 @@ settingRoutes.put('/', zValidator('json', z.record(z.unknown())), async (c) => {
 // ===== PUT /api/v1/settings/:key - 更新单个配置 =====
 settingRoutes.put('/:key', zValidator('json', z.unknown()), async (c) => {
   const { key } = c.req.param();
+  if (PROTECTED_KEYS.has(key)) {
+    return c.json({ error: '不允许修改系统内部配置' }, 403);
+  }
   const value = c.req.valid('json');
   const valueStr = JSON.stringify(value);
 

@@ -117,6 +117,17 @@ export async function getFullData(): Promise<DataSchema> {
 
 export function replaceFullData(data: DataSchema): void {
   sqlite.transaction(() => {
+    // 0. 备份内部密钥（admin 密码、session secret、api token），
+    //    避免被全量替换时清掉导致管理后台回到初始化页
+    const internalKeys = ['admin_password_hash', 'admin_session_secret', 'api_token'];
+    const preservedKeys: Array<{ key: string; value: string }> = [];
+    try {
+      const rows = sqlite.prepare(
+        `SELECT key, value FROM settings WHERE key IN (${internalKeys.map(() => '?').join(',')})`
+      ).all(...internalKeys) as Array<{ key: string; value: string }>;
+      preservedKeys.push(...rows);
+    } catch { /* 表可能还不存在，忽略 */ }
+
     // 1. 清空旧数据（注意外键顺序）
     db.delete(bookmarksTable).run();
     db.delete(categoriesTable).run();
@@ -186,6 +197,13 @@ export function replaceFullData(data: DataSchema): void {
         key,
         value: JSON.stringify(value),
       }).run();
+    }
+
+    // 6. 恢复内部密钥（admin 密码、session secret、api token）
+    for (const row of preservedKeys) {
+      db.insert(settingsTable).values({ key: row.key, value: row.value })
+        .onConflictDoUpdate({ target: settingsTable.key, set: { value: row.value } })
+        .run();
     }
   })();
 }

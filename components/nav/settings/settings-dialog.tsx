@@ -129,7 +129,7 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
           </TabsContent>
 
           <TabsContent value="storage" className="flex-1 flex flex-col min-h-0 data-[state=active]:flex">
-             <StorageTab config={storageConfig} setConfig={setStorageConfig} />
+             <StorageTab config={storageConfig} setConfig={setStorageConfig} localData={localData} setLocalData={setLocalData} onSave={onSave} />
           </TabsContent>
         </Tabs>
 

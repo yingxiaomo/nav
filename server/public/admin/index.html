@@ -64,7 +64,9 @@ async function copyText(t){try{await navigator.clipboard.writeText(t);return tru
 
 function renderSetup(){
   document.getElementById('app').innerHTML=`<div class="card card-narrow"><h1>⚙️ Nav Server</h1><div class="subtitle">首次配置</div><label>管理员密码</label><input type=password id=pw1 placeholder="至少6位" autocomplete=new-password><label>确认密码</label><input type=password id=pw2 placeholder="再次输入" autocomplete=new-password><button class="btn btn-primary btn-block" id=setupBtn>创建管理员密码</button><div id=setupMsg class=hidden></div></div>`;
-  $('setupBtn').onclick=async()=>{const p1=$('pw1').value,p2=$('pw2').value;if(p1.length<6){$('setupMsg').className='alert alert-danger';$('setupMsg').textContent='密码至少6位';return}if(p1!==p2){$('setupMsg').className='alert alert-danger';$('setupMsg').textContent='两次密码不一致';return}const b=$('setupBtn');b.disabled=true;b.innerHTML='<span class=spinner></span> 配置中...';const{ok,data}=await req('POST',`${AUTH}/setup`,{password:p1});if(ok)location.reload();else{b.disabled=false;b.textContent='创建管理员密码';$('setupMsg').className='alert alert-danger';$('setupMsg').textContent=data.error||'配置失败'}}
+  $('setupBtn').onclick=async()=>{const p1=$('pw1').value,p2=$('pw2').value;if(p1.length<6){$('setupMsg').className='alert alert-danger';$('setupMsg').textContent='密码至少6位';return}if(p1!==p2){$('setupMsg').className='alert alert-danger';$('setupMsg').textContent='两次密码不一致';return}const b=$('setupBtn');b.disabled=true;b.innerHTML='<span class=spinner></span> 配置中...';const{ok,data}=await req('POST',`${AUTH}/setup`,{password:p1});if(ok)location.reload();else{b.disabled=false;b.textContent='创建管理员密码';$('setupMsg').className='alert alert-danger';$('setupMsg').textContent=data.error||'配置失败'}};
+  $('pw1').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('pw2').focus()}};
+  $('pw2').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('setupBtn').click()}}
 }
 
 function renderLogin(){

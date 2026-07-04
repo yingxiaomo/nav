@@ -8,10 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertCircle, Wifi, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import type { DataSchema } from "@/lib/types";
 
 interface StorageTabProps {
   config: StorageConfig;
   setConfig: (config: StorageConfig) => void;
+  localData: DataSchema;
+  setLocalData: (data: DataSchema) => void;
+  onSave: (newData: DataSchema) => Promise<void>;
 }
 
 const DEFAULT_GITHUB: GithubRepoSettings = { token: "", owner: "", repo: "", branch: "main", path: "public/data.json" };
@@ -22,8 +26,10 @@ const DEFAULT_DROPBOX: DropboxSettings = { token: "", path: "/nav-data.json" };
 const DEFAULT_GOOGLE_DRIVE: GoogleDriveSettings = { token: "", fileId: "", filename: "nav-data.json" };
 const DEFAULT_APISERVER: ApiServerSettings = { baseUrl: "", token: "" };
 
-export function StorageTab({ config, setConfig }: StorageTabProps) {
+export function StorageTab({ config, setConfig, localData, setLocalData, onSave }: StorageTabProps) {
   const [isTesting, setIsTesting] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
@@ -149,28 +155,50 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
   const handleResetDefault = async () => {
     if (!confirm("确定恢复默认模板？所有当前书签将被默认模板覆盖。")) return;
     if (!confirm("再次确认：当前数据将被替换！")) return;
+    setIsResetting(true);
     try {
       const res = await fetch("/data.json");
-      if (!res.ok) { toast.error("无法加载默认模板"); return; }
+      if (!res.ok) { toast.error("无法加载默认模板"); setIsResetting(false); return; }
       const template = await res.json();
-      const clean = { ...template, todos: [], notes: [] };
-      localStorage.setItem("clean-nav-local-data", JSON.stringify(clean));
-      toast.success("默认模板已加载，请点击上方的「保存」按钮同步到云端");
+      // 保留当前设置（主题、壁纸、存储配置等），只替换书签数据
+      const merged: DataSchema = {
+        ...template,
+        settings: { ...localData.settings, ...template.settings, wallpaperList: localData.settings.wallpaperList || template.settings.wallpaperList },
+        todos: [],
+        notes: [],
+      };
+      setLocalData(merged);
+      localStorage.setItem("clean-nav-local-data", JSON.stringify(merged));
+      await onSave(merged);
+      toast.success("已恢复默认模板并同步到云端");
       window.location.reload();
     } catch {
-      toast.error("恢复失败");
+      toast.error("恢复失败，请稍后重试");
+      setIsResetting(false);
     }
   };
-  const handleClearAll = () => {
-    if (!confirm("将清空模板文件在内的所有书签，此操作不可撤销，确定吗？")) return;
+  const handleClearAll = async () => {
+    if (!confirm("将清空所有书签、待办和笔记，此操作不可撤销，确定吗？")) return;
     if (!confirm("再次确认：所有书签、待办、笔记将被永久删除！")) return;
-    const empty = {
-      settings: { title: "Clean Nav", wallpaper: "", wallpaperType: "local", blurLevel: "medium", wallpaperList: [], showFeatures: true, homeLayout: "folder" },
-      categories: [], todos: [], notes: [],
-    };
-    localStorage.setItem("clean-nav-local-data", JSON.stringify(empty));
-    toast.success("已清空全部数据，点击上方的「保存」同步到云端");
-    window.location.reload();
+    setIsClearing(true);
+    try {
+      const cleared: DataSchema = {
+        ...localData,
+        categories: [],
+        todos: [],
+        notes: [],
+      };
+      // 保留壁纸列表
+      cleared.settings = { ...cleared.settings, wallpaperList: localData.settings.wallpaperList || [] };
+      setLocalData(cleared);
+      localStorage.setItem("clean-nav-local-data", JSON.stringify(cleared));
+      await onSave(cleared);
+      toast.success("已清空所有书签并同步到云端");
+      window.location.reload();
+    } catch {
+      toast.error("清空失败，请稍后重试");
+      setIsClearing(false);
+    }
   };
 
   const githubCfg = config.github || DEFAULT_GITHUB;
@@ -537,9 +565,14 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
                 variant="outline"
                 className="w-full gap-2 text-red-500 hover:text-red-400 border-red-500/30 hover:border-red-500/50"
                 onClick={handleResetDefault}
+                disabled={isResetting || isClearing}
             >
-                <AlertCircle className="w-4 h-4" />
-                恢复默认模板
+                {isResetting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                    <AlertCircle className="w-4 h-4" />
+                )}
+                {isResetting ? "正在恢复..." : "恢复默认模板"}
             </Button>
         </div>
         <div className="pt-2">
@@ -547,9 +580,14 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
                 variant="outline"
                 className="w-full gap-2 text-destructive hover:text-destructive border-destructive/30"
                 onClick={handleClearAll}
+                disabled={isClearing || isResetting}
             >
-                <AlertCircle className="w-4 h-4" />
-                清空所有书签
+                {isClearing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                    <AlertCircle className="w-4 h-4" />
+                )}
+                {isClearing ? "正在清空..." : "清空所有书签"}
             </Button>
         </div>
       </div>

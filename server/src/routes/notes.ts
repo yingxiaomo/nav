@@ -5,6 +5,7 @@ import { db } from '../db/index.ts';
 import { notes } from '../db/schema.ts';
 import { eq, desc } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { apiError } from '../utils/response.ts';
 
 const noteRoutes = new Hono();
 
@@ -33,7 +34,7 @@ noteRoutes.get('/:id', async (c) => {
     .where(eq(notes.id, id))
     .get();
 
-  if (!note) return c.json({ error: '笔记不存在' }, 404);
+  if (!note) return c.json(apiError('笔记不存在', 'NOT_FOUND'), 404);
   return c.json(note);
 });
 
@@ -64,7 +65,7 @@ noteRoutes.put('/:id', zValidator('json', updateSchema), async (c) => {
     .where(eq(notes.id, id))
     .get();
 
-  if (!existing) return c.json({ error: '笔记不存在' }, 404);
+  if (!existing) return c.json(apiError('笔记不存在', 'NOT_FOUND'), 404);
 
   await db
     .update(notes)
@@ -94,7 +95,7 @@ noteRoutes.delete('/:id', async (c) => {
     .where(eq(notes.id, id))
     .get();
 
-  if (!existing) return c.json({ error: '笔记不存在' }, 404);
+  if (!existing) return c.json(apiError('笔记不存在', 'NOT_FOUND'), 404);
 
   await db.delete(notes).where(eq(notes.id, id));
   return c.json({ success: true });

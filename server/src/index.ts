@@ -4,6 +4,7 @@ import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { authMiddleware } from './middleware/auth.ts';
 import { adminAuthMiddleware } from './middleware/admin-auth.ts';
+import { apiError } from './utils/response.ts';
 import categoryRoutes from './routes/categories.ts';
 import bookmarkRoutes from './routes/bookmarks.ts';
 import settingRoutes from './routes/settings.ts';
@@ -15,6 +16,7 @@ import parseRoutes from './routes/parse.ts';
 import suggestRoutes from './routes/suggest.ts';
 import authRoutes from './routes/auth.ts';
 import adminRoutes from './routes/admin.ts';
+import monitorRoutes from './routes/monitor.ts';
 
 const app = new Hono();
 
@@ -65,6 +67,13 @@ app.route('/api/v1/data', dataRoutes);
 app.route('/api/v1/parse', parseRoutes);
 app.route('/api/v1/suggest', suggestRoutes);
 app.route('/api/v1/admin', adminRoutes);
+app.route('/api/v1/admin/monitor', monitorRoutes);
+
+// ===== 全局错误处理 =====
+app.onError((err, c) => {
+  console.error(`[${c.req.method}] ${c.req.path}:`, err);
+  return c.json(apiError('服务器内部错误', 'INTERNAL_ERROR'), 500);
+});
 
 // ===== 前端静态文件（合体镜像模式，未匹配 API 的请求走这里）=====
 app.use('/*', serveStatic({ root: './public' }));

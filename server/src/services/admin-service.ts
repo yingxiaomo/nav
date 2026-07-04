@@ -1,11 +1,11 @@
 import { db } from '../db/index.ts';
 import { settings } from '../db/schema.ts';
 import { eq } from 'drizzle-orm';
-import { randomBytes, createHash } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
+import bcrypt from 'bcryptjs';
 
 const ADMIN_PW_KEY = 'admin_password_hash';
 const API_TOKEN_KEY = 'api_token';
-const SALT_KEY = 'admin_salt';
 const SESSION_KEY = 'admin_session_secret';
 
 // ===== 会话密钥（管理后台登录用）=====
@@ -28,26 +28,6 @@ export function getSessionSecret(): string | null {
 
 // ===== 管理后台密码（用于登录管理页面）=====
 
-function getSalt(): string {
-  // 优先使用环境变量中的固定 salt，保证重启后 hash 一致
-  if (process.env.ADMIN_SALT) return process.env.ADMIN_SALT;
-
-  const row = db.select().from(settings).where(eq(settings.key, SALT_KEY)).get();
-  if (row) return row.value;
-
-  // 自动生成 salt
-  const salt = randomBytes(16).toString('hex');
-  try {
-    db.insert(settings).values({ key: SALT_KEY, value: salt }).run();
-  } catch { /* 并发冲突忽略 */ }
-  return salt;
-}
-
-function hashPassword(password: string): string {
-  const salt = getSalt();
-  return createHash('sha256').update(salt + password).digest('hex');
-}
-
 /** 管理后台是否已配置密码 */
 export function hasAdminPassword(): boolean {
   if (process.env.ROOT_PASSWORD) return true;
@@ -55,34 +35,37 @@ export function hasAdminPassword(): boolean {
   return !!row;
 }
 
+/** 恒定时间比较 */
+function constantTimeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
 /** 验证管理后台密码 */
 export function verifyAdminPassword(input: string): boolean {
   const envPw = process.env.ROOT_PASSWORD;
   if (envPw) {
-    // 环境变量密码：直接比较
-    if (input.length !== envPw.length) return false;
-    let result = 0;
-    for (let i = 0; i < input.length; i++) {
-      result |= input.charCodeAt(i) ^ envPw.charCodeAt(i);
-    }
-    return result === 0;
+    // 环境变量密码：直接恒定时间比较
+    return constantTimeCompare(input, envPw);
   }
 
   const row = db.select().from(settings).where(eq(settings.key, ADMIN_PW_KEY)).get();
   if (!row) return false;
 
-  return row.value === hashPassword(input);
+  try {
+    return bcrypt.compareSync(input, row.value);
+  } catch {
+    return false;
+  }
 }
 
 /** 保存管理后台密码（首次配置用） */
 export function saveAdminPassword(password: string): void {
-  // 重新生成 salt，使之前的 hash 失效
-  const newSalt = randomBytes(16).toString('hex');
-  db.insert(settings).values({ key: SALT_KEY, value: newSalt })
-    .onConflictDoUpdate({ target: settings.key, set: { value: newSalt } })
-    .run();
-
-  const hashed = createHash('sha256').update(newSalt + password).digest('hex');
+  const hashed = bcrypt.hashSync(password, 10);
   db.insert(settings).values({ key: ADMIN_PW_KEY, value: hashed })
     .onConflictDoUpdate({ target: settings.key, set: { value: hashed } })
     .run();

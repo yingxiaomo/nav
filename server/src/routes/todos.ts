@@ -5,6 +5,7 @@ import { db } from '../db/index.ts';
 import { todos } from '../db/schema.ts';
 import { eq, asc } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { apiError } from '../utils/response.ts';
 
 const todoRoutes = new Hono();
 
@@ -53,7 +54,7 @@ todoRoutes.put('/:id', zValidator('json', updateSchema), async (c) => {
     .where(eq(todos.id, id))
     .get();
 
-  if (!existing) return c.json({ error: '待办不存在' }, 404);
+  if (!existing) return c.json(apiError('待办不存在', 'NOT_FOUND'), 404);
 
   await db
     .update(todos)
@@ -82,7 +83,7 @@ todoRoutes.delete('/:id', async (c) => {
     .where(eq(todos.id, id))
     .get();
 
-  if (!existing) return c.json({ error: '待办不存在' }, 404);
+  if (!existing) return c.json(apiError('待办不存在', 'NOT_FOUND'), 404);
 
   await db.delete(todos).where(eq(todos.id, id));
   return c.json({ success: true });

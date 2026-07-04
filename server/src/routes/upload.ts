@@ -4,6 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import fs from 'node:fs';
 import path from 'node:path';
 import { nanoid } from 'nanoid';
+import { apiError } from '../utils/response.ts';
 
 const uploadRoutes = new Hono();
 
@@ -43,18 +44,18 @@ uploadRoutes.post('/', async (c) => {
   const file = formData.get('file');
 
   if (!file || !(file instanceof File)) {
-    return c.json({ error: '请选择文件' }, 400);
+    return c.json(apiError('请选择文件'), 400);
   }
 
   if (file.size > MAX_SIZE) {
-    return c.json({ error: '文件大小不能超过 10MB' }, 400);
+    return c.json(apiError('文件大小不能超过 10MB'), 400);
   }
 
   // 读取文件头部检测真实类型（不信任 file.type）
   const buffer = new Uint8Array(await file.arrayBuffer());
   const ext = detectImageExt(buffer);
   if (!ext) {
-    return c.json({ error: '不支持的文件格式，仅接受 jpg/png/gif/webp 图片' }, 400);
+    return c.json(apiError('不支持的文件格式，仅接受 jpg/png/gif/webp 图片'), 400);
   }
 
   const filename = `${nanoid()}.${ext}`;

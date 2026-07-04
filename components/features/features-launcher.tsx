@@ -1,10 +1,11 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ListTodo, NotebookPen } from "lucide-react";
+import { ListTodo, NotebookPen, Activity } from "lucide-react";
 import { ResizablePanel } from "@/components/ui/resizable-panel";
 import { TodoWidget } from "@/components/features/todo-widget";
 import { NoteWidget } from "@/components/features/note-widget";
+import { MonitorWidget } from "@/components/features/monitor-widget";
 import { Todo, Note } from "@/lib/types";
 import { useUIStore } from "@/lib/stores";
 
@@ -38,6 +39,15 @@ export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }:
           <NotebookPen className="w-5 h-5 text-amber-400" />
           <span>笔记</span>
         </Button>
+
+        <Button
+          variant="outline"
+          onClick={() => togglePanel('monitor')}
+          className={`h-12 px-6 rounded-full border-white/20 hover:bg-black/40 backdrop-blur-md text-white transition-all hover:scale-105 gap-2 ${activePanel === 'monitor' ? 'bg-black/40 ring-2 ring-green-500/50' : 'bg-black/20'}`}
+        >
+          <Activity className="w-5 h-5 text-green-400" />
+          <span>监控</span>
+        </Button>
       </div>
 
       {activePanel === 'todo' && (
@@ -65,6 +75,20 @@ export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }:
           onFocus={() => setActivePanel('note')}
         >
           <NoteWidget notes={notes} onUpdate={onNotesUpdate} />
+        </ResizablePanel>
+      )}
+
+      {activePanel === 'monitor' && (
+        <ResizablePanel
+          title="系统监控"
+          icon={<Activity className="w-5 h-5 text-green-500" />}
+          defaultWidth={480}
+          defaultHeight={500}
+          onClose={() => togglePanel('monitor')}
+          zIndex={activePanel === 'monitor' ? 101 : 100}
+          onFocus={() => setActivePanel('monitor')}
+        >
+          <MonitorWidget />
         </ResizablePanel>
       )}
     </>

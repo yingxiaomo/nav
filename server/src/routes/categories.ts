@@ -5,6 +5,7 @@ import { db } from '../db/index.ts';
 import { categories, bookmarks } from '../db/schema.ts';
 import { eq, asc } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { apiError } from '../utils/response.ts';
 
 const categoryRoutes = new Hono();
 
@@ -47,7 +48,7 @@ categoryRoutes.get('/:id', async (c) => {
     .where(eq(categories.id, id))
     .get();
 
-  if (!cat) return c.json({ error: '分类不存在' }, 404);
+  if (!cat) return c.json(apiError('分类不存在', 'NOT_FOUND'), 404);
 
   const links = await db
     .select()

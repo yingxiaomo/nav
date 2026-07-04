@@ -4,6 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import { db, sqlite } from '../db/index.ts';
 import { settings } from '../db/schema.ts';
 import { eq } from 'drizzle-orm';
+import { apiError } from '../utils/response.ts';
 
 const settingRoutes = new Hono();
 
@@ -41,7 +42,7 @@ settingRoutes.get('/:key', async (c) => {
     .where(eq(settings.key, key))
     .get();
 
-  if (!row) return c.json({ error: '配置不存在' }, 404);
+  if (!row) return c.json(apiError('配置不存在', 'NOT_FOUND'), 404);
 
   try {
     return c.json(JSON.parse(row.value));
@@ -70,7 +71,7 @@ settingRoutes.put('/', zValidator('json', z.record(z.unknown())), async (c) => {
 settingRoutes.put('/:key', zValidator('json', z.unknown()), async (c) => {
   const { key } = c.req.param();
   if (PROTECTED_KEYS.has(key)) {
-    return c.json({ error: '不允许修改系统内部配置' }, 403);
+    return c.json(apiError('不允许修改系统内部配置', 'FORBIDDEN'), 403);
   }
   const value = c.req.valid('json');
   const valueStr = JSON.stringify(value);

@@ -49,3 +49,12 @@ export const notes = sqliteTable('notes', {
   content: text('content').notNull().default(''),
   updatedAt: integer('updated_at').notNull(),
 });
+
+// ===== 监控目标表 =====
+export const monitorTargets = sqliteTable('monitor_targets', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  url: text('url').notNull(),
+  timeout: integer('timeout').notNull().default(5000),
+  createdAt: integer('created_at').notNull(),
+});

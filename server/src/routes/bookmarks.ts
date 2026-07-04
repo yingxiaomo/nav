@@ -5,6 +5,7 @@ import { db, sqlite } from '../db/index.ts';
 import { bookmarks, categories } from '../db/schema.ts';
 import { eq, and, asc } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { apiError } from '../utils/response.ts';
 
 const bookmarkRoutes = new Hono();
 
@@ -47,7 +48,7 @@ bookmarkRoutes.get('/:id', async (c) => {
     .where(eq(bookmarks.id, id))
     .get();
 
-  if (!bookmark) return c.json({ error: '书签不存在' }, 404);
+  if (!bookmark) return c.json(apiError('书签不存在', 'NOT_FOUND'), 404);
   return c.json(bookmark);
 });
 
@@ -62,7 +63,7 @@ bookmarkRoutes.post('/', zValidator('json', createSchema), async (c) => {
     .where(eq(categories.id, body.categoryId))
     .get();
 
-  if (!cat) return c.json({ error: '所属分类不存在' }, 404);
+  if (!cat) return c.json(apiError('所属分类不存在', 'NOT_FOUND'), 404);
 
   const now = Date.now();
 
@@ -98,7 +99,7 @@ bookmarkRoutes.put('/:id', zValidator('json', updateSchema), async (c) => {
     .where(eq(bookmarks.id, id))
     .get();
 
-  if (!existing) return c.json({ error: '书签不存在' }, 404);
+  if (!existing) return c.json(apiError('书签不存在', 'NOT_FOUND'), 404);
 
   // 如果更换了分类，验证目标分类存在
   if (body.categoryId && body.categoryId !== existing.categoryId) {
@@ -136,7 +137,7 @@ bookmarkRoutes.delete('/:id', async (c) => {
     .where(eq(bookmarks.id, id))
     .get();
 
-  if (!existing) return c.json({ error: '书签不存在' }, 404);
+  if (!existing) return c.json(apiError('书签不存在', 'NOT_FOUND'), 404);
 
   await db.delete(bookmarks).where(eq(bookmarks.id, id));
   return c.json({ success: true });

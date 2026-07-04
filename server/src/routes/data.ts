@@ -64,29 +64,19 @@ const dataSchema = z.object({
   pinnedLinks: z.array(linkItemSchema).optional(),
 });
 
-// ===== GET /api/v1/data — 获取完整数据快照 =====
+// ===== GET /api/v1/data — 获取完整数据快照（全局 onError 兜底未捕获异常）=====
 
 dataRoutes.get('/', async (c) => {
-  try {
-    const data = await getFullData();
-    return c.json(data);
-  } catch (error) {
-    console.error('获取数据快照失败:', error);
-    return c.json({ error: '获取数据失败' }, 500);
-  }
+  const data = await getFullData();
+  return c.json(data);
 });
 
 // ===== PUT /api/v1/data — 全量替换数据 =====
 
 dataRoutes.put('/', zValidator('json', dataSchema), async (c) => {
-  try {
-    const body = c.req.valid('json') as unknown as DataSchema;
-    replaceFullData(body);
-    return c.json({ success: true });
-  } catch (error) {
-    console.error('保存数据快照失败:', error);
-    return c.json({ error: '保存数据失败' }, 500);
-  }
+  const body = c.req.valid('json') as unknown as DataSchema;
+  replaceFullData(body);
+  return c.json({ success: true });
 });
 
 export default dataRoutes;

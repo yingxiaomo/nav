@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { apiError } from '../utils/response.ts';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { readRecent } from '../services/logger.ts';

@@ -116,7 +116,8 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://api.github.com" crossOrigin="anonymous" />
-        <meta httpEquiv="Content-Security-Policy" content={`default-src 'self'; script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ""} https://fonts.googleapis.com https://api.github.com https://*.vercel.com https://cdnjs.cloudflare.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; img-src 'self' data: https://*.githubusercontent.com https://*.imgur.com https://*.cloudflare.com https://*.vercel.com https://raw.githubusercontent.com https://iconapi.396638.xyz https://icons.duckduckgo.com https://bing.img.run https://source.unsplash.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; connect-src 'self' https://api.github.com https://*.githubusercontent.com https://api.dropboxapi.com https://www.googleapis.com https://iconapi.396638.xyz http://localhost:* http://127.0.0.1:*; form-action 'self'; frame-src 'self'`} />
+        {/* CSP 由 next.config.ts 的 headers() 统一管理，仅在非 export 模式下生效 */}
+        {/* 静态导出模式下如需 CSP，请在托管平台（Vercel/Cloudflare）的自定义响应头中配置 */}
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

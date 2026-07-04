@@ -1,8 +1,6 @@
 services:
   nav:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/yingxiaomo/nav:latest
     container_name: nav
     ports:
       - "8642:8642"

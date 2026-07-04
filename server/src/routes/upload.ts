@@ -1,6 +1,4 @@
 ﻿import { Hono } from 'hono';
-import { z } from 'zod';
-import { zValidator } from '@hono/zod-validator';
 import fs from 'node:fs';
 import path from 'node:path';
 import { nanoid } from 'nanoid';

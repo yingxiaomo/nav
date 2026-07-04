@@ -74,7 +74,7 @@ dataRoutes.get('/', async (c) => {
 // ===== PUT /api/v1/data — 全量替换数据 =====
 
 dataRoutes.put('/', zValidator('json', dataSchema), async (c) => {
-  const body = c.req.valid('json') as unknown as DataSchema;
+  const body = c.req.valid('json') as DataSchema;
   replaceFullData(body);
   return c.json({ success: true });
 });

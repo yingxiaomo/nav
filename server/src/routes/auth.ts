@@ -5,7 +5,7 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { signAdminSession, verifySession } from '../middleware/admin-auth.ts';
 import {
   hasAdminPassword, verifyAdminPassword, saveAdminPassword,
-  hasApiToken, getApiToken, verifyApiToken, generateApiToken, saveApiToken,
+  hasApiToken, getApiToken, generateApiToken, saveApiToken,
   rotateSessionSecret, getSessionSecret,
 } from '../services/admin-service.ts';
 import { info, warn } from '../services/logger.ts';

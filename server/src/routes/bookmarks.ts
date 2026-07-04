@@ -104,7 +104,7 @@ bookmarkRoutes.put('/:id', zValidator('json', updateSchema), async (c) => {
   // 如果更换了分类，验证目标分类存在
   if (body.categoryId && body.categoryId !== existing.categoryId) {
     const cat = await db.select().from(categories).where(eq(categories.id, body.categoryId)).get();
-    if (!cat) return c.json({ error: '目标分类不存在' }, 400);
+    if (!cat) return c.json(apiError('目标分类不存在', 'NOT_FOUND'), 400);
   }
 
   await db

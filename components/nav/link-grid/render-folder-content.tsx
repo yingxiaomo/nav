@@ -1,6 +1,6 @@
 "use client";
 
-import { LinkItem } from "@/lib/types/types";
+import { LinkItem } from "@/lib/types";
 import { LinkItemCard } from "./link-item-card";
 
 interface RenderFolderContentProps {

@@ -2,7 +2,6 @@ import { DataSchema } from "../types/types";
 import { Octokit } from "@octokit/rest";
 import { S3Client, GetObjectCommand, PutObjectCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
 import { createClient, WebDAVClient } from "webdav";
-import { parseNetscapeBookmarks } from "../parsers/bookmark-parser";
 import { uint8ArrayToBase64 } from "../utils/common";
 
 export const STORAGE_CONFIG_KEY = "clean-nav-storage-config";
@@ -731,9 +730,21 @@ export class ApiServerAdapter implements StorageAdapter {
   }
 
   private async request(path: string, options?: RequestInit): Promise<Response> {
-    const headers: Record<string, string> = {
-      ...(options?.headers as Record<string, string>),
-    };
+    const headers: Record<string, string> = {};
+    if (options?.headers) {
+      // Headers 可能传入 Record、Headers 实例或数组，统一转为对象
+      const h = options.headers;
+      if (Array.isArray(h)) {
+        // [key, value][] 格式
+        for (const [k, v] of h) { headers[k] = v; }
+      } else if ('forEach' in h && typeof h.forEach === 'function') {
+        // Headers 实例
+        h.forEach((v: string, k: string) => { headers[k] = v; });
+      } else {
+        // Record<string, string>
+        Object.assign(headers, h as Record<string, string>);
+      }
+    }
     if (this.config.token) {
       headers['Authorization'] = `Bearer ${this.config.token}`;
     }

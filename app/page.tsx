@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import HomeClient from '../components/home-client';
+import HomeClient from '@/components/home-client';
 
 /* eslint-disable react-hooks/purity */
 

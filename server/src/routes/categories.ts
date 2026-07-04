@@ -93,7 +93,7 @@ categoryRoutes.put('/:id', zValidator('json', updateSchema), async (c) => {
     .where(eq(categories.id, id))
     .get();
 
-  if (!existing) return c.json({ error: '分类不存在' }, 404);
+  if (!existing) return c.json(apiError('分类不存在', 'NOT_FOUND'), 404);
 
   await db
     .update(categories)
@@ -122,7 +122,7 @@ categoryRoutes.delete('/:id', async (c) => {
     .where(eq(categories.id, id))
     .get();
 
-  if (!existing) return c.json({ error: '分类不存在' }, 404);
+  if (!existing) return c.json(apiError('分类不存在', 'NOT_FOUND'), 404);
 
   await db.delete(categories).where(eq(categories.id, id));
   return c.json({ success: true });

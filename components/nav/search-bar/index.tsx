@@ -5,7 +5,7 @@ import { Search, Clock, X, Trash2, Link as LinkIcon, Globe, Wifi } from "lucide-
 import { motion } from "framer-motion";
 import { Input, Button } from "@/components/ui";
 import { useSearchHistory } from "@/lib";
-import { LinkItem } from "@/lib/types/types";
+import { LinkItem } from "@/lib/types";
 import Fuse, { type IFuseOptions } from "fuse.js";
 import { STORAGE_CONFIG_KEY } from "@/lib/adapters/storage";
 

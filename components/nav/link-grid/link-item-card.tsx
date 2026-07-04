@@ -1,6 +1,6 @@
 "use client";
 
-import { LinkItem } from "@/lib/types/types";
+import { LinkItem } from "@/lib/types";
 import { ChevronLeft, X } from "lucide-react";
 import { IconRender } from "@/components/nav/settings/shared";
 import { useSortable } from "@dnd-kit/sortable";

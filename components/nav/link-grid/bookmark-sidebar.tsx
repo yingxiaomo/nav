@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Category, LinkItem } from "@/lib/types/types";
+import { Category, LinkItem } from "@/lib/types";
 import { PanelLeft, PanelLeftClose, ChevronLeft, Pin } from "lucide-react";
 import { generateFaviconUrl } from "@/lib/utils/common";
 

@@ -4,12 +4,12 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { DataSchema } from "../types/types";
 import { DEFAULT_DATA, Category, Todo, Note, LinkItem } from "../types/types";
-import { StorageAdapter, STORAGE_CONFIG_KEY, StorageConfig } from "../adapters/storage";
+import { StorageAdapter, StorageConfig } from "../adapters/storage";
 import { toast } from "sonner";
 import { convertToWebP } from '../utils/image-utils';
 import { deepEqual } from '../utils/common';
 import { mergeCategories, mergeItems } from '../utils/data-merge';
-import { useStorageConfig } from '../hooks/use-storage-config';
+import { useStorageConfig } from './use-storage-config';
 
 const LOCAL_DATA_KEY = "clean-nav-local-data";
 

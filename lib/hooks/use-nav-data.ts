@@ -102,7 +102,7 @@ export function useNavData(initialWallpapers: string[]) {
         }
       } catch (err) {
         console.error("Initialization error", err);
-        setSyncError(false);
+        setSyncError(true);
       } finally {
         setIsReady(true);
       }

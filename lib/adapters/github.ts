@@ -11,5 +11,8 @@ import type { GithubRepoSettings } from './storage';
 /** @deprecated 请使用 storage.ts 中的 GithubRepoSettings */
 export type GithubConfig = GithubRepoSettings;
 
-// 保持现有导入不变
-export { STORAGE_CONFIG_KEY as GITHUB_CONFIG_KEY } from './storage';
+/**
+ * 旧版 GitHub 配置的 localStorage 键名
+ * 用于从旧版本迁移到新版 StorageConfig，不可与 STORAGE_CONFIG_KEY 共用
+ */
+export const GITHUB_CONFIG_KEY = "clean-nav-github-config";

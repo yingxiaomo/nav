@@ -28,11 +28,19 @@ export function getSessionSecret(): string | null {
 
 // ===== 管理后台密码（用于登录管理页面）=====
 
+/** 判断字符串是否为 bcrypt 哈希（以 $2 开头） */
+function isBcryptHash(value: string): boolean {
+  return value.startsWith('$2');
+}
+
 /** 管理后台是否已配置密码 */
 export function hasAdminPassword(): boolean {
   if (process.env.ROOT_PASSWORD) return true;
   const row = db.select().from(settings).where(eq(settings.key, ADMIN_PW_KEY)).get();
-  return !!row;
+  if (!row) return false;
+  // 如果存储的是旧版 SHA-256 哈希（非 bcrypt 格式），视为未配置
+  // 用户需要重新初始化密码，否则 bcrypt.compareSync 会抛异常
+  return isBcryptHash(row.value);
 }
 
 /** 恒定时间比较 */
@@ -56,11 +64,10 @@ export function verifyAdminPassword(input: string): boolean {
   const row = db.select().from(settings).where(eq(settings.key, ADMIN_PW_KEY)).get();
   if (!row) return false;
 
-  try {
-    return bcrypt.compareSync(input, row.value);
-  } catch {
-    return false;
-  }
+  // 旧版 SHA-256 哈希 → 无法验证，提示用户重新初始化
+  if (!isBcryptHash(row.value)) return false;
+
+  return bcrypt.compareSync(input, row.value);
 }
 
 /** 保存管理后台密码（首次配置用） */

@@ -1,7 +1,7 @@
 import { createMiddleware } from 'hono/factory';
 import { getCookie } from 'hono/cookie';
 import { createHmac, randomBytes } from 'node:crypto';
-import { hasAdminPassword, getApiToken, getSessionSecret } from '../services/admin-service.ts';
+import { hasAdminPassword, getApiToken, verifyApiToken, getSessionSecret } from '../services/admin-service.ts';
 
 // 启动时生成随机 fallback secret，容器重启后旧 session 失效
 const SESSION_SECRET = process.env.SESSION_SECRET ?? randomBytes(32).toString('hex');
@@ -56,6 +56,17 @@ export const adminAuthMiddleware = createMiddleware(async (c, next) => {
   if (path === '/api/v1/auth/setup' && !hasAdminPassword()) {
     await next();
     return;
+  }
+
+  // 检查 Authorization: Bearer <api-token>（用于前端 Widget 等非浏览器客户端）
+  const authHeader = c.req.header('Authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    if (verifyApiToken(token)) {
+      await next();
+      return;
+    }
+    return c.json({ error: 'API 令牌无效' }, 401);
   }
 
   // 检查会话 cookie

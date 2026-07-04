@@ -82,6 +82,13 @@ async function checkTarget(target: MonitorTarget): Promise<CheckResult> {
     const timer = setTimeout(() => controller.abort(), target.timeout || CHECK_TIMEOUT);
     const res = await fetch(target.url, { method: 'HEAD', signal: controller.signal });
     clearTimeout(timer);
+
+    // 重定向后重新校验目标地址（防止 SSRF 绕过）
+    const finalUrl = new URL(res.url);
+    if (isPrivateHost(finalUrl.hostname)) {
+      return { id: target.id, name: target.name, url: target.url, status: 'error', latency: null, lastCheck: Date.now() };
+    }
+
     const latency = Date.now() - start;
     return { id: target.id, name: target.name, url: target.url, status: 'ok', latency, lastCheck: Date.now() };
   } catch {

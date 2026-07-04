@@ -52,8 +52,8 @@ settingRoutes.get('/:key', async (c) => {
 });
 
 // ===== PUT /api/v1/settings - 批量更新配置 =====
-settingRoutes.put('/', zValidator('json', z.record(z.unknown())), async (c) => {
-  const body = stripProtected(c.req.valid('json'));
+settingRoutes.put('/', async (c) => {
+  const body = stripProtected(await c.req.json() as Record<string, unknown>);
 
   sqlite.transaction(() => {
     for (const [key, value] of Object.entries(body)) {

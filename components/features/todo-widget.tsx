@@ -1,13 +1,12 @@
 "use client"
 
-import { useState, useRef, KeyboardEvent, useCallback } from "react"
-import { Trash2, CheckCircle2, Circle } from "lucide-react" 
+import { useState, useRef, useEffect, KeyboardEvent, useCallback } from "react"
+import { Trash2, CheckCircle2, Circle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Todo } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { v4 as uuidv4 } from "uuid"
 import { motion, AnimatePresence } from "framer-motion"
 
 interface TodoWidgetProps {
@@ -18,7 +17,7 @@ interface TodoWidgetProps {
 export function TodoWidget({ todos = [], onUpdate }: TodoWidgetProps) {
   const [newTodo, setNewTodo] = useState("")
   const todosRef = useRef(todos)
-  todosRef.current = todos
+  useEffect(() => { todosRef.current = todos; }, [todos]);
 
   const addTodo = useCallback(() => {
     if (!newTodo.trim()) return

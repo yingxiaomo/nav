@@ -71,7 +71,7 @@ export function extractTitleFromUrl(url: string): string {
       }
     }
 
-    let name = hostname.replace(/^www\./, '').split('.')[0];
+    const name = hostname.replace(/^www\./, '').split('.')[0];
     return name.charAt(0).toUpperCase() + name.slice(1);
   } catch {
     return '';
@@ -133,6 +133,7 @@ export function FaviconImage({ icon, url, type, className }: FaviconImageProps) 
   const [failedDdg, setFailedDdg] = React.useState(false);
 
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- init derived state
     setCurrentSrc(getLinkIcon(icon, url, type));
     setFailedApi(false);
     setFailedDdg(false);

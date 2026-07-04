@@ -1,6 +1,6 @@
 import { db, sqlite } from '../db/index.ts';
 import { categories as categoriesTable, bookmarks as bookmarksTable, todos as todosTable, notes as notesTable, settings as settingsTable } from '../db/schema.ts';
-import { eq, asc, desc } from 'drizzle-orm';
+import { asc, desc } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import type { DataSchema, Category, LinkItem, Todo, Note, SiteSettings } from '../types/index.ts';
 

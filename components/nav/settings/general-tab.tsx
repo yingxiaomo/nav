@@ -9,7 +9,6 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useThemeStore } from "@/lib/stores";
-import { ACCENT_MAP } from "@/lib/stores/theme-store";
 
 const BLUR_OPTIONS = [
   { value: 'low' as const, label: '低', px: '4px' },
@@ -29,8 +28,6 @@ const FONT_OPTIONS = [
   { value: 'system' as const, label: '系统字体' },
   { value: 'mono' as const, label: '等宽字体' },
 ];
-
-const BLUR_LABELS: Record<string, string> = { low: '低', medium: '中', high: '高' };
 
 interface GeneralTabProps {
   localData: DataSchema;

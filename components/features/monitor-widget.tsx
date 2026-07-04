@@ -89,7 +89,12 @@ export function MonitorWidget() {
     } finally { setLoading(false); }
   }, [baseUrl]);
 
-  useEffect(() => { fetchData(); const t = setInterval(fetchData, 10000); return () => clearInterval(t); }, [fetchData]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- periodic fetch for live data
+    fetchData();
+    const t = setInterval(fetchData, 10000);
+    return () => clearInterval(t);
+  }, [fetchData]);
 
   if (!baseUrl) return null;
   if (loading) return <div className="text-sm text-white/40 text-center py-4">加载监控数据...</div>;

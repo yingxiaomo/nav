@@ -29,6 +29,7 @@ export function useLocalStorage<T>(
   // 异步解密敏感数据
   useEffect(() => {
     if (typeof window === 'undefined' || !sensitiveFields.length || initialized) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- guard flag
       setInitialized(true);
       return;
     }

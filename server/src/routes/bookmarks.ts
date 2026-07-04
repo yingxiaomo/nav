@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { db, sqlite } from '../db/index.ts';
 import { bookmarks, categories } from '../db/schema.ts';
-import { eq, and, asc } from 'drizzle-orm';
+import { eq, asc } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { apiError } from '../utils/response.ts';
 

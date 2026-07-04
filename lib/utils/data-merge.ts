@@ -1,7 +1,7 @@
 /**
  * 数据合并工具（纯函数，无 React 依赖）
  */
-import type { Category, LinkItem, Todo, Note } from '../types/types';
+import type { Category } from '../types/types';
 
 /**
  * 合并两个数组：远程优先，本地有但远程没有的不补回

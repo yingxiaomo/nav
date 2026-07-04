@@ -2,8 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import HomeClient from '@/components/home-client';
 
-/* eslint-disable react-hooks/purity */
-
 export default function Page() {
   let wallpapersBase64: string[] = [];
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Search, Clock, X, Trash2, Link as LinkIcon, Globe, Wifi } from "lucide-react";
 import { motion } from "framer-motion";
 import { Input, Button } from "@/components/ui";
@@ -98,8 +98,6 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
         : "";
 
     const hasHistoryItems = suggestions.some((s) => s.kind === "history");
-    const hasBookmarkItems = suggestions.some((s) => s.kind === "bookmark");
-    const hasWebItems = suggestions.some((s) => s.kind === "web");
 
     // ── 点击外部关闭 ──────────────────────────────────────
     useEffect(() => {

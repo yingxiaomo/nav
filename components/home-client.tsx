@@ -12,6 +12,8 @@ const CheatSheet = lazy(() => import("@/components/features/cheat-sheet").then(m
 import { FeaturesLauncher } from "@/components/features/features-launcher";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
+import Image from "next/image";
 
 import { useWallpaper, useNavData, useKeyboardShortcuts } from "@/lib";
 import { useUIStore } from "@/lib/stores";
@@ -177,9 +179,11 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
             <div className="flex flex-col items-center gap-4">
                 <div className="relative">
                     <div className="h-16 w-16 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
-                        <img
+                        <Image
                             src="/icon/logo.png"
                             alt="Logo"
+                            width={48}
+                            height={48}
                             className="h-12 w-12 object-contain"
                         />
                     </div>
@@ -211,15 +215,17 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
               <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"></div>
             </div>
           }>
-            <SettingsDialog 
-              data={data} 
-              onSave={(newData) => handleSave(newData, initWallpaper)} 
-              isSaving={isSaving}
-              hasUnsavedChanges={hasUnsavedChanges}
-              syncError={syncError}
-              onRefreshWallpaper={() => initWallpaper(data)}
-              uploadWallpaper={uploadWallpaper}
-            />
+            <ErrorBoundary name="settings" fallback={<div className="w-10 h-10" />}>
+              <SettingsDialog
+                data={data}
+                onSave={(newData) => handleSave(newData, initWallpaper)}
+                isSaving={isSaving}
+                hasUnsavedChanges={hasUnsavedChanges}
+                syncError={syncError}
+                onRefreshWallpaper={() => initWallpaper(data)}
+                uploadWallpaper={uploadWallpaper}
+              />
+            </ErrorBoundary>
           </Suspense>
         </div>
 
@@ -229,12 +235,14 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
                   {data.settings.homeLayout !== 'list' && <ClockWidget />}
                   
                   {data.settings.homeLayout === 'list' && !searchQuery && data.settings.showFeatures !== false && (
-                    <FeaturesLauncher 
-                      todos={data.todos || []}
-                      notes={data.notes || []}
-                      onTodosUpdate={handleTodosUpdate}
-                      onNotesUpdate={handleNotesUpdate}
-                    />
+                    <ErrorBoundary name="features" fallback={null}>
+                      <FeaturesLauncher
+                        todos={data.todos || []}
+                        notes={data.notes || []}
+                        onTodosUpdate={handleTodosUpdate}
+                        onNotesUpdate={handleNotesUpdate}
+                      />
+                    </ErrorBoundary>
                   )}
                   
                   <div className={data.settings.homeLayout === 'list' ? "mt-8 w-full" : "w-full"}>
@@ -247,20 +255,23 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
                 </div>
                   
                   {data.settings.homeLayout !== 'list' && !searchQuery && data.settings.showFeatures !== false && (
-                    <FeaturesLauncher 
-                      todos={data.todos || []}
-                      notes={data.notes || []}
-                      onTodosUpdate={handleTodosUpdate}
-                      onNotesUpdate={handleNotesUpdate}
-                    />
+                    <ErrorBoundary name="features" fallback={null}>
+                      <FeaturesLauncher
+                        todos={data.todos || []}
+                        notes={data.notes || []}
+                        onTodosUpdate={handleTodosUpdate}
+                        onNotesUpdate={handleNotesUpdate}
+                      />
+                    </ErrorBoundary>
                   )}
                 </div>
             </div>
             
             {data.settings.homeLayout !== 'list' && <div className="flex-grow" />}
 
-            <div className={`w-full max-w-5xl flex flex-col items-center ${data.settings.homeLayout === 'list' ? 'mt-8 mb-20' : 'mb-10'}`}> 
-               <LinkGrid
+            <div className={`w-full max-w-5xl flex flex-col items-center ${data.settings.homeLayout === 'list' ? 'mt-8 mb-20' : 'mb-10'}`}>
+              <ErrorBoundary name="link-grid" fallback={<p className="text-white/60 text-sm mt-8">书签加载失败</p>}>
+                <LinkGrid
                   ref={folderNavRef}
                   categories={displayCategories}
                   onReorder={searchQuery ? undefined : handleReorder}
@@ -270,7 +281,8 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
                   onPinLink={handlePinLink}
                   onUnpinLink={handleUnpinLink}
                   onPinnedReorder={handlePinnedReorder}
-               />
+                />
+              </ErrorBoundary>
             </div>
 
             <footer className="relative mt-auto pt-4 w-full text-center z-0">
@@ -285,7 +297,9 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
         
         <Toaster position="top-center" />
         <Suspense fallback={null}>
-          <CheatSheet />
+          <ErrorBoundary name="cheatsheet" fallback={null}>
+            <CheatSheet />
+          </ErrorBoundary>
         </Suspense>
       </main>
     </ThemeProvider>

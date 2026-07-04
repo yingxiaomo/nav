@@ -10,7 +10,7 @@ RUN apk add --no-cache libc6-compat
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm install
 
 COPY . .
 RUN npm run build
@@ -24,7 +24,7 @@ WORKDIR /app
 # 后端依赖（better-sqlite3 需要编译，需安装 Python）
 COPY server/package.json server/package-lock.json ./
 RUN apk add --no-cache --virtual .build-deps python3 make g++ && \
-    npm ci --omit=dev && \
+    npm install --omit=dev && \
     apk del .build-deps && \
     npm cache clean --force
 

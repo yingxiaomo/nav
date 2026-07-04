@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const fs = require('fs');
 let c = fs.readFileSync('D:/Github/nav/nav/server/public/admin/index.html', 'utf8');
 

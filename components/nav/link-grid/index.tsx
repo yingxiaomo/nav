@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useEffect, useId, forwardRef, useImperativeHandle } from "react";
+import { useState, useEffect, useId, forwardRef, useImperativeHandle, useCallback } from "react";
 import { Category, LinkItem } from "@/lib/types";
 import { X, ChevronLeft, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,7 +21,7 @@ import {
 import { IconRender } from "@/components/nav/settings/shared";
 
 import { SortableCard } from "./category-cards";
-import { LinkItemCard, SortableLinkItemCard, SortablePinnedLinkCard } from "./link-item-card";
+import { SortableLinkItemCard, SortablePinnedLinkCard } from "./link-item-card";
 import { RenderFolderContent } from "./render-folder-content";
 import { BookmarkSidebar } from "./bookmark-sidebar";
 
@@ -102,6 +102,19 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
     setNavStack([]);
   }, [displayMode]);
 
+  // closeModal 定义在 useImperativeHandle 之前，避免 TDZ 错误
+  const closeModal = useCallback(() => {
+    const idToRestore = selectedId;
+    setSelectedId(null);
+    setNavStack([]);
+    if (idToRestore) {
+      requestAnimationFrame(() => {
+        const card = document.querySelector(`[data-category-id="${idToRestore}"]`) as HTMLElement | null;
+        card?.focus();
+      });
+    }
+  }, [selectedId]);
+
   // 暴露给父组件的文件夹导航控制接口
   useImperativeHandle(ref, () => ({
     /** 返回上一级；若已在根级则关闭模态框。有操作返回 true，无操作（未打开）返回 false */
@@ -122,7 +135,7 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
     },
     /** 直接关闭文件夹模态框 */
     close: closeModal,
-  }), [navStack.length, selectedId]);
+  }), [navStack.length, selectedId, closeModal]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -198,19 +211,6 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
       if (item.type === 'folder') {
           setNavStack(prev => [...prev, item]);
       }
-  };
-
-  // 关闭模态框并将焦点返还给卡片
-  const closeModal = () => {
-    const idToRestore = selectedId;
-    setSelectedId(null);
-    setNavStack([]);
-    if (idToRestore) {
-      requestAnimationFrame(() => {
-        const card = document.querySelector(`[data-category-id="${idToRestore}"]`) as HTMLElement | null;
-        card?.focus();
-      });
-    }
   };
 
   const handleLinkDragEnd = (event: DragEndEvent) => {

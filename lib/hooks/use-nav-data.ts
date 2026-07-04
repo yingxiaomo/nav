@@ -171,7 +171,7 @@ export function useNavData(initialWallpapers: string[]) {
         }, 0);
       }
     }
-  }, [remoteData, dataRef, mergeCategories, mergeItems, deepEqual]);
+  }, [remoteData, dataRef]);
 
   // ── React Query：保存到云端 ──
   const { mutate: saveMutate, isPending: isSaving } = useMutation({

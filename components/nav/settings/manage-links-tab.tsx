@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { DataSchema, Category, LinkItem } from "@/lib/types";
 import {
   DndContext,
@@ -68,6 +68,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
   // SSR 安全：延迟 portal 渲染到客户端
   useEffect(() => {
+     
     setPortalTarget(document.body);
   }, []);
 
@@ -107,10 +108,6 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       else next.add(id);
       return next;
     });
-  };
-
-  const selectAll = () => {
-    setSelectedIds(new Set(getVisibleLinkIds()));
   };
 
   const deselectAll = () => {
@@ -404,22 +401,22 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       return options;
   }, [localData.categories, movingLink]);
 
-  // 定义递归函数 findContainer（不依赖 hooks）
-  const findContainer = (id: string, items: (Category | LinkItem)[]): string | undefined => {
+  // 定义递归函数 findContainer（使用命名函数表达式以支持递归）
+  const findContainer = useCallback(function findContainerImpl(id: string, items: (Category | LinkItem)[]): string | undefined {
       if (items.find(i => i.id === id)) return id;
-  
+
       for (const item of items) {
           const children = getChildren(item);
           if (children) {
               if (children.find(c => c.id === id)) {
                   return item.id;
               }
-              const found = findContainer(id, children);
+              const found = findContainerImpl(id, children);
               if (found) return found;
           }
       }
       return undefined;
-  };
+  }, []);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event;
@@ -654,6 +651,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
   useEffect(() => {
     if (currentFolder && !resolvedCurrentFolder) {
+         
         setFolderPath([]);
     }
   }, [currentFolder, resolvedCurrentFolder]);

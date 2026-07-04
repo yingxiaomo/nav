@@ -83,7 +83,7 @@ function setupListener(store: typeof useThemeStore) {
   if (mediaListener) {
     window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', mediaListener);
   }
-  mediaListener = (e: MediaQueryListEvent) => {
+  mediaListener = () => {
     const state = store.getState();
     if (state.theme === 'system') {
       applyCSS(state);

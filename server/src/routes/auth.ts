@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
@@ -42,7 +42,7 @@ function recordAttempt(ip: string, success: boolean): void {
 }
 
 /** 检查当前请求的 admin session 是否有效 */
-function checkSession(c: Parameters<typeof authRoutes.get>[1] extends (...a: infer A) => unknown ? A[0] : never): boolean {
+function checkSession(c: Context): boolean {
   const cookieValue = getCookie(c, SESSION_COOKIE);
   if (!cookieValue) return false;
 
@@ -132,9 +132,13 @@ authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
   const secret = rotateSessionSecret();
   info(`[auth] login success (ip=${ip})`);
 
+  // 判断是否 HTTPS：X-Forwarded-Proto 用于反代场景，fallback 检测 URL
+  const isSecure = c.req.header('X-Forwarded-Proto') === 'https' ||
+                   c.req.url.startsWith('https://');
+
   setCookie(c, SESSION_COOKIE, signAdminSession(secret), {
     httpOnly: true,
-    secure: true,
+    secure: isSecure,
     sameSite: 'Lax',
     path: '/',
     maxAge: 86400 * 7,

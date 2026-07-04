@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Category, LinkItem } from "@/lib/types";
 import { PanelLeft, PanelLeftClose, ChevronLeft, Pin } from "lucide-react";
 import { generateFaviconUrl } from "@/lib/utils/common";
+import Image from "next/image";
 
 interface BookmarkSidebarProps {
   categories: Category[];
@@ -177,7 +178,7 @@ export function BookmarkSidebar({ categories, pinnedLinks, onPinLink, onUnpinLin
                     style={{ minWidth: 0 }}
                   >
                     {iconSrc ? (
-                      <img src={iconSrc} alt="" className="h-4 w-4 flex-shrink-0 rounded-sm object-contain" />
+                      <Image src={iconSrc} alt="" width={16} height={16} className="h-4 w-4 flex-shrink-0 rounded-sm object-contain" unoptimized />
                     ) : (
                       <div className={"h-4 w-4 flex-shrink-0 " + (node.type === "category" ? "text-yellow-200/90" : node.type === "folder" ? "text-blue-200/90" : "text-white/40")}>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-full w-full">

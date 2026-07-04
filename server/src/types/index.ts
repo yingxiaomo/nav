@@ -31,6 +31,7 @@ export interface LinkItem {
   type?: 'link' | 'folder';
   children?: LinkItem[];
   updatedAt?: number;
+  order?: number;
 }
 
 export interface Category {
@@ -39,6 +40,7 @@ export interface Category {
   icon?: string;
   links: LinkItem[];
   updatedAt?: number;
+  order?: number;
 }
 
 export interface Todo {

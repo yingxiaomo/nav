@@ -3,7 +3,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { LinkItem } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Trash2, FolderInput, Pencil } from "lucide-react";
+import { Trash2, FolderInput } from "lucide-react";
 import { IconRender } from "./shared";
 import { FaviconImage } from "@/lib/utils/favicon";
 

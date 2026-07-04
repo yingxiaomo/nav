@@ -14,7 +14,7 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-const sqlite = new Database(resolvedPath);
+const sqlite: InstanceType<typeof Database> = new Database(resolvedPath);
 // 开启 WAL 模式，提升并发性能
 sqlite.pragma('journal_mode = WAL');
 // 开启外键约束

@@ -21,7 +21,7 @@ export interface CheckResult {
 }
 
 const CHECK_TIMEOUT = 5000;
-let cachedResults = new Map<string, CheckResult>();
+const cachedResults = new Map<string, CheckResult>();
 
 // 定时巡检（每 60 秒）
 let interval: ReturnType<typeof setInterval> | null = null;

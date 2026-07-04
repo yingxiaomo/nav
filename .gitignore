@@ -37,6 +37,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Claude Code local instructions (do not commit)
+.claude/
+
 .1.md
 
 .vscode/
@@ -48,3 +51,11 @@ next-env.d.ts
 server/node_modules
 server/data/
 server/.env
+*.md
+!README.md
+
+# data (本地数据库文件)
+data/
+*.db
+*.db-shm
+*.db-wal

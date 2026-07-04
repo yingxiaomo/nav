@@ -13,6 +13,8 @@ function toLinkItem(row: typeof bookmarksTable.$inferSelect): LinkItem {
     url: row.url,
     icon: row.icon ?? undefined,
     description: row.description ?? undefined,
+    updatedAt: row.createdAt,
+    order: row.order,
   };
 }
 
@@ -24,6 +26,8 @@ function toCategory(
     id: catRow.id,
     title: catRow.title,
     icon: catRow.icon ?? undefined,
+    order: catRow.order,
+    updatedAt: catRow.createdAt,
     links: linkRows.map(toLinkItem),
   };
 }

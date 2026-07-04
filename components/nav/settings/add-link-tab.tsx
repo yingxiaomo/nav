@@ -78,9 +78,8 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
               const meta = await res.json();
               if (meta.title) setNewTitle(meta.title);
               if (meta.icon) setNewIcon(meta.icon);
-              // description 可以在后续版本中用到
-              if (!isAuto) toast.success("已从网页获取标题和图标", { description: meta.title });
-              return;
+              if (!isAuto) toast.success("已从网页获取标题和图标", { description: meta.title || processedUrl });
+              if (meta.title) return; // 有标题才跳过客户端降级
             }
           }
         }
@@ -89,7 +88,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
       }
     }
 
-    // 降级：客户端 URL 解析
+    // 降级：客户端 URL 解析（后端未返回标题时也执行）
     try {
       const urlObj = new URL(processedUrl);
       const hostname = urlObj.hostname;
@@ -117,7 +116,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
         description: "文件夹名称不能为空，长度限制1-50字符，且不能包含特殊字符（<>:\"/\\|?*）"
       });
     }
-    const newData = { ...localData };
+    const newData = { ...localData, categories: [...localData.categories] };
     if (newData.categories.some(c => c.title === sanitizedFolderName)) {
         return toast.error("该文件夹已存在", { description: "请使用不同的文件夹名称" });
     }
@@ -216,6 +215,10 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
       newData.categories.push({ id: `c-${crypto.randomUUID()}`, title: sanitizedCategory, icon: "FolderOpen", links: [] });
       categoryIndex = newData.categories.length - 1;
     }
+    newData.categories[categoryIndex] = {
+      ...newData.categories[categoryIndex],
+      links: [...newData.categories[categoryIndex].links],
+    };
     
       newData.categories[categoryIndex].links.push({ 
         id: `l-${crypto.randomUUID()}`, 

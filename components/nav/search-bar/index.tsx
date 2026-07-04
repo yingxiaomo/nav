@@ -148,6 +148,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
       if (engine.url === "local") onLocalSearch?.(val);
 
       // 获取网络搜索建议（后端已配置时）
+      let hasWebResults = false;
       if (val.trim().length >= 2) {
         try {
           const configRaw = localStorage.getItem(STORAGE_CONFIG_KEY);
@@ -162,6 +163,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
               if (res.ok) {
                 const data = await res.json();
                 setWebSuggestions(data.suggestions || []);
+                hasWebResults = (data.suggestions?.length ?? 0) > 0;
               } else {
                 setWebSuggestions([]);
               }
@@ -182,8 +184,9 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
         const matches = history.filter((h) =>
           h.toLowerCase().includes(val.toLowerCase()),
         );
-        // 只要有历史或书签匹配就显示下拉
-        if (matches.length > 0 || fuse.search(val.trim()).length > 0) {
+        const hasLocal = matches.length > 0 || fuse.search(val.trim()).length > 0;
+        // 有本地匹配或网络建议时都显示下拉
+        if (hasLocal || hasWebResults) {
           setShowDropdown(true);
           setSelectedIdx(0);
         } else {

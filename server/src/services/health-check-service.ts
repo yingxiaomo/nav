@@ -1,12 +1,13 @@
 import { db } from '../db/index.ts';
 import { monitorTargets } from '../db/schema.ts';
 import { eq } from 'drizzle-orm';
-import { isPrivateHost } from './security.ts';
 
 export interface MonitorTarget {
   id: string;
   name: string;
   url: string;
+  icon?: string;
+  mac?: string;
   timeout: number;
   createdAt: number;
 }
@@ -44,13 +45,15 @@ export function getTargets(): MonitorTarget[] {
   }
 }
 
-export function addTarget(name: string, url: string, timeout = CHECK_TIMEOUT): MonitorTarget {
-  const target = { id: crypto.randomUUID(), name, url, timeout, createdAt: Date.now() };
+export function addTarget(name: string, url: string, timeout = CHECK_TIMEOUT, icon?: string, mac?: string): MonitorTarget {
+  const target: MonitorTarget = { id: crypto.randomUUID(), name, url, icon, mac, timeout, createdAt: Date.now() };
   db.insert(monitorTargets).values(target).run();
+  // 添加后立即触发一次巡检
+  checkTarget(target).then(r => cachedResults.set(r.id, r));
   return target;
 }
 
-export function updateTarget(id: string, data: { name?: string; url?: string; timeout?: number }): boolean {
+export function updateTarget(id: string, data: { name?: string; url?: string; icon?: string; mac?: string; timeout?: number }): boolean {
   const existing = db.select().from(monitorTargets).where(eq(monitorTargets.id, id)).get();
   if (!existing) return false;
   db.update(monitorTargets).set(data).where(eq(monitorTargets.id, id)).run();
@@ -66,16 +69,6 @@ export function deleteTarget(id: string): boolean {
 }
 
 async function checkTarget(target: MonitorTarget): Promise<CheckResult> {
-  // SSRF 防护：阻止巡检内网地址
-  try {
-    const url = new URL(target.url);
-    if (isPrivateHost(url.hostname)) {
-      return { id: target.id, name: target.name, url: target.url, status: 'error', latency: null, lastCheck: Date.now() };
-    }
-  } catch {
-    return { id: target.id, name: target.name, url: target.url, status: 'error', latency: null, lastCheck: Date.now() };
-  }
-
   const start = Date.now();
   try {
     const controller = new AbortController();
@@ -83,10 +76,10 @@ async function checkTarget(target: MonitorTarget): Promise<CheckResult> {
     const res = await fetch(target.url, { method: 'HEAD', signal: controller.signal });
     clearTimeout(timer);
 
-    // 重定向后重新校验目标地址（防止 SSRF 绕过）
-    const finalUrl = new URL(res.url);
-    if (isPrivateHost(finalUrl.hostname)) {
-      return { id: target.id, name: target.name, url: target.url, status: 'error', latency: null, lastCheck: Date.now() };
+    // 非 2xx 状态码视为故障
+    if (!res.ok) {
+      const latency = Date.now() - start;
+      return { id: target.id, name: target.name, url: target.url, status: 'timeout', latency, lastCheck: Date.now() };
     }
 
     const latency = Date.now() - start;

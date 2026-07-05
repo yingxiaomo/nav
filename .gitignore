@@ -41,6 +41,9 @@ next-env.d.ts
 # Claude Code local instructions (do not commit)
 .claude/
 
+# test servers (虚拟内网测试服务)
+scripts/test-*
+
 .1.md
 
 .vscode/

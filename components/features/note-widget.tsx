@@ -100,7 +100,7 @@ export function NoteWidget({ notes = [], onUpdate }: NoteWidgetProps) {
                  animate={{ opacity: 1 }}
                  transition={{ duration: 0.5 }}
                >
-                 暂无笔记
+                 暂无笔记 · 在下方添加第一条
                </motion.div>
             )}
           </div>

@@ -160,7 +160,7 @@ export function BookmarkSidebar({ categories, pinnedLinks, onPinLink, onUnpinLin
         {/* Items */}
         <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
           {currentNodes.length === 0 ? (
-            <p className="text-center text-white/30 text-xs py-8">空文件夹</p>
+            <p className="text-center text-white/30 text-xs py-8">暂无链接 · 在设置中添加</p>
           ) : (
             currentNodes.map((node) => {
               const isLink = node.type === "link";

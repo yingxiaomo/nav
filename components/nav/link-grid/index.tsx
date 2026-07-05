@@ -244,7 +244,7 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
       <div className="w-full max-w-5xl mx-auto pb-3 px-4 relative z-30">
         <DndContext id={pinnedDndContextId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handlePinnedDragEnd}>
           <SortableContext items={pinnedLinks.map(l => `pin-${l.id}`)} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-1 sm:gap-1.5">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(3.5rem,1fr))] gap-1 sm:gap-1.5">
               {pinnedLinks.map((link) => (
                 <SortablePinnedLinkCard
                   key={link.id}
@@ -296,7 +296,7 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
                             />
                           ) : (
                             <div className="col-span-full py-4 text-center text-sm text-white/30">
-                                空文件夹
+                                空文件夹 · 拖入链接即可添加
                             </div>
                           )}
                       </div>
@@ -403,7 +403,7 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
                       ))}
                       {modalCurrentItems.length === 0 && (
                         <div className="col-span-full py-10 text-center text-muted-foreground">
-                          此文件夹为空
+                          此文件夹暂无链接
                         </div>
                       )}
                     </div>

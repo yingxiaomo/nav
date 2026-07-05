@@ -111,7 +111,7 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
           </TabsList>
 
           <TabsContent value="add" className="flex-1 flex flex-col min-h-0 data-[state=active]:flex">
-             <AddLinkTab localData={localData} setLocalData={setLocalData} />
+             <AddLinkTab localData={localData} setLocalData={setLocalData} storageConfig={storageConfig} />
           </TabsContent>
 
           <TabsContent value="manage" className="flex-1 flex flex-col min-h-0 data-[state=active]:flex">

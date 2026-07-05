@@ -322,13 +322,17 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
                   className="absolute inset-y-0 left-6 flex items-center pointer-events-none z-10"
                   aria-hidden
                 >
-                  <span className="text-lg font-sans select-none tracking-normal text-white/20">
+                  <span className="text-lg font-sans select-none tracking-normal text-white/30">
                     {query}
-                    <span className="text-white/[0.07]">{completionText}</span>
+                    <span className="text-white/20">{completionText}</span>
                   </span>
                 </div>
               )}
+              <label htmlFor="search-input" className="sr-only">
+                {engine.url === "local" ? "本地链接搜索" : "搜索引擎搜索"}
+              </label>
               <Input
+                id="search-input"
                 ref={ref}
                 type="text"
                 value={query}

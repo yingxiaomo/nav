@@ -2,6 +2,7 @@
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
+import { readFileSync } from 'node:fs';
 import { authMiddleware } from './middleware/auth.ts';
 import { adminAuthMiddleware } from './middleware/admin-auth.ts';
 import { apiError } from './utils/response.ts';
@@ -73,6 +74,16 @@ app.route('/api/v1/admin/monitor', monitorRoutes);
 app.onError((err, c) => {
   console.error(`[${c.req.method}] ${c.req.path}:`, err);
   return c.json(apiError('服务器内部错误', 'INTERNAL_ERROR'), 500);
+});
+
+// ===== 管理后台（Next.js 导出为 flat HTML，显式映射 /admin → /admin.html）=====
+app.get('/admin', (c) => {
+  try {
+    const html = readFileSync('./public/admin.html', 'utf-8');
+    return c.html(html);
+  } catch {
+    return c.redirect('/');
+  }
 });
 
 // ===== 前端静态文件（合体镜像模式，未匹配 API 的请求走这里）=====

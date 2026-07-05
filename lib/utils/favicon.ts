@@ -1,5 +1,6 @@
 import { generateFaviconUrl } from "./common";
 import React from "react";
+import { getCachedFavicon, setCachedFavicon } from "./icon-cache";
 
 /** 常见域名 → 品牌名称映射 */
 const DOMAIN_BRAND: Record<string, string> = {
@@ -82,7 +83,7 @@ export function extractTitleFromUrl(url: string): string {
  * 获取链接的首选图标 URL
  * 优先：自定义 icon → /favicon.ico → null（由 FaviconImage 组件处理回退）
  */
-export function getLinkIcon(
+function getLinkIcon(
   icon: string | null | undefined,
   url: string,
   type?: string,
@@ -99,17 +100,17 @@ export function getLinkIcon(
 }
 
 /** 获取 API 回退图标 URL */
-export function getApiFallbackIcon(url: string): string | null {
+function getApiFallbackIcon(url: string): string | null {
   try { return generateFaviconUrl(new URL(url).hostname); } catch { return null; }
 }
 
 /** 获取 DuckDuckGo 回退图标 URL */
-export function getDuckDuckGoFallbackIcon(url: string): string | null {
+function getDuckDuckGoFallbackIcon(url: string): string | null {
   try { return `https://icons.duckduckgo.com/ip3/${new URL(url).hostname}.ico`; } catch { return null; }
 }
 
 /** 判断图标值是否为图片 URL */
-export function isImageIcon(val: string | null): val is string {
+function isImageIcon(val: string | null): val is string {
   return !!val && (val.startsWith('http') || val.startsWith('/') || val.startsWith('data:'));
 }
 
@@ -131,17 +132,73 @@ export function FaviconImage({ icon, url, type, className }: FaviconImageProps) 
   const [currentSrc, setCurrentSrc] = React.useState<string | null>(null);
   const [failedApi, setFailedApi] = React.useState(false);
   const [failedDdg, setFailedDdg] = React.useState(false);
+  const isAutoResolved = React.useRef(false);
 
   React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- init derived state
-    setCurrentSrc(getLinkIcon(icon, url, type));
+    // 1. 自定义图标 → 直接使用，跳过缓存
+    const customSrc = getLinkIcon(icon, url, type);
+    if (customSrc) {
+      setCurrentSrc(customSrc);
+      setFailedApi(false);
+      setFailedDdg(false);
+      isAutoResolved.current = false;
+      return;
+    }
+
+    // 2. 无自定义图标 → 检查 localStorage 缓存（仅当有 URL 可提取 domain）
+    if (url) {
+      try {
+        const domain = new URL(url).hostname;
+        const cached = getCachedFavicon(domain);
+        if (cached) {
+          setCurrentSrc(cached);
+          setFailedApi(false);
+          setFailedDdg(false);
+          isAutoResolved.current = false; // 缓存命中也是最终结果，不再重复缓存
+          return;
+        }
+      } catch { /* URL 解析失败，走常规 fallback */ }
+    }
+
+    // 3. 无缓存 → 从 /favicon.ico 开始试探
+    try {
+      const u = new URL(url);
+      setCurrentSrc(`${u.origin}/favicon.ico`);
+    } catch {
+      setCurrentSrc(null);
+    }
     setFailedApi(false);
     setFailedDdg(false);
+    isAutoResolved.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [icon, url, type]);
 
   if (!currentSrc) return null;
 
+  /** favicon 成功加载 → 写入缓存（仅缓存自动解析的，不缓存用户自定义图标） */
+  const handleLoad = () => {
+    if (isAutoResolved.current && currentSrc && url) {
+      try {
+        const domain = new URL(url).hostname;
+        setCachedFavicon(domain, currentSrc);
+      } catch { /* 静默降级 */ }
+    }
+  };
+
   const handleError = () => {
+    // 当前加载失败的 URL 如果曾经是缓存中的，清除它
+    if (!isAutoResolved.current && currentSrc && url) {
+      try {
+        const domain = new URL(url).hostname;
+        const cached = getCachedFavicon(domain);
+        if (cached === currentSrc) {
+          localStorage.removeItem('favicon_cache_' + domain);
+        }
+      } catch { /* ignore */ }
+    }
+
+    isAutoResolved.current = true;
+
     if (!failedApi) {
       const fb = getApiFallbackIcon(url);
       if (fb) {
@@ -166,6 +223,7 @@ export function FaviconImage({ icon, url, type, className }: FaviconImageProps) 
     alt: "",
     className: className,
     onError: handleError,
+    onLoad: handleLoad,
     loading: "lazy",
   });
 }

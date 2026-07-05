@@ -1,12 +1,17 @@
 // 图片处理工具函数
 
 /**
- * 将图片文件转换为WebP格式
+ * 将图片文件转换为限制尺寸的 WebP 格式
  * @param file 原始图片文件
- * @param quality 转换质量 (0-100)
- * @returns Promise<File> 转换后的WebP文件
+ * @param quality 转换质量 (0-100，默认 65)
+ * @param maxDimension 最大宽高（px，默认 128），等比缩放
+ * @returns Promise<File> 转换后的 WebP 文件
  */
-export const convertToWebP = (file: File, quality: number = 85): Promise<File> => {
+export const convertToWebP = (
+  file: File,
+  quality: number = 65,
+  maxDimension: number = 128
+): Promise<File> => {
   return new Promise((resolve, reject) => {
     // 检查文件是否为图片
     if (!file.type.startsWith('image/')) {
@@ -14,8 +19,8 @@ export const convertToWebP = (file: File, quality: number = 85): Promise<File> =
       return;
     }
 
-    // 如果已经是WebP格式，直接返回
-    if (file.type === 'image/webp') {
+    // 如果已经是 WebP 格式且无需缩放，直接返回
+    if (file.type === 'image/webp' && maxDimension >= 4096) {
       resolve(file);
       return;
     }
@@ -28,28 +33,31 @@ export const convertToWebP = (file: File, quality: number = 85): Promise<File> =
       img.src = event.target?.result as string;
 
       img.onload = () => {
-        // 创建Canvas元素
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
+        // 限制最大尺寸，保持宽高比
+        let { width, height } = img;
+        if (width > maxDimension || height > maxDimension) {
+          const ratio = Math.min(maxDimension / width, maxDimension / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
 
-        // 绘制图片
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           reject(new Error('无法创建Canvas上下文'));
           return;
         }
-        ctx.drawImage(img, 0, 0);
+        ctx.drawImage(img, 0, 0, width, height);
 
-        // 转换为WebP格式
         canvas.toBlob(
           (blob) => {
             if (!blob) {
               reject(new Error('图片转换失败'));
               return;
             }
-
-            // 创建新的File对象
             const webpFileName = `${file.name.split('.')[0]}.webp`;
             const webpFile = new File([blob], webpFileName, { type: 'image/webp' });
             resolve(webpFile);
@@ -59,14 +67,10 @@ export const convertToWebP = (file: File, quality: number = 85): Promise<File> =
         );
       };
 
-      img.onerror = () => {
-        reject(new Error('图片加载失败'));
-      };
+      img.onerror = () => reject(new Error('图片加载失败'));
     };
 
-    reader.onerror = () => {
-      reject(new Error('文件读取失败'));
-    };
+    reader.onerror = () => reject(new Error('文件读取失败'));
   });
 };
 

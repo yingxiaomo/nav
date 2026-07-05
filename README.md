@@ -43,6 +43,9 @@
 - **扩展功能**：
   - **任务管理**：支持添加、编辑、完成和删除任务
   - **笔记功能**：支持创建和管理简单笔记
+  - **系统监控**（需部署后端）：实时 CPU/内存/磁盘监控，HTTP 服务健康巡检，支持自定义图标
+  - **Docker 管理**（需 Docker socket 挂载）：容器列表查看，实时日志流式推送
+  - **WOL 网络唤醒**（需配置 MAC）：一键唤醒局域网内关机设备
 - **管理体验**
   - **书签导入**：支持一键导入浏览器书签，快速完成初始化。
   - **自动识别**：自动抓取链接标题和图标。
@@ -90,7 +93,7 @@
 
 ### 7. 本地服务器（推荐自部署）
 
-如果你不想依赖第三方服务，可以使用配套的后端 API 服务，将数据持久化到本地 SQLite 数据库。后端还提供网页元数据解析、搜索联想等增强功能。
+如果你不想依赖第三方服务，可以使用配套的后端 API 服务，将数据持久化到本地 SQLite 数据库。后端还提供网页元数据解析、搜索联想、系统监控、Docker 容器管理和 WOL 网络唤醒等增强功能。
 
 需要部署后端服务，详情见下方 Docker 部署章节。
 
@@ -131,7 +134,13 @@
 docker run -p 8642:8642 -v nav-data:/app/data ghcr.io/yingxiaomo/nav:latest
 ```
 
-打开 <http://localhost:8642> 即可看到导航页，<http://localhost:8642/admin/> 进入管理后台。
+打开 <http://localhost:8642> 即可看到导航页，<http://localhost:8642/admin> 进入管理后台。
+
+如需使用 **Docker 容器日志** 和 **容器列表** 功能，需挂载 Docker socket：
+
+```bash
+docker run -p 8642:8642 -v nav-data:/app/data -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/yingxiaomo/nav:latest
+```
 
 ### 方式二: 独立后端
 

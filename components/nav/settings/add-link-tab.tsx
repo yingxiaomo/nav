@@ -17,14 +17,15 @@ import {
   sanitizeText
 } from "@/lib/utils/validation";
 import { convertToWebP } from "@/lib/utils/image-utils";
-import { STORAGE_CONFIG_KEY } from "@/lib/adapters/storage";
+import { STORAGE_CONFIG_KEY, StorageConfig, GithubRepoAdapter, S3Adapter, WebDavAdapter, DropboxAdapter, GoogleDriveAdapter, ApiServerAdapter } from "@/lib/adapters/storage";
 
 interface AddLinkTabProps {
   localData: DataSchema;
   setLocalData: React.Dispatch<React.SetStateAction<DataSchema>>;
+  storageConfig?: StorageConfig;
 }
 
-export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
+export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTabProps) {
   const [newUrl, setNewUrl] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("");
@@ -133,60 +134,94 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 检查文件类型
     if (!isValidImageFile(file)) {
       return toast.error("请选择图片文件", { description: "支持的图片格式：JPG、PNG、GIF、SVG等" });
     }
-
-    // 检查文件大小（限制为2MB）
     if (!isValidFileSize(file, 2)) {
       return toast.error("文件大小超过限制", { description: "图片大小不能超过2MB" });
     }
 
     setIsUploadingIcon(true);
     setIconUploadProgress(0);
-
     let progressInterval: ReturnType<typeof setInterval> | null = null;
 
     try {
-      // 先将图片转换为WebP格式，然后再转换为Base64
+      // 1. 极限压缩：转为 WebP + 128px 限制 + 65% 质量
       setIconUploadProgress(10);
-      
-      // 转换为WebP格式
-      const webpFile = await convertToWebP(file);
+      const webpFile = await convertToWebP(file, 65, 128);
       setIconUploadProgress(50);
-      
-      // 使用 FileReader 将WebP图片转换为 Base64 格式
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64Data = event.target?.result as string;
-        setNewIcon(base64Data);
-        setIconUploadProgress(100);
-        toast.success("图标上传成功", { description: "已转换为WebP格式并设置为当前链接的图标" });
-      };
 
-      // 模拟上传进度
-      let progress = 50;
-      progressInterval = setInterval(() => {
-        progress += 5;
-        if (progress < 90) {
-          setIconUploadProgress(progress);
+      // 2. 尝试上传到存储后端（如果当前适配器支持）
+      let iconUrl: string | null = null;
+
+      if (storageConfig && storageConfig.type !== 'gist') {
+        try {
+          let adapter: { uploadFile?: (file: File, name: string) => Promise<string> } | null = null;
+          switch (storageConfig.type) {
+            case 'github':
+              if (storageConfig.github?.token) adapter = new GithubRepoAdapter(storageConfig.github);
+              break;
+            case 's3':
+              if (storageConfig.s3?.accessKeyId) adapter = new S3Adapter(storageConfig.s3);
+              break;
+            case 'webdav':
+              if (storageConfig.webdav?.url) adapter = new WebDavAdapter(storageConfig.webdav);
+              break;
+            case 'dropbox':
+              if (storageConfig.dropbox?.token) adapter = new DropboxAdapter(storageConfig.dropbox);
+              break;
+            case 'googledrive':
+              if (storageConfig.googledrive?.token) adapter = new GoogleDriveAdapter(storageConfig.googledrive);
+              break;
+            case 'api-server':
+              if (storageConfig.apiServer?.baseUrl) adapter = new ApiServerAdapter(storageConfig.apiServer);
+              break;
+          }
+
+          if (adapter?.uploadFile) {
+            const url = await adapter.uploadFile(webpFile, `icon-${Date.now()}.webp`);
+            iconUrl = url;
+          }
+        } catch {
+          // 上传失败 → 降级到 data URI
         }
-      }, 100);
+      }
 
-      reader.onloadend = () => {
-        if (progressInterval) clearInterval(progressInterval);
+      // 3. 设置最终图标（URL 优先，否则 data URI）
+      if (iconUrl) {
+        setNewIcon(iconUrl);
+        setIconUploadProgress(100);
+        toast.success("图标已上传到云端并设置为当前链接的图标");
         setIsUploadingIcon(false);
-      };
-
-      reader.readAsDataURL(webpFile);
+      } else {
+        // 降级：转 data URI
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64Data = event.target?.result as string;
+          setNewIcon(base64Data);
+          setIconUploadProgress(100);
+          toast.success("图标已压缩并设置为当前链接的图标");
+        };
+        let progress = 50;
+        progressInterval = setInterval(() => {
+          progress += 5;
+          if (progress < 90) setIconUploadProgress(progress);
+        }, 100);
+        reader.onloadend = () => {
+          if (progressInterval) clearInterval(progressInterval);
+          setIsUploadingIcon(false);
+        };
+        reader.readAsDataURL(webpFile);
+      }
     } catch (error) {
       console.error("Icon upload error:", error);
       toast.error("图标上传失败", { description: "请重试或选择其他图标" });
       if (progressInterval) clearInterval(progressInterval);
       setIsUploadingIcon(false);
     }
-  };  const handleAddLink = () => {
+  };
+
+  const handleAddLink = () => {
     // 净化和验证输入
     const sanitizedTitle = sanitizeText(newTitle.trim());
     const sanitizedCategory = sanitizeText(newCategory.trim());

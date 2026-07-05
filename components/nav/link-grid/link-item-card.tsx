@@ -40,7 +40,7 @@ export function LinkItemCard({ item, onClick, className, showPinButton, isPinned
     if (isFolder) {
         return (
            <div className={`group block relative ${className || ''}`} onClick={() => onClick?.(item)} {...commonProps}>
-               <div className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition-colors cursor-pointer">
+               <div className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition-all cursor-pointer active:scale-[0.98]">
                    <div className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center border border-white/20 overflow-hidden bg-yellow-500/10 text-yellow-500">
                        <IconRender name={item.icon || "FolderOpen"} className="h-4 w-4" />
                    </div>
@@ -76,7 +76,7 @@ export function LinkItemCard({ item, onClick, className, showPinButton, isPinned
                </svg>
              </button>
            )}
-           <div className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition-colors cursor-pointer" onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')} {...commonProps}>
+           <div className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition-all cursor-pointer active:scale-[0.98]" onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')} {...commonProps}>
                <div className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center overflow-hidden border border-white/20 bg-blue-500/10 text-blue-500">
                  <FaviconImage icon={item.icon} url={item.url} className="h-8 w-8 object-cover" />
                </div>
@@ -147,22 +147,22 @@ export function PinnedLinkCard({
   onUnpin: () => void;
 }) {
   return (
-    <div className="group relative p-2.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
+    <div className="group relative cursor-pointer py-1">
       <button
         onClick={(e) => { e.stopPropagation(); onUnpin(); }}
-        className="absolute -top-1.5 -right-1.5 z-10 p-0.5 rounded-full bg-red-500/70 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 max-sm:hidden"
+        className="absolute -top-1 -right-1 z-10 p-0.5 rounded-full bg-red-500/70 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 max-sm:hidden"
         title="取消固定"
       >
-        <X className="h-3 w-3" />
+        <X className="h-2.5 w-2.5" />
       </button>
       <div
-        className="flex flex-col items-center gap-1.5"
+        className="flex flex-col items-center gap-1 active:scale-95 transition-transform"
         onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
       >
-        <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
-          <FaviconImage icon={item.icon} url={item.url} className="h-5 w-5 object-contain" />
+        <div className="flex items-center justify-center w-12 h-12 drop-shadow-xl">
+          <FaviconImage icon={item.icon} url={item.url} className="w-12 h-12 object-contain drop-shadow-lg" />
         </div>
-        <span className="text-white text-[11px] font-medium truncate max-w-full text-center leading-tight">
+        <span className="text-white/80 text-[10px] font-medium truncate max-w-full text-center leading-tight drop-shadow-sm max-w-[64px]">
           {item.title}
         </span>
       </div>

@@ -55,6 +55,8 @@ export const monitorTargets = sqliteTable('monitor_targets', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   url: text('url').notNull(),
+  icon: text('icon'),
+  mac: text('mac'),
   timeout: integer('timeout').notNull().default(5000),
   createdAt: integer('created_at').notNull(),
 });

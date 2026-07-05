@@ -7,6 +7,7 @@ export interface ThemeState {
 
   // ── 视觉定制 ──
   accentColor: string;
+  customAccentColor: string | null; // 自由选色（覆盖 ACCENT_MAP）
   overlayDarkness: number;    // 0–100
   cardOpacity: number;        // 0–100
   fontFamily: 'system' | 'mono';
@@ -15,6 +16,7 @@ export interface ThemeState {
   // ── 动作 ──
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
   setAccentColor: (color: string) => void;
+  setCustomAccentColor: (color: string | null) => void;
   setOverlayDarkness: (value: number) => void;
   setCardOpacity: (value: number) => void;
   setFontFamily: (family: 'system' | 'mono') => void;
@@ -32,7 +34,7 @@ const ACCENT_MAP: Record<string, { light: string; dark: string }> = {
   amber:  { light: '#f97316', dark: '#fb923c' },
 };
 
-export const THEME_DEFAULTS = {
+const THEME_DEFAULTS = {
   theme: 'system' as const,
   accentColor: 'blue',
   overlayDarkness: 20,
@@ -52,10 +54,14 @@ function applyCSS(state: ThemeState) {
   root.classList.add(isDark ? 'dark' : 'light');
   root.setAttribute('data-theme', isDark ? 'dark' : 'light');
 
-  // Accent color
-  const accent = ACCENT_MAP[state.accentColor];
-  if (accent) {
-    root.style.setProperty('--accent', isDark ? accent.dark : accent.light);
+  // Accent color — custom overrides preset
+  if (state.customAccentColor) {
+    root.style.setProperty('--accent', state.customAccentColor);
+  } else {
+    const accent = ACCENT_MAP[state.accentColor];
+    if (accent) {
+      root.style.setProperty('--accent', isDark ? accent.dark : accent.light);
+    }
   }
 
   // Overlay darkness (0–1 decimal for CSS rgba)
@@ -97,6 +103,7 @@ const useThemeStore = create<ThemeState>()(
     (set, get) => ({
       theme: 'system',
       accentColor: 'blue',
+      customAccentColor: null,
       overlayDarkness: 20,
       cardOpacity: 10,
       fontFamily: 'system',
@@ -109,7 +116,12 @@ const useThemeStore = create<ThemeState>()(
       },
 
       setAccentColor: (color) => {
-        set({ accentColor: color });
+        set({ accentColor: color, customAccentColor: null });
+        applyCSS(get());
+      },
+
+      setCustomAccentColor: (color) => {
+        set({ customAccentColor: color });
         applyCSS(get());
       },
 
@@ -141,6 +153,7 @@ const useThemeStore = create<ThemeState>()(
         set({
           theme: 'system',
           accentColor: 'blue',
+          customAccentColor: null,
           overlayDarkness: 20,
           cardOpacity: 10,
           fontFamily: 'system',
@@ -166,4 +179,4 @@ if (typeof window !== 'undefined') {
   }, 0);
 }
 
-export { useThemeStore, ACCENT_MAP, BLUR_MAP };
+export { useThemeStore };

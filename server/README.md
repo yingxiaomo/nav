@@ -18,37 +18,73 @@ npm run dev
 docker compose -f server/docker-compose.yml up -d
 ```
 
+> 如需使用 Docker 容器日志功能，需挂载 Docker socket：`-v /var/run/docker.sock:/var/run/docker.sock`
+
 ## API 概览
 
 所有接口前缀：`/api/v1`
 
+### 核心数据接口
+
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | /health | 健康检查 |
-| GET | /data | 获取完整数据快照（一次性返回所有数据） |
+| GET | /data | 获取完整数据快照（分类、书签、待办、笔记、设置） |
 | PUT | /data | 全量替换数据（事务写入） |
 | GET | /parse?url=... | 解析网页元数据（标题、描述、图标、封面图） |
-| GET | /suggest?q=...&source=... | 搜索联想词（支持 duckduckgo / google / baidu） |
-| GET | /categories | 获取全部分类（含书签） |
-| POST | /categories | 创建分类 |
-| PUT | /categories/:id | 更新分类 |
-| DELETE | /categories/:id | 删除分类 |
-| GET | /bookmarks | 获取书签（支持 ?categoryId= 筛选） |
-| POST | /bookmarks | 创建书签 |
-| PUT | /bookmarks/:id | 更新书签 |
-| DELETE | /bookmarks/:id | 删除书签 |
-| PATCH | /bookmarks/reorder | 批量排序 |
-| GET | /todos | 获取待办 |
-| POST | /todos | 创建待办 |
-| PUT | /todos/:id | 更新待办 |
-| DELETE | /todos/:id | 删除待办 |
-| GET | /notes | 获取笔记 |
-| POST | /notes | 创建笔记 |
-| PUT | /notes/:id | 更新笔记 |
-| DELETE | /notes/:id | 删除笔记 |
+| GET | /suggest?q=...&source=... | 搜索联想词 |
+| GET/POST | /categories | 分类 CRUD |
+| PUT/DELETE | /categories/:id | 分类 CRUD |
+| GET/POST | /bookmarks | 书签 CRUD |
+| PUT/DELETE | /bookmarks/:id | 书签 CRUD |
+| GET/POST | /todos | 待办 CRUD |
+| PUT/DELETE | /todos/:id | 待办 CRUD |
+| GET/POST | /notes | 笔记 CRUD |
+| PUT/DELETE | /notes/:id | 笔记 CRUD |
 | GET | /settings | 获取所有配置 |
 | PUT | /settings | 批量更新配置 |
 | POST | /upload | 上传图片 |
+
+### 系统监控接口
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /admin/monitor/system | 系统资源（CPU/内存/磁盘/运行时间） |
+| GET | /admin/monitor/checks | 所有监控目标及巡检结果 |
+| POST | /admin/monitor/checks | 添加监控目标 |
+| PUT | /admin/monitor/checks/:id | 编辑监控目标 |
+| DELETE | /admin/monitor/checks/:id | 删除监控目标 |
+| POST | /admin/monitor/fetch-icon | 自动识别目标页面的 favicon |
+| POST | /admin/monitor/wol/:id | 按监控目标 ID 发送 WOL 魔法包 |
+| POST | /admin/monitor/wol | 按 MAC 地址发送 WOL 魔法包 |
+
+### Docker 管理接口
+
+> 需要 Docker socket 挂载 (`-v /var/run/docker.sock:/var/run/docker.sock`)
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /admin/docker/containers | 列出所有容器 |
+| GET | /admin/docker/logs/:name | SSE 流式推送容器日志 |
+
+### 管理后台接口
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /admin/logs?lines=300 | 获取后端运行日志 |
+| GET | /admin/backup | 服务端全量备份（含监控目标） |
+| POST | /admin/backup | 导入全量备份（保留内部密钥） |
+
+### 认证接口
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | /auth/setup | 首次配置管理员密码和 API 令牌 |
+| POST | /auth/login | 管理员登录 |
+| POST | /auth/logout | 退出登录 |
+| GET | /auth/status | 检查配置和登录状态 |
+| GET | /auth/api-token | 查看当前 API 令牌（需登录） |
+| POST | /auth/api-token | 重新生成 API 令牌（需登录） |
 
 ## 数据模型
 
@@ -88,6 +124,7 @@ docker compose -f server/docker-compose.yml up -d
 | CORS_ORIGIN | * | CORS 允许的起源，生产环境建议设为前端域名 |
 | ROOT_PASSWORD | 空 | 管理员密码（不设则首次启动通过 Web 界面配置）|
 | ADMIN_SALT | 自动生成 | 密码加密盐值 |
+| DISABLE_MONITORING | false | 设为 true 关闭监控功能（独立后端/公网部署） |
 
 ## 安全
 

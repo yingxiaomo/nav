@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertCircle, Wifi, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { DataSchema } from "@/lib/types";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface StorageTabProps {
   config: StorageConfig;
@@ -30,6 +31,10 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
   const [isTesting, setIsTesting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    phase: 'first' | 'second';
+    action: 'reset' | 'clear';
+  } | null>(null);
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
@@ -132,10 +137,6 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
         });
       } else if (config.type === 'api-server') {
         const settings = config.apiServer || DEFAULT_APISERVER;
-        if (!settings.baseUrl) {
-          toast.error("连接失败", { description: "请填写后端地址" });
-          return;
-        }
         const adapter = new ApiServerAdapter(settings);
         if (adapter.testConnection) await adapter.testConnection();
         toast.success("后端连接成功！", {
@@ -152,15 +153,13 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
     }
   };
 
-  const handleResetDefault = async () => {
-    if (!confirm("确定恢复默认模板？所有当前书签将被默认模板覆盖。")) return;
-    if (!confirm("再次确认：当前数据将被替换！")) return;
+  const runResetDefault = async () => {
     setIsResetting(true);
+    setConfirmDialog(null);
     try {
       const res = await fetch("/data.json");
       if (!res.ok) { toast.error("无法加载默认模板"); setIsResetting(false); return; }
       const template = await res.json();
-      // 保留当前设置（主题、壁纸、存储配置等），只替换书签数据
       const merged: DataSchema = {
         ...template,
         settings: { ...localData.settings, ...template.settings, wallpaperList: localData.settings.wallpaperList || template.settings.wallpaperList },
@@ -177,10 +176,9 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
       setIsResetting(false);
     }
   };
-  const handleClearAll = async () => {
-    if (!confirm("将清空所有书签、待办和笔记，此操作不可撤销，确定吗？")) return;
-    if (!confirm("再次确认：所有书签、待办、笔记将被永久删除！")) return;
+  const runClearAll = async () => {
     setIsClearing(true);
+    setConfirmDialog(null);
     try {
       const cleared: DataSchema = {
         ...localData,
@@ -188,7 +186,6 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
         todos: [],
         notes: [],
       };
-      // 保留壁纸列表
       cleared.settings = { ...cleared.settings, wallpaperList: localData.settings.wallpaperList || [] };
       setLocalData(cleared);
       localStorage.setItem("clean-nav-local-data", JSON.stringify(cleared));
@@ -198,6 +195,28 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
     } catch {
       toast.error("清空失败，请稍后重试");
       setIsClearing(false);
+    }
+  };
+
+  const confirmLabels = !confirmDialog ? { title: '', description: '', confirmText: '' } : {
+    title: confirmDialog.action === 'reset'
+      ? (confirmDialog.phase === 'first' ? '恢复默认模板' : '再次确认')
+      : (confirmDialog.phase === 'first' ? '清空所有书签' : '再次确认'),
+    description: confirmDialog.phase === 'first'
+      ? (confirmDialog.action === 'reset'
+        ? '所有当前书签将被默认模板覆盖。'
+        : '所有书签、待办和笔记将被清空。')
+      : '此操作不可撤销，确定要继续吗？',
+    confirmText: confirmDialog.action === 'reset' ? '恢复' : '清空',
+  };
+
+  const handleConfirm = () => {
+    if (!confirmDialog) return;
+    if (confirmDialog.phase === 'first') {
+      setConfirmDialog({ ...confirmDialog, phase: 'second' });
+    } else {
+      if (confirmDialog.action === 'reset') runResetDefault();
+      else runClearAll();
     }
   };
 
@@ -512,7 +531,7 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
               <Input
                 value={apiServerCfg.baseUrl || ""}
                 onChange={e => updateApiServer({ baseUrl: e.target.value })}
-                placeholder="http://your-server:8642"
+                placeholder="留空则默认使用当前地址 (推荐)"
                 className="h-9"
               />
             </div>
@@ -564,7 +583,7 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
             <Button
                 variant="outline"
                 className="w-full gap-2 text-red-500 hover:text-red-400 border-red-500/30 hover:border-red-500/50"
-                onClick={handleResetDefault}
+                onClick={() => setConfirmDialog({ phase: 'first', action: 'reset' })}
                 disabled={isResetting || isClearing}
             >
                 {isResetting ? (
@@ -579,7 +598,7 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
             <Button
                 variant="outline"
                 className="w-full gap-2 text-destructive hover:text-destructive border-destructive/30"
-                onClick={handleClearAll}
+                onClick={() => setConfirmDialog({ phase: 'first', action: 'clear' })}
                 disabled={isClearing || isResetting}
             >
                 {isClearing ? (
@@ -590,6 +609,18 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
                 {isClearing ? "正在清空..." : "清空所有书签"}
             </Button>
         </div>
+
+        <ConfirmDialog
+          open={confirmDialog !== null}
+          onOpenChange={(open) => { if (!open) setConfirmDialog(null); }}
+          title={confirmLabels.title}
+          description={confirmLabels.description}
+          confirmText={confirmLabels.confirmText}
+          cancelText="取消"
+          variant="destructive"
+          loading={isResetting || isClearing}
+          onConfirm={handleConfirm}
+        />
       </div>
     </div>
   );

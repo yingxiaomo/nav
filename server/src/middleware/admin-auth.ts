@@ -58,6 +58,12 @@ export const adminAuthMiddleware = createMiddleware(async (c, next) => {
     return;
   }
 
+  // 允许前端页面获取监控数据（只读 GET）
+  if (c.req.method === 'GET' && path.startsWith('/api/v1/admin/monitor/')) {
+    await next();
+    return;
+  }
+
   // 检查 Authorization: Bearer <api-token>（用于前端 Widget 等非浏览器客户端）
   const authHeader = c.req.header('Authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {

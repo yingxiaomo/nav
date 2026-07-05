@@ -13,6 +13,7 @@ import { FeaturesLauncher } from "@/components/features/features-launcher";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { SystemStatusFloater } from "@/components/features/system-status-floater";
 import Image from "next/image";
 
 import { useWallpaper, useNavData, useKeyboardShortcuts } from "@/lib";
@@ -175,7 +176,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
 
   if (!isReady) {
     return (
-        <div className="min-h-screen w-full bg-gradient-to-br from-gray-900 via-black to-gray-900 flex flex-col items-center justify-center p-4">
+        <div className="min-h-dvh w-full bg-gradient-to-br from-gray-900 via-black to-gray-900 flex flex-col items-center justify-center p-4">
             <div className="flex flex-col items-center gap-4">
                 <div className="relative">
                     <div className="h-16 w-16 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
@@ -200,7 +201,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
 
   return (
     <ThemeProvider initialTheme={data.settings.theme || "system"}>
-      <main className="relative min-h-screen w-full overflow-hidden flex flex-col items-center p-6 md:p-12 animate-in fade-in duration-500">
+      <main id="main-content" className="relative min-h-dvh w-full overflow-hidden flex flex-col items-center p-6 md:p-12 animate-in fade-in duration-500">
         <div 
           className="fixed inset-0 z-0 transition-opacity duration-700 ease-in-out bg-cover bg-center bg-no-repeat bg-gray-900"
           style={{
@@ -227,25 +228,35 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
               />
             </ErrorBoundary>
           </Suspense>
+          <SystemStatusFloater />
         </div>
 
+        {/* Floating feature icons - top left */}
+        {data.settings.showFeatures !== false && !searchQuery && (
+          <ErrorBoundary name="features" fallback={null}>
+            <FeaturesLauncher
+              todos={data.todos || []}
+              notes={data.notes || []}
+              onTodosUpdate={handleTodosUpdate}
+              onNotesUpdate={handleNotesUpdate}
+            />
+          </ErrorBoundary>
+        )}
+
         <div className="relative z-10 w-full flex flex-col items-center flex-grow">
-            <div className={`w-full max-w-5xl flex flex-col items-center shrink-0 ${data.settings.homeLayout === 'list' ? 'mt-8' : 'mt-10 md:mt-20'}`}>
+            <div className={`w-full max-w-5xl flex flex-col items-center shrink-0 ${data.settings.homeLayout === 'list' ? 'mt-8' : 'mt-6 md:mt-10'}`}>
                 <div className="flex flex-col items-center w-full">
-                  {data.settings.homeLayout !== 'list' && <ClockWidget />}
-                  
-                  {data.settings.homeLayout === 'list' && !searchQuery && data.settings.showFeatures !== false && (
-                    <ErrorBoundary name="features" fallback={null}>
-                      <FeaturesLauncher
-                        todos={data.todos || []}
-                        notes={data.notes || []}
-                        onTodosUpdate={handleTodosUpdate}
-                        onNotesUpdate={handleNotesUpdate}
-                      />
-                    </ErrorBoundary>
+                  {data.settings.homeLayout !== 'list' && (
+                    <>
+                      <h1 className="sr-only">Clean Nav</h1>
+                      <ClockWidget />
+                    </>
                   )}
-                  
-                  <div className={data.settings.homeLayout === 'list' ? "mt-8 w-full" : "w-full"}>
+                  {data.settings.homeLayout === 'list' && (
+                    <h1 className="sr-only">Clean Nav</h1>
+                  )}
+
+                  <div className={data.settings.homeLayout === 'list' ? "mt-6 w-full" : "w-full"}>
                   <SearchBar
                     ref={searchInputRef}
                     onLocalSearch={setSearchQuery}
@@ -253,23 +264,12 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
                     onOpenLink={(url) => window.open(url, '_blank', 'noopener,noreferrer')}
                   />
                 </div>
-                  
-                  {data.settings.homeLayout !== 'list' && !searchQuery && data.settings.showFeatures !== false && (
-                    <ErrorBoundary name="features" fallback={null}>
-                      <FeaturesLauncher
-                        todos={data.todos || []}
-                        notes={data.notes || []}
-                        onTodosUpdate={handleTodosUpdate}
-                        onNotesUpdate={handleNotesUpdate}
-                      />
-                    </ErrorBoundary>
-                  )}
                 </div>
             </div>
-            
+
             {data.settings.homeLayout !== 'list' && <div className="flex-grow" />}
 
-            <div className={`w-full max-w-5xl flex flex-col items-center ${data.settings.homeLayout === 'list' ? 'mt-8 mb-20' : 'mb-10'}`}>
+            <div className={`w-full max-w-5xl flex flex-col items-center ${data.settings.homeLayout === 'list' ? 'mt-4 mb-20' : '-mt-2 mb-6'}`}>
               <ErrorBoundary name="link-grid" fallback={<p className="text-white/60 text-sm mt-8">书签加载失败</p>}>
                 <LinkGrid
                   ref={folderNavRef}

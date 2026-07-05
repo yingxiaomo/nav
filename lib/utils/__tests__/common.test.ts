@@ -15,6 +15,7 @@ import {
   formatDate,
   formatTime,
   formatFileSize,
+  isPrivateHost,
 } from "../common";
 
 // ---------------------------------------------------------------------------
@@ -181,5 +182,40 @@ describe("formatFileSize", () => {
     expect(formatFileSize(0)).toBe("0 Bytes");
     expect(formatFileSize(1024)).toBe("1 KB");
     expect(formatFileSize(1048576)).toBe("1 MB");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isPrivateHost（与后端 security.test.ts 对齐）
+// ---------------------------------------------------------------------------
+describe("isPrivateHost", () => {
+  it("应识别 localhost", () => {
+    expect(isPrivateHost("localhost")).toBe(true);
+    expect(isPrivateHost("127.0.0.1")).toBe(true);
+    expect(isPrivateHost("[::1]")).toBe(true);
+  });
+  it("应识别 IPv4 私有段", () => {
+    expect(isPrivateHost("10.0.0.1")).toBe(true);
+    expect(isPrivateHost("172.16.0.1")).toBe(true);
+    expect(isPrivateHost("172.31.255.255")).toBe(true);
+    expect(isPrivateHost("192.168.1.1")).toBe(true);
+  });
+  it("应拒绝公网 IPv4", () => {
+    expect(isPrivateHost("8.8.8.8")).toBe(false);
+    expect(isPrivateHost("1.1.1.1")).toBe(false);
+    expect(isPrivateHost("172.32.0.1")).toBe(false);
+  });
+  it("应识别私有域名后缀", () => {
+    expect(isPrivateHost("server.local")).toBe(true);
+    expect(isPrivateHost("nas.internal")).toBe(true);
+    expect(isPrivateHost("router.lan")).toBe(true);
+  });
+  it("应拒绝公网域名", () => {
+    expect(isPrivateHost("github.com")).toBe(false);
+    expect(isPrivateHost("example.com")).toBe(false);
+  });
+  it("应处理 0.0.0.0", () => {
+    expect(isPrivateHost("0.0.0.0")).toBe(true);
+    expect(isPrivateHost("[::]")).toBe(true);
   });
 });

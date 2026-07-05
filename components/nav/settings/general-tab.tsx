@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch" 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ImageIcon, Shuffle, Layers, Upload, Loader2, Sun, Moon, Monitor, RotateCcw } from "lucide-react";
+import { ImageIcon, Shuffle, Layers, Upload, Loader2, Sun, Moon, Monitor, RotateCcw, AlertTriangle, Check } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -23,6 +23,24 @@ const ACCENT_COLORS = [
   { key: 'orange', label: '橙', color: '#f59e0b' },
   { key: 'amber',  label: '琥珀', color: '#f97316' },
 ];
+
+/** 简单对比度计算（用于实时预览警告） */
+function hexToRgb(hex: string) {
+  const h = hex.replace('#', '');
+  return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) };
+}
+function getLuminance(r: number, g: number, b: number) {
+  const [rl, gl, bl] = [r, g, b].map(c => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); });
+  return 0.2126 * rl + 0.7152 * gl + 0.0722 * bl;
+}
+function getContrastRatio(hex: string): number {
+  try {
+    const { r, g, b } = hexToRgb(hex);
+    const lum = getLuminance(r, g, b);
+    const lighter = Math.max(lum, 0.05), darker = Math.min(lum, 0.05);
+    return Math.round((lighter + 0.05) / (darker + 0.05) * 100) / 100;
+  } catch { return 21; }
+}
 
 const FONT_OPTIONS = [
   { value: 'system' as const, label: '系统字体' },
@@ -263,15 +281,15 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
 
       {/* ── 强调色 ── */}
       <div className="space-y-3 border border-border/50 p-4 rounded-xl bg-muted/30">
-        <Label>强调色</Label>
-        <div className="flex gap-2">
+        <Label>强调色 — 预设</Label>
+        <div className="flex gap-2 flex-wrap">
           {ACCENT_COLORS.map((c) => (
             <button
               key={c.key}
               onClick={() => themeStore.setAccentColor(c.key)}
               className={`w-8 h-8 rounded-full transition-all border-2 ${
-                themeStore.accentColor === c.key
-                  ? 'border-foreground scale-110 shadow-md'
+                themeStore.accentColor === c.key && !themeStore.customAccentColor
+                  ? 'border-foreground scale-110 shadow-md ring-2 ring-offset-2 ring-foreground/20'
                   : 'border-transparent hover:scale-105'
               }`}
               style={{ backgroundColor: c.color }}
@@ -279,6 +297,14 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
               title={c.label}
             />
           ))}
+        </div>
+
+        <div className="border-t border-border/50 pt-3 mt-3">
+          <Label>自定义颜色</Label>
+          <ColorPickerWithPreview
+            value={themeStore.customAccentColor || ACCENT_COLORS.find(c => c.key === themeStore.accentColor)?.color || '#3b82f6'}
+            onChange={(color) => themeStore.setCustomAccentColor(color)}
+          />
         </div>
       </div>
 
@@ -513,6 +539,84 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
           恢复视觉设置为默认值
         </Button>
       </div>
+    </div>
+  );
+}
+
+// ══════ Color Picker with Contrast Validation ══════
+
+function ColorPickerWithPreview({ value, onChange }: { value: string; onChange: (color: string | null) => void }) {
+  const [inputValue, setInputValue] = useState(value);
+
+  const ratio = getContrastRatio(value);
+  const passes = ratio >= 4.5;
+  const isValidHex = /^#[0-9a-fA-F]{6}$/.test(value);
+
+  const handleColorPicker = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    setInputValue(v);
+    onChange(v);
+  };
+
+  const handleTextInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    setInputValue(v);
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+      onChange(v);
+    }
+  };
+
+  const handleBlur = () => {
+    if (/^#[0-9a-fA-F]{6}$/.test(inputValue)) {
+      onChange(inputValue);
+    } else {
+      setInputValue(value);
+    }
+  };
+
+  return (
+    <div className="space-y-3 mt-2">
+      {/* 拾色器 + 输入框 */}
+      <div className="flex gap-2 items-center">
+        <div className="relative">
+          <input
+            type="color"
+            value={isValidHex ? value : '#3b82f6'}
+            onChange={handleColorPicker}
+            className="w-10 h-10 rounded-md cursor-pointer border border-border p-0.5 bg-transparent"
+          />
+        </div>
+        <input
+          value={inputValue}
+          onChange={handleTextInput}
+          onBlur={handleBlur}
+          placeholder="#HEX 颜色值"
+          className={`flex-1 h-9 px-3 rounded-md border text-sm font-mono bg-background ${
+            isValidHex ? 'border-input' : 'border-destructive/50'
+          }`}
+        />
+      </div>
+
+      {/* 预览色块 */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="p-2 rounded text-xs bg-white border" style={{ color: value }}>
+          {value} 浅色背景
+        </div>
+        <div className="p-2 rounded text-xs bg-gray-900 border border-gray-700" style={{ color: value }}>
+          {value} 深色背景
+        </div>
+      </div>
+
+      {/* 对比度状态 */}
+      {isValidHex && (
+        <div className={`flex items-center gap-1.5 text-xs ${passes ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
+          {passes ? (
+            <><Check className="size-3.5" /> 对比度 {ratio}:1 — 符合 WCAG AA 标准</>
+          ) : (
+            <><AlertTriangle className="size-3.5" /> 对比度 {ratio}:1 — 低于 WCAG AA 标准 4.5:1，建议选择更深的颜色</>
+          )}
+        </div>
+      )}
     </div>
   );
 }

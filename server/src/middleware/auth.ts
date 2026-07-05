@@ -30,7 +30,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
 
   const isSameOrigin =
     (origin && (origin.includes(`://${host}`) || origin.includes('://localhost'))) ||
-    (referer && referer.includes(`://${host}`));
+    (referer && (referer.includes(`://${host}`) || referer.includes('://localhost')));
 
   if (isSameOrigin) {
     await next();

@@ -118,11 +118,20 @@ export default function RootLayout({
         <link rel="preconnect" href="https://api.github.com" crossOrigin="anonymous" />
         {/* CSP 由 next.config.ts 的 headers() 统一管理，仅在非 export 模式下生效 */}
         {/* 静态导出模式下如需 CSP，请在托管平台（Vercel/Cloudflare）的自定义响应头中配置 */}
+        {/* 全局禁用浏览器默认右键菜单（自定义菜单通过 JS 控制） */}
+        <script dangerouslySetInnerHTML={{ __html: "document.addEventListener('contextmenu',e=>e.preventDefault())" }} />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         style={{ fontFamily: 'var(--font-body)' }}
       >
+        {/* 跳转到主内容的链接 — 键盘用户专用 */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-background focus:text-foreground focus:rounded-md focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          跳转到主内容
+        </a>
         {children}
       </body>
     </html>

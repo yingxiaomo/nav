@@ -9,8 +9,29 @@ export function ClockWidget() {
   const [time, setTime] = useState<Date>(new Date());
 
   useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    // 只在页面可见时更新时钟，标签页隐藏时暂停以节省资源
+    let timer: ReturnType<typeof setInterval>;
+
+    const tick = () => {
+      if (!document.hidden) {
+        setTime(new Date());
+      }
+    };
+
+    timer = setInterval(tick, 1000);
+
+    // 切回可见时立即刷新
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        setTime(new Date());
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, []);
 
   return (

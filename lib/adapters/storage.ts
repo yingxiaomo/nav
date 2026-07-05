@@ -782,7 +782,7 @@ export class ApiServerAdapter implements StorageAdapter {
     if (this.config.token) {
       headers['Authorization'] = `Bearer ${this.config.token}`;
     }
-    const url = `${this.baseUrl}/api/v1/health`;
+    const url = this.baseUrl ? `${this.baseUrl}/api/v1/health` : '/api/v1/health';
     console.log('[ApiServerAdapter] testConnection:', url);
     const res = await fetch(url, { headers });
     if (!res.ok) {

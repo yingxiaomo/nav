@@ -68,6 +68,12 @@ export const adminAuthMiddleware = createMiddleware(async (c, next) => {
     return;
   }
 
+  // 允许读写 Docker 容器元数据（仅图标等非敏感偏好设置）
+  if (path.startsWith('/api/v1/admin/docker/metadata')) {
+    await next();
+    return;
+  }
+
   // 检查 Authorization: Bearer <api-token>（用于前端 Widget 等非浏览器客户端）
   const authHeader = c.req.header('Authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {

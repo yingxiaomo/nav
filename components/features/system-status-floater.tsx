@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { ChevronDown, Cpu, HardDrive, Plus, XCircle, Box, MemoryStick, Zap, Container, ExternalLink, Globe, Server, Monitor, Wifi, Database, Cloud, Terminal, Shield, Activity, Settings, Loader2, Pin, Play, Square } from "lucide-react";
 import { useMonitorConfig } from "@/lib/hooks/use-monitor-config";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 // ── Types ──
 interface SystemInfo {
@@ -372,17 +373,27 @@ export function SystemStatusFloater() {
                   const h = { ...authHeaders, 'Content-Type': 'application/json' };
                   // 查找或创建固定服务分类
                   const catRes = await fetch(`${baseUrl}/api/v1/categories`, { headers: h });
-                  const cats = catRes.ok ? (await catRes.json()) : [];
+                  if (!catRes.ok) { toast.error('获取分类失败'); setContextMenu(null); return; }
+                  const cats = await catRes.json();
                   let catId = Array.isArray(cats) ? cats.find((c: Record<string, unknown>) => c.title === '固定服务')?.id : null;
                   if (!catId) {
                     const cr = await fetch(`${baseUrl}/api/v1/categories`, { method: 'POST', headers: h, body: JSON.stringify({ title: '固定服务' }) });
-                    if (cr.ok) catId = (await cr.json()).id;
+                    if (!cr.ok) { toast.error('创建分类失败'); setContextMenu(null); return; }
+                    catId = (await cr.json()).id;
                   }
                   // 添加书签（带图标）
                   if (catId) {
-                    await fetch(`${baseUrl}/api/v1/bookmarks`, { method: 'POST', headers: h, body: JSON.stringify({ categoryId: catId, title: name, url, icon }) });
+                    const bkRes = await fetch(`${baseUrl}/api/v1/bookmarks`, { method: 'POST', headers: h, body: JSON.stringify({ categoryId: catId, title: name, url, icon }) });
+                    if (bkRes.ok) {
+                      toast.success(`已固定「${name}」到主页`);
+                    } else {
+                      const err = await bkRes.json().catch(() => ({}));
+                      toast.error('固定失败: ' + ((err as Record<string, unknown>)?.error || bkRes.status));
+                    }
                   }
-                } catch { /* silent */ }
+                } catch (e) { toast.error('固定失败: 网络错误'); }
+              } else {
+                if (!url) toast.error('无法固定：没有可访问的 URL');
               }
               setContextMenu(null);
             }}

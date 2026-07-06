@@ -13,11 +13,22 @@ export interface MonitorConfig {
  * 从 localStorage 中读取存储配置，
  * 仅当存储类型为 api-server 且地址是内网/私有地址时返回有效配置。
  * 否则返回 isActive: false，监控组件据此决定是否渲染。
+ *
+ * 同源/内网环境无需手动配置存储，自动启用。
  */
 export function useMonitorConfig(): MonitorConfig {
   try {
     const raw = localStorage.getItem(STORAGE_CONFIG_KEY);
-    if (!raw) return { baseUrl: null, authHeaders: {}, isActive: false };
+
+    // 无配置时检测是否内网环境，自动启用（同源模式）
+    if (!raw) {
+      const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+      if (hostname && isPrivateHost(hostname)) {
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        return { baseUrl: origin, authHeaders: {}, isActive: true };
+      }
+      return { baseUrl: null, authHeaders: {}, isActive: false };
+    }
 
     const config = JSON.parse(raw);
     if (config.type !== 'api-server') {

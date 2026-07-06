@@ -84,8 +84,8 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               `script-src 'self' 'unsafe-inline'${!isProduction ? " 'unsafe-eval'" : ""} https://fonts.googleapis.com https://api.github.com https://*.vercel.com https://cdnjs.cloudflare.com https://static.cloudflareinsights.com`,
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
-              // img-src: GitHub avatars/raw, Imgur, Cloudflare, Vercel, favicon API, DuckDuckGo icons, Bing wallpaper, Unsplash
-              "img-src 'self' data: https://raw.githubusercontent.com https://avatars.githubusercontent.com https://*.githubusercontent.com https://*.imgur.com https://*.cloudflare.com https://*.vercel.com https://iconapi.396638.xyz https://icons.duckduckgo.com https://bing.img.run https://source.unsplash.com",
+              // img-src: 放开 HTTPS 来源以支持外部 favicon
+              "img-src 'self' data: https://* http://*",
               "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com",
               "connect-src 'self' https://api.github.com https://*.githubusercontent.com https://api.dropboxapi.com https://www.googleapis.com https://iconapi.396638.xyz http://localhost:* http://127.0.0.1:*",
               "form-action 'self'",

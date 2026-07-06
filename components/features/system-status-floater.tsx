@@ -388,7 +388,8 @@ export function SystemStatusFloater() {
                       toast.success(`已固定「${name}」到主页`);
                     } else {
                       const err = await bkRes.json().catch(() => ({}));
-                      toast.error('固定失败: ' + ((err as Record<string, unknown>)?.error || bkRes.status));
+                      const errMsg = (err as Record<string, unknown>)?.error;
+                      toast.error('固定失败: ' + (typeof errMsg === 'object' && errMsg !== null ? (errMsg as Record<string, unknown>)?.message || JSON.stringify(errMsg) : (errMsg || bkRes.status)));
                     }
                   }
                 } catch (e) { toast.error('固定失败: 网络错误'); }

@@ -17,6 +17,7 @@ import { DataSchema } from "@/lib/types";
 import { STORAGE_CONFIG_KEY, StorageConfig } from "@/lib/adapters/storage";
 import { GITHUB_CONFIG_KEY } from "@/lib/adapters/github";
 import { useLocalStorage } from "@/lib/hooks";
+import { isPrivateHost } from "@/lib/utils";
 import { useUIStore } from "@/lib/stores";
 
 import { AddLinkTab } from "./add-link-tab";
@@ -56,6 +57,10 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
                 github: JSON.parse(oldGithub),
                 settings: undefined
             };
+        }
+        // 同源/内网环境默认使用本地服务器
+        if (isPrivateHost(window.location.hostname)) {
+            return { type: 'api-server', apiServer: { baseUrl: '', token: '' } };
         }
     }
     return {

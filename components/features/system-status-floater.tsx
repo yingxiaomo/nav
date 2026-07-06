@@ -90,6 +90,7 @@ export function SystemStatusFloater() {
   const [targets, setTargets] = useState<TargetInfo[]>([]);
   const [containers, setContainers] = useState<ContainerInfo[]>([]);
   const [containerStats, setContainerStats] = useState<ContainerStats[]>([]);
+  const [dockerMeta, setDockerMeta] = useState<Record<string, { name: string; icon?: string }>>({});
   const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [editTarget, setEditTarget] = useState<{ id: string; name: string; icon?: string; url?: string } | null>(null);
 
@@ -105,10 +106,12 @@ export function SystemStatusFloater() {
       const cr = await fetch(`${baseUrl}/api/v1/admin/monitor/checks`, { headers: h });
       const dr = await fetch(`${baseUrl}/api/v1/admin/docker/containers`, { headers: h });
       const sr2 = await fetch(`${baseUrl}/api/v1/admin/docker/stats`, { headers: h });
+      const dmr = await fetch(`${baseUrl}/api/v1/admin/docker/metadata`, { headers: h });
       if (sr.ok) setSys(await sr.json());
       if (cr.ok) { const d = await cr.json(); setChecks(d.results || []); setTargets(d.targets || []); }
       if (dr.ok) { const d = await dr.json(); setContainers(d.containers || []); }
       if (sr2.ok) { const d = await sr2.json(); setContainerStats(d.stats || []); }
+      if (dmr.ok) setDockerMeta(await dmr.json());
     } catch { /* silent */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseUrl]);
@@ -136,6 +139,8 @@ export function SystemStatusFloater() {
     targets.find(t => t.id === id)?.icon;
   const getMac = (id: string): string | undefined =>
     targets.find(t => t.id === id)?.mac;
+  const getDockerIcon = (containerName: string): string | undefined =>
+    dockerMeta[containerName]?.icon;
 
   const handleWake = async (id: string) => {
     const mac = getMac(id);
@@ -318,6 +323,7 @@ export function SystemStatusFloater() {
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <span className={"w-1.5 h-1.5 rounded-full shrink-0 " + (c.state === "running" ? "bg-green-400" : "bg-red-400")} />
+                    {(() => { const ico = getDockerIcon(c.name); if (ico) { if (ico.startsWith('http') || ico.startsWith('/uploads')) return <img src={ico} alt="" className="w-4 h-4 rounded shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />; return <span className="text-sm shrink-0">{ico}</span>; } return null; })()}
                     <span className="text-xs truncate text-foreground/80">{c.name}</span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -367,7 +373,7 @@ export function SystemStatusFloater() {
               const dockerC = containers.find(c => 'docker:' + c.name === contextMenu.id);
               const name = check?.name || dockerC?.name || contextMenu.id.replace('docker:', '');
               const url = check?.url || (dockerC ? parseContainerUrl(dockerC.ports) : undefined);
-              const icon = check?.id ? (getIcon(check.id) || undefined) : undefined;
+              const icon = check?.id ? (getIcon(check.id) || undefined) : (dockerC ? getDockerIcon(dockerC.name) || undefined : undefined);
               if (url && baseUrl) {
                 try {
                   const h = { ...authHeaders, 'Content-Type': 'application/json' };
@@ -409,7 +415,7 @@ export function SystemStatusFloater() {
                 if (c) { setEditTarget({ id: c.id, name: c.name, icon: getIcon(c.id), url: c.url }); }
                 else {
                   const dc = containers.find(ch => 'docker:' + ch.name === contextMenu.id);
-                  if (dc) setEditTarget({ id: contextMenu.id, name: dc.name, url: parseContainerUrl(dc.ports) || undefined });
+                  if (dc) setEditTarget({ id: contextMenu.id, name: dc.name, icon: getDockerIcon(dc.name) || undefined, url: parseContainerUrl(dc.ports) || undefined });
                 }
                 setContextMenu(null);
               }}
@@ -485,7 +491,15 @@ function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSaved }: {
           headers: { ...authHeaders, 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: name.trim(), url: url.trim(), icon: icon || undefined }),
         });
-      } else if (!isDocker) {
+      } else if (isDocker) {
+        // 编辑模式（Docker 容器）
+        const containerName = target.id.replace('docker:', '');
+        await fetch(`${baseUrl}/api/v1/admin/docker/metadata/${encodeURIComponent(containerName)}`, {
+          method: 'PUT',
+          headers: { ...authHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ icon: icon || undefined }),
+        });
+      } else {
         // 编辑模式（内网巡检）
         await fetch(`${baseUrl}/api/v1/admin/monitor/checks/${target.id}`, {
           method: 'PUT',

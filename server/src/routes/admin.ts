@@ -3,6 +3,7 @@ import { readRecent } from '../services/logger.ts';
 import { apiError } from '../utils/response.ts';
 import { exportFullBackup, restoreFullBackup } from '../services/full-backup-service.ts';
 import { listContainers, streamContainerLogs, getContainerStats } from '../services/docker-service.ts';
+import { getAllDockerMetadata, setDockerMetadata } from '../services/docker-metadata-service.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -178,6 +179,21 @@ adminRoutes.post('/docker/fetch-icon', async (c) => {
     } catch { /* fall through */ }
     return c.json({ icon: null });
   } catch { return c.json({ icon: null }); }
+});
+
+// ===== GET /api/v1/admin/docker/metadata — 获取所有 Docker 容器持久化元数据 =====
+
+adminRoutes.get('/docker/metadata', async (c) => {
+  return c.json(getAllDockerMetadata());
+});
+
+// ===== PUT /api/v1/admin/docker/metadata/:name — 保存 Docker 容器元数据（名称/图标）=====
+
+adminRoutes.put('/docker/metadata/:name', async (c) => {
+  const name = c.req.param('name');
+  const { icon } = await c.req.json() as { icon?: string };
+  setDockerMetadata(name, { name, icon });
+  return c.json({ success: true });
 });
 
 export default adminRoutes;

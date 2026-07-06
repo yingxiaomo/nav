@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ChevronDown, Cpu, HardDrive, Plus, XCircle, Box, MemoryStick, Zap, Container, ExternalLink, Globe, Server, Monitor, Wifi, Database, Cloud, Terminal, Shield, Activity, Settings, Loader2, Pin, Play, Square, PinOff } from "lucide-react";
+import { ChevronDown, Cpu, HardDrive, Plus, XCircle, Box, MemoryStick, Zap, Container, ExternalLink, Globe, Server, Monitor, Wifi, Database, Cloud, Terminal, Shield, Activity, Settings, Loader2, Pin, Play, Square } from "lucide-react";
 import { useMonitorConfig } from "@/lib/hooks/use-monitor-config";
 import { cn } from "@/lib/utils";
 
@@ -94,6 +94,7 @@ export function SystemStatusFloater() {
   const [addName, setAddName] = useState('');
   const [addUrl, setAddUrl] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [editTarget, setEditTarget] = useState<{ id: string; name: string; icon?: string } | null>(null);
 
 
   const { baseUrl, authHeaders, isActive } = useMonitorConfig();
@@ -460,6 +461,14 @@ export function SystemStatusFloater() {
           >
             <Pin className="w-3 h-3" /> 固定到主页
           </button>
+          {checks.some(c => c.id === contextMenu.id) && (
+            <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-foreground/80 hover:bg-accent rounded-lg transition-colors"
+              onClick={() => { const c = checks.find(ch => ch.id === contextMenu.id); if (c) setEditTarget({ id: c.id, name: c.name, icon: getIcon(c.id) }); setContextMenu(null); }}
+              aria-label="编辑"
+            >
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg> 编辑
+            </button>
+          )}
           {getMac(contextMenu.id) && (
             <button
               className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors"
@@ -483,6 +492,70 @@ export function SystemStatusFloater() {
           </button>
         </div>
       )}
+
+      {/* ── 编辑巡检目标 ── */}
+      {editTarget && (
+        <MonitorEditDialog
+          target={editTarget}
+          baseUrl={baseUrl || ''}
+          authHeaders={authHeaders}
+          onClose={() => setEditTarget(null)}
+          onSaved={() => { setEditTarget(null); fetchData(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── 巡检目标编辑弹窗（居中模态）──
+function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSaved }: {
+  target: { id: string; name: string; icon?: string };
+  baseUrl: string; authHeaders: Record<string, string>;
+  onClose: () => void; onSaved: () => void;
+}) {
+  const [name, setName] = useState(target.name);
+  const [icon, setIcon] = useState(target.icon || '');
+  const [saving, setSaving] = useState(false);
+  const [detecting, setDetecting] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100); }, []);
+
+  const save = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      await fetch(`${baseUrl}/api/v1/admin/monitor/checks/${target.id}`, {
+        method: 'PUT',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), icon: icon || undefined }),
+      });
+      onSaved();
+    } catch { /* silent */ }
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={onClose}>
+      <div className="bg-background/90 backdrop-blur-xl border border-border/40 rounded-2xl p-5 w-80 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="text-sm font-medium text-foreground mb-3">编辑巡检目标</div>
+        <input ref={inputRef} value={name} onChange={e => setName(e.target.value)}
+          placeholder="名称" className="w-full px-3 py-2 rounded-xl text-sm bg-muted/50 border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors mb-2"
+          onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') onClose(); }}
+        />
+        <div className="flex gap-2 items-center mb-3">
+          <input value={icon} onChange={e => setIcon(e.target.value)}
+            placeholder="图标 URL（可选）"
+            className="flex-1 px-3 py-2 rounded-xl text-sm bg-muted/50 border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors"
+          />
+          {icon && <img src={icon} alt="" className="w-8 h-8 rounded-lg shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+        </div>
+        <div className="flex gap-2">
+          <button className="flex-1 px-3 py-1.5 rounded-xl text-sm font-medium text-foreground bg-muted/50 border border-border/30 hover:bg-accent transition-colors" onClick={onClose}>取消</button>
+          <button className="flex-1 px-3 py-1.5 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50" style={{ background: '#6366f1' }} disabled={saving} onClick={save}>
+            {saving ? '保存中...' : '保存'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -18,6 +18,7 @@ export default function CategoriesTab({ showConfirm }: { showConfirm: (opts: Omi
     if (Array.isArray(data)) setCats(data);
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   const addCat = async () => {

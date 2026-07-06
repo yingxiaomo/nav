@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { req, API, ConfirmState } from '../admin-tabs';
-import { Download, Upload, RefreshCw, Trash2, Server, Loader2, AlertTriangle } from 'lucide-react';
+import { Download, Upload, RefreshCw, Trash2, Server, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function BackupTab({ showConfirm }: { showConfirm: (opts: Omit<ConfirmState, 'open'>) => void }) {

@@ -2,9 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { req, API, es } from '../admin-tabs';
+import { req, API } from '../admin-tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Container, RefreshCw, Check, X, ClipboardList, Loader2 } from 'lucide-react';
+
+// Module-level store for EventSource references (avoids window property assignment)
+const dockerLogSources = new Map<string, EventSource>();
 
 interface ContainerItem {
   id: string; name: string; image: string; state: string;
@@ -27,6 +30,7 @@ export default function DockerTab() {
     setLoading(false);
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   const openLogs = (name: string) => {
@@ -45,12 +49,13 @@ export default function DockerTab() {
       es.close();
     });
 
-    (window as unknown as Record<string, unknown>)[`__docker_log_es`] = es;
+    dockerLogSources.set(name, es);
   };
 
   const closeLogs = () => {
-    const es = (window as unknown as Record<string, unknown>)[`__docker_log_es`] as EventSource | undefined;
+    const es = dockerLogSources.get(logContainer || '');
     es?.close();
+    dockerLogSources.delete(logContainer || '');
     setLogContainer(null);
     setLogs([]);
   };
@@ -58,6 +63,15 @@ export default function DockerTab() {
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
+
+  // 组件卸载时清理日志连接
+  useEffect(() => {
+    return () => {
+      const es = dockerLogSources.get(logContainer || '');
+      if (es) { es.close(); dockerLogSources.delete(logContainer || '');
+      }
+    };
+  }, [logContainer]);
 
   if (error) {
     return (

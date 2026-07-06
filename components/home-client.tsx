@@ -191,8 +191,8 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
                     <div className="absolute inset-0 rounded-full border-4 border-white/30 border-t-transparent animate-spin-slow"></div>
                 </div>
                 <div className="text-center space-y-2">
-                    <h2 className="text-white text-xl font-medium animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">正在加载数据...</h2>
-                    <p className="text-white/60 text-sm animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">请稍候，我们正在为您准备最佳体验</p>
+                    <h2 className="text-white text-xl font-medium animate-in fade-in slide-in-from-bottom-4 duration-300 delay-100">正在加载数据...</h2>
+                    <p className="text-white/60 text-sm animate-in fade-in slide-in-from-bottom-4 duration-300 delay-200">请稍候，我们正在为您准备最佳体验</p>
                 </div>
             </div>
         </div>
@@ -201,7 +201,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
 
   return (
     <ThemeProvider initialTheme={data.settings.theme || "system"}>
-      <main id="main-content" className="relative min-h-dvh w-full overflow-hidden flex flex-col items-center p-6 md:p-12 animate-in fade-in duration-500">
+      <main id="main-content" className="relative min-h-dvh w-full overflow-hidden flex flex-col items-center p-6 md:p-12 animate-in fade-in duration-300">
         <div 
           className="fixed inset-0 z-0 transition-opacity duration-700 ease-in-out bg-cover bg-center bg-no-repeat bg-gray-900"
           style={{

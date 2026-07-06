@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ChevronDown, Cpu, HardDrive, Server, Plus, XCircle, Play, Square, Pin, PinOff, Box, MemoryStick, Zap } from "lucide-react";
+import { ChevronDown, Cpu, HardDrive, Plus, XCircle, Box, MemoryStick, Zap, Container, ExternalLink, Globe, Server, Monitor, Wifi, Database, Cloud, Terminal, Shield, Activity, Settings, Loader2, Pin, Play, Square, PinOff } from "lucide-react";
 import { useMonitorConfig } from "@/lib/hooks/use-monitor-config";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,14 @@ interface CheckResult {
 interface TargetInfo {
   id: string; name: string; url: string; icon?: string; mac?: string;
 }
+interface ContainerInfo {
+  id: string; name: string; image: string;
+  state: string; status: string; ports: string; created: string;
+}
+interface ContainerStats {
+  name: string; cpuPercent: number;
+  memUsage: number; memLimit: number; memPercent: number;
+}
 
 // ── Helpers ──
 const fmt = (b: number) => {
@@ -35,27 +43,26 @@ const serverName = typeof window !== 'undefined'
   ? (window.location.hostname === 'localhost' ? '本地服务器' : window.location.hostname)
   : '服务器';
 
-// 模拟各服务 CPU/RAM 波动（基于 id 做种子决定基准值）
+/** 从 Docker 端口字符串提取第一个宿主机IP:端口的URL */
+function parseContainerUrl(ports: string): string | null {
+  const m = ports.match(/(?:0\.0\.0\.0|::):(\d+)->\d+/);
+  if (m) return `http://${window.location.hostname}:${m[1]}`;
+  return null;
+}
+
+// 各服务 CPU/RAM 静态估算（基于 id 做种子）
 function mockResource(id: string): { cpu: number; ram: number } {
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = ((hash << 5) - hash) + id.charCodeAt(i);
   const base = Math.abs(hash % 30);
-  const jitter = Math.sin(Date.now() / 5000 + hash) * 5;
-  return { cpu: Math.max(0, Math.round(base + jitter)), ram: Math.max(10, 40 + base + Math.round(jitter * 2)) };
+  return { cpu: base, ram: 40 + base };
 }
 
 // ── Circular Progress ──
 function CircleProgress({ percent, size = 72, stroke = 6, color, label, sub }: { percent: number; size?: number; stroke?: number; color: string; label: string; sub?: string }) {
-  const [animatedPercent, setAnimatedPercent] = useState(0);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setAnimatedPercent(percent), 30);
-    return () => clearTimeout(timer);
-  }, [percent]);
-
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
-  const offset = circ - (Math.min(animatedPercent, 100) / 100) * circ;
+  const offset = circ - (Math.min(percent, 100) / 100) * circ;
   return (
     <div className="flex flex-col items-center gap-0.5">
       <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
@@ -80,15 +87,15 @@ export function SystemStatusFloater() {
   const [sys, setSys] = useState<SystemInfo | null>(null);
   const [checks, setChecks] = useState<CheckResult[]>([]);
   const [targets, setTargets] = useState<TargetInfo[]>([]);
+  const [containers, setContainers] = useState<ContainerInfo[]>([]);
+  const [containerStats, setContainerStats] = useState<ContainerStats[]>([]);
   const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addName, setAddName] = useState('');
   const [addUrl, setAddUrl] = useState('');
   const [isAdding, setIsAdding] = useState(false);
-  const [pinnedServices, setPinnedServices] = useState<string[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try { return JSON.parse(localStorage.getItem('floater_pinned_services') || '[]'); } catch { return []; }
-  });
+
+
   const { baseUrl, authHeaders, isActive } = useMonitorConfig();
   const menuRef = useRef<HTMLDivElement>(null);
   const addNameRef = useRef<HTMLInputElement>(null);
@@ -97,18 +104,24 @@ export function SystemStatusFloater() {
     if (!baseUrl) return;
     try {
       const h = authHeaders;
-      const [sr, cr] = await Promise.all([
-        fetch(`${baseUrl}/api/v1/admin/monitor/system`, { headers: h }),
-        fetch(`${baseUrl}/api/v1/admin/monitor/checks`, { headers: h }),
-      ]);
+      const sr = await fetch(`${baseUrl}/api/v1/admin/monitor/system`, { headers: h });
+      const cr = await fetch(`${baseUrl}/api/v1/admin/monitor/checks`, { headers: h });
+      const dr = await fetch(`${baseUrl}/api/v1/admin/docker/containers`, { headers: h });
+      const sr2 = await fetch(`${baseUrl}/api/v1/admin/docker/stats`, { headers: h });
       if (sr.ok) setSys(await sr.json());
       if (cr.ok) { const d = await cr.json(); setChecks(d.results || []); setTargets(d.targets || []); }
+      if (dr.ok) { const d = await dr.json(); setContainers(d.containers || []); }
+      if (sr2.ok) { const d = await sr2.json(); setContainerStats(d.stats || []); }
     } catch { /* silent */ }
-  }, [baseUrl, authHeaders]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseUrl]);
+
+  const getContainerStat = (name: string) => containerStats.find(s => s.name === name);
 
   useEffect(() => {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
-    if (baseUrl) { const t = setInterval(fetchData, 10000); return () => clearInterval(t); }
+    if (baseUrl) { const t = setInterval(fetchData, 30000); return () => clearInterval(t); }
   }, [fetchData, baseUrl]);
 
   // Close context menu on outside click
@@ -168,12 +181,13 @@ export function SystemStatusFloater() {
   const stoppedCount = checks.length - runningCount;
 
   const glassPanel = 'bg-background/70 dark:bg-background/60 backdrop-blur-xl border border-border/40';
+  const WIDTH = 'min(360px, calc(100vw - 32px))';
 
   return (
-    <div className="fixed top-4 right-4 z-[60]">
+    <div className="fixed top-4 right-4 z-[60]" style={{ width: WIDTH }}>
       {/* ── Collapsed pill ── */}
       <div
-        className={cn('relative flex items-center justify-between w-full px-3 h-10 cursor-pointer select-none rounded-2xl transition-all duration-300 hover:border-border/80', glassPanel)}
+        className={cn('flex items-center justify-between px-3 h-10 cursor-pointer select-none rounded-2xl transition-all duration-300 hover:border-border/80', glassPanel)}
         onClick={() => setExpanded(!expanded)}
       >
         {/* 【左侧模块】：flex-1 强制占据左边 50% 空间 */}
@@ -220,7 +234,6 @@ export function SystemStatusFloater() {
       {/* ── Expanded panel ── */}
       <div
         className={cn('mt-2 overflow-hidden transition-all duration-300 ease-in-out', expanded ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none')}
-        style={{ width: 'min(360px, calc(100vw - 32px))' }}
       >
         <div className={cn('rounded-2xl p-3 space-y-3', glassPanel)}>
 
@@ -302,6 +315,44 @@ export function SystemStatusFloater() {
             )}
           </div>
 
+          {/* ── Card 3: Docker ── */}
+          {containers.length > 0 && (
+          <div className="rounded-xl p-3.5 bg-card/50 dark:bg-white/5 border border-border/30">
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-1.5">
+                <Container className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">Docker 容器</span>
+              </div>
+              <span className="text-[11px] text-muted-foreground/60">
+                <span className="text-green-400">{containers.filter(function(c) { return c.state === "running"; }).length}</span>
+                /{containers.length} 运行中
+              </span>
+            </div>
+            <div className="space-y-1 max-h-[200px] overflow-y-auto">
+              {containers.map(function(c) {
+                return (
+                <div key={c.id}
+                  className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-muted/30 dark:bg-white/[0.03] hover:bg-accent/50 transition-colors cursor-pointer"
+                  onContextMenu={function(e) { e.preventDefault(); setContextMenu({ id: "docker:" + c.name, x: e.clientX, y: e.clientY }); }}
+                  onClick={function() {
+                    const url = parseContainerUrl(c.ports);
+                    if (url) window.open(url, "_blank");
+                  }}
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className={"w-1.5 h-1.5 rounded-full shrink-0 " + (c.state === "running" ? "bg-green-400" : "bg-red-400")} />
+                    <span className="text-xs truncate text-foreground/80">{c.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    {(() => { const st = c.state === "running" ? getContainerStat(c.name) : null; return st ? <><span className="text-[10px] tabular-nums text-foreground/80">{st.cpuPercent.toFixed(1)}%</span><span className="text-[9px] tabular-nums text-muted-foreground/60 ml-1">{fmt(st.memUsage)}</span></> : <span className="text-[10px] tabular-nums text-muted-foreground/60">{c.status}</span>; })()}
+                    {c.state === "running" ? <ExternalLink className="w-3 h-3 text-muted-foreground/40" /> : null}
+                  </div>
+                </div>
+                );
+              })}
+            </div>
+          </div>
+          )}
           {/* ── Card 3: Storage ── */}
           <div className="rounded-xl p-3.5 bg-card/50 dark:bg-white/5 border border-border/30">
             <div className="flex items-center gap-1.5 mb-2.5">
@@ -381,10 +432,33 @@ export function SystemStatusFloater() {
         >
           <button
             className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-foreground/80 hover:bg-accent rounded-lg transition-colors"
-            onClick={() => { setPinnedServices(ps => { const n = ps.includes(contextMenu.id) ? ps : [...ps, contextMenu.id]; localStorage.setItem('floater_pinned_services', JSON.stringify(n)); return n; }); setContextMenu(null); }}
-            aria-label="固定到仪表盘"
+            onClick={async () => {
+              const check = checks.find(c => c.id === contextMenu.id);
+              const dockerC = containers.find(c => 'docker:' + c.name === contextMenu.id);
+              const name = check?.name || dockerC?.name || contextMenu.id.replace('docker:', '');
+              const url = check?.url || (dockerC ? parseContainerUrl(dockerC.ports) : undefined);
+              if (url && baseUrl) {
+                try {
+                  const h = { ...authHeaders, 'Content-Type': 'application/json' };
+                  // 查找或创建固定服务分类
+                  const catRes = await fetch(`${baseUrl}/api/v1/categories`, { headers: h });
+                  const cats = catRes.ok ? (await catRes.json()) : [];
+                  let catId = Array.isArray(cats) ? cats.find((c: any) => c.title === '固定服务')?.id : null;
+                  if (!catId) {
+                    const cr = await fetch(`${baseUrl}/api/v1/categories`, { method: 'POST', headers: h, body: JSON.stringify({ title: '固定服务' }) });
+                    if (cr.ok) catId = (await cr.json()).id;
+                  }
+                  // 添加书签
+                  if (catId) {
+                    await fetch(`${baseUrl}/api/v1/bookmarks`, { method: 'POST', headers: h, body: JSON.stringify({ categoryId: catId, title: name, url }) });
+                  }
+                } catch { /* silent */ }
+              }
+              setContextMenu(null);
+            }}
+            aria-label="固定到主页"
           >
-            <Pin className="w-3 h-3" /> 固定到仪表盘
+            <Pin className="w-3 h-3" /> 固定到主页
           </button>
           {getMac(contextMenu.id) && (
             <button
@@ -407,45 +481,6 @@ export function SystemStatusFloater() {
           >
             <Square className="w-3 h-3" /> 停止
           </button>
-        </div>
-      )}
-
-      {/* ── Pinned services grid ── */}
-      {pinnedServices.length > 0 && (
-        <div className="mt-3 rounded-2xl backdrop-blur-xl border border-border/40 p-2.5" style={{ background: 'hsl(var(--background) / 0.5)' }}>
-          <div className="flex items-center gap-1.5 mb-2 px-1">
-            <PinOff className="w-3 h-3 text-muted-foreground" />
-            <span className="text-[10px] text-muted-foreground">已固定</span>
-            <button
-              className="ml-auto text-[10px] text-muted-foreground/50 hover:text-muted-foreground"
-              onClick={() => { setPinnedServices([]); localStorage.removeItem('floater_pinned_services'); }}
-            >
-              清空
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-1.5">
-            {pinnedServices.map(id => {
-              const c = checks.find(ch => ch.id === id);
-              if (!c) return null;
-              const mc = mockResource(c.id);
-              return (
-                <div key={id} className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-muted/30 dark:bg-white/[0.03] border border-border/20 cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => window.open(c.url, '_blank')}>
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.status === 'ok' ? 'bg-green-400' : 'bg-red-400'}`} />
-                  {(() => {
-                    const icon = getIcon(c.id);
-                    if (icon) {
-                      if (icon.startsWith('http') || icon.startsWith('/uploads'))
-                        return <img src={icon} alt="" className="w-3 h-3 rounded shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />;
-                      return <span className="text-xs shrink-0">{icon}</span>;
-                    }
-                    return null;
-                  })()}
-                  <span className="text-[10px] truncate text-foreground/70 flex-1">{c.name}</span>
-                  <span className="text-[9px] tabular-nums text-muted-foreground/50">{mc.cpu}%</span>
-                </div>
-              );
-            })}
-          </div>
         </div>
       )}
     </div>

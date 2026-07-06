@@ -32,7 +32,6 @@ app.use('*', cors({
 // ===== 静态文件（上传目录 + 管理后台）=====
 app.use('/uploads/*', serveStatic({ root: './data' }));
 app.use('/admin/*', serveStatic({ root: './public' }));
-app.get('/admin', (c) => c.redirect('/admin/index.html'));
 
 // ===== 健康检查（无需认证）=====
 app.get('/api/v1/health', (c) => {

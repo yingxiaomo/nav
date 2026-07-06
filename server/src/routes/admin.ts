@@ -2,7 +2,11 @@ import { Hono } from 'hono';
 import { readRecent } from '../services/logger.ts';
 import { apiError } from '../utils/response.ts';
 import { exportFullBackup, restoreFullBackup } from '../services/full-backup-service.ts';
-import { listContainers, streamContainerLogs } from '../services/docker-service.ts';
+import { listContainers, streamContainerLogs, getContainerStats } from '../services/docker-service.ts';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const UPLOAD_DIR = process.env.UPLOAD_DIR || './data/uploads';
 
 const adminRoutes = new Hono();
 
@@ -51,8 +55,15 @@ adminRoutes.get('/docker/containers', async (c) => {
     return c.json({ containers });
   } catch (e) {
     const msg = (e as Error).message || 'Docker 不可用';
-    return c.json(apiError(msg, 'DOCKER_ERROR'), 500);
+    return c.json({ containers: [], error: msg });
   }
+});
+
+// ===== GET /api/v1/admin/docker/stats — Docker 容器实时资源占用 =====
+
+adminRoutes.get('/docker/stats', async (c) => {
+  const stats = await getContainerStats();
+  return c.json({ stats });
 });
 
 // ===== GET /api/v1/admin/docker/logs/:name — SSE 容器日志流 =====
@@ -90,6 +101,83 @@ adminRoutes.get('/docker/logs/:name', async (c) => {
   });
 
   return c.newResponse(stream);
+});
+
+// ===== GET /api/v1/admin/uploads — 列出上传文件 =====
+
+adminRoutes.get('/uploads', async (c) => {
+  try {
+    const dir = path.resolve(UPLOAD_DIR);
+    if (!fs.existsSync(dir)) return c.json({ files: [] });
+    const names = fs.readdirSync(dir).filter(f => /\.(png|jpg|jpeg|gif|svg|webp|ico)$/i.test(f));
+    const files = names.map(name => {
+      const stat = fs.statSync(path.join(dir, name));
+      return { name, size: stat.size, mtime: stat.mtimeMs };
+    }).sort((a, b) => b.mtime - a.mtime);
+    return c.json({ files });
+  } catch {
+    return c.json(apiError('无法读取上传目录', 'IO_ERROR'), 500);
+  }
+});
+
+// ===== DELETE /api/v1/admin/uploads/:filename — 删除上传文件 =====
+
+adminRoutes.delete('/uploads/:filename', async (c) => {
+  const filename = decodeURIComponent(c.req.param('filename'));
+  // 防止路径穿越
+  if (filename.includes('..') || filename.includes('/')) {
+    return c.json(apiError('无效的文件名', 'INVALID_FILENAME'), 400);
+  }
+  try {
+    const filepath = path.resolve(UPLOAD_DIR, filename);
+    if (!fs.existsSync(filepath)) return c.json(apiError('文件不存在', 'NOT_FOUND'), 404);
+    fs.unlinkSync(filepath);
+    return c.json({ success: true });
+  } catch {
+    return c.json(apiError('删除失败', 'IO_ERROR'), 500);
+  }
+});
+
+// ===== POST /api/v1/admin/docker/fetch-icon — 自动识别 Docker 容器图标 =====
+
+adminRoutes.post('/docker/fetch-icon', async (c) => {
+  try {
+    const { image } = await c.req.json() as { image?: string };
+    if (!image) return c.json({ icon: null });
+    // 从镜像名提取服务名：nginx:latest → nginx
+    const name = image.split(':')[0].split('/').pop() || '';
+    if (!name) return c.json({ icon: null });
+    // 常见项目域名映射
+    const knownDomains: Record<string, string> = {
+      nginx: 'nginx.org', redis: 'redis.io', postgres: 'postgresql.org',
+      mysql: 'mysql.com', mariadb: 'mariadb.org', mongo: 'mongodb.com',
+      node: 'nodejs.org', python: 'python.org', alpine: 'alpinelinux.org',
+      ubuntu: 'ubuntu.com', debian: 'debian.org', centos: 'centos.org',
+      grafana: 'grafana.com', prometheus: 'prometheus.io', 'traefik': 'traefik.io',
+      portainer: 'portainer.io', jenkins: 'jenkins.io', gitlab: 'gitlab.com',
+      'nextcloud': 'nextcloud.com', 'homeassistant': 'home-assistant.io',
+      openwrt: 'openwrt.org', pihole: 'pi-hole.net', 'adguard': 'adguard.com',
+      jellyfin: 'jellyfin.org', emby: 'emby.media', plex: 'plex.tv',
+      transmission: 'transmissionbt.com', qbittorrent: 'qbittorrent.org',
+      sonarr: 'sonarr.tv', radarr: 'radarr.video', jackett: 'jackett.io',
+      navidrome: 'navidrome.org', firefly: 'firefly-iii.org',
+      outline: 'getoutline.com', frp: 'gofrp.org', ddns: 'ddns.org',
+    };
+    const domain = knownDomains[name] || `${name}.org`;
+    // 尝试 DuckDuckGo 图标服务
+    const ddgUrl = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+    try {
+      const resp = await fetch(ddgUrl, { method: 'HEAD', signal: AbortSignal.timeout(3000) });
+      if (resp.ok) return c.json({ icon: ddgUrl });
+    } catch { /* fall through */ }
+    // 尝试直接访问 favicon
+    const favUrl = `https://${domain}/favicon.ico`;
+    try {
+      const resp = await fetch(favUrl, { method: 'HEAD', signal: AbortSignal.timeout(3000) });
+      if (resp.ok) return c.json({ icon: favUrl });
+    } catch { /* fall through */ }
+    return c.json({ icon: null });
+  } catch { return c.json({ icon: null }); }
 });
 
 export default adminRoutes;

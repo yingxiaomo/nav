@@ -8,7 +8,7 @@ import { fetchMonitorIconUrl } from '../services/monitor-icon-service.ts';
 import { wakeOnLan } from '../services/wol-service.ts';
 import {
   getTargets, addTarget, updateTarget, deleteTarget, getCheckResults,
-  startHealthChecks, stopHealthChecks,
+  startHealthChecks,
 } from '../services/health-check-service.ts';
 
 const monitorRoutes = new Hono();

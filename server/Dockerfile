@@ -5,7 +5,7 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++ libc6-compat
 
 COPY package.json package-lock.json ./
-RUN npm install
+RUN npm install --omit=dev && npm i -g tsx && npm cache clean --force
 
 COPY . .
 
@@ -13,14 +13,18 @@ COPY . .
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# 从构建阶段复制编译好的依赖（better-sqlite3 需要编译）
+# 从构建阶段复制编译好的依赖
 COPY --from=builder /app/node_modules ./node_modules
-RUN npm prune --omit=dev && npm cache clean --force
+
+# Docker CLI — 只复制二进制（省 ~20MB）
+RUN apk add --no-cache --virtual .docker-cli docker-cli && \
+    cp /usr/bin/docker /usr/local/bin/docker && \
+    apk del .docker-cli && \
+    rm -rf /var/cache/apk/*
 
 # 从构建阶段复制源码和迁移文件
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/drizzle ./drizzle
-COPY --from=builder /app/public ./public
 
 # 数据目录
 RUN mkdir -p /app/data/uploads
@@ -34,6 +38,4 @@ ENV CORS_ORIGIN=*
 
 EXPOSE 8642
 
-USER node
-
-CMD ["npx", "tsx", "src/index.ts"]
+CMD ["tsx", "src/index.ts"]

@@ -1,6 +1,6 @@
 // ══════ 管理后台共享常量 & 工具函数 ══════
 
-export type TabId = 'overview' | 'cats' | 'bms' | 'todos' | 'notes' | 'monitor' | 'docker' | 'backup' | 'settings' | 'logs';
+export type TabId = 'overview' | 'cats' | 'bms' | 'todos' | 'notes' | 'monitor' | 'docker' | 'backup' | 'settings' | 'logs' | 'gallery';
 
 export interface StatusInfo {
   setupRequired: boolean;
@@ -57,6 +57,7 @@ import type React from 'react';
 import {
   LayoutDashboard, Folder, Link, CheckSquare, FileText,
   Monitor, Container, Save, Settings, ClipboardList, Loader2,
+  ImageIcon,
 } from 'lucide-react';
 
 export const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
@@ -68,6 +69,7 @@ export const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'monitor', label: '监控', icon: <Monitor className="icon-sm" /> },
   { id: 'docker', label: 'Docker', icon: <Container className="icon-sm" /> },
   { id: 'backup', label: '备份', icon: <Save className="icon-sm" /> },
+  { id: 'gallery', label: '图库', icon: <ImageIcon className="icon-sm" /> },
   { id: 'settings', label: '设置', icon: <Settings className="icon-sm" /> },
   { id: 'logs', label: '日志', icon: <ClipboardList className="icon-sm" /> },
 ];

@@ -158,6 +158,14 @@ export function PinnedLinkCard({
       <div
         className="flex flex-col items-center gap-1 active:scale-95 transition-transform"
         onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            window.open(item.url, '_blank', 'noopener,noreferrer');
+          }
+        }}
       >
         <div className="flex items-center justify-center w-12 h-12 drop-shadow-xl">
           <FaviconImage icon={item.icon} url={item.url} className="w-12 h-12 object-contain drop-shadow-lg" />

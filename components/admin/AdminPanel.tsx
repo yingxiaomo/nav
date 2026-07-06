@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import {
   Settings, LogOut, Lock, Key, ShieldAlert, Eye, EyeOff,
   Loader2, AlertTriangle,
@@ -20,6 +21,7 @@ import DockerTab from './tabs/docker-tab';
 import BackupTab from './tabs/backup-tab';
 import SettingsTab from './tabs/settings-tab';
 import LogsTab from './tabs/logs-tab';
+import GalleryTab from './tabs/gallery-tab';
 
 // ═══════════════════════════════════════════════════
 //   MAIN COMPONENT
@@ -56,9 +58,9 @@ export default function AdminPanel() {
         <h1 className="flex items-center gap-1.5 m-0 text-[1.375rem] font-bold text-card-foreground tracking-tight">
           <Settings className="size-5" />
           <span>Nav Server</span>
-          <a href="/" className="ml-3 text-xs text-muted-foreground hover:text-foreground transition-colors no-underline inline-flex items-center gap-1">
+          <Link href="/" className="ml-3 text-xs text-muted-foreground hover:text-foreground transition-colors no-underline inline-flex items-center gap-1">
             ← 返回主页
-          </a>
+          </Link>
         </h1>
         <Button variant="outline" size="sm" onClick={doLogout}>
           <LogOut className="size-3.5" />
@@ -113,6 +115,7 @@ function TabContent({ tab, showConfirm }: { tab: TabId; showConfirm: (opts: Omit
     case 'backup': return <BackupTab showConfirm={showConfirm} />;
     case 'settings': return <SettingsTab showConfirm={showConfirm} />;
     case 'logs': return <LogsTab />;
+    case 'gallery': return <GalleryTab />;
   }
 }
 

@@ -6,8 +6,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { req, API, SystemInfo, CheckResult, MonitorData, ConfirmState, ProgressBar, fm, ft } from '../admin-tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
-  Plus, Pencil, Trash2, Check, X, Search, Upload, ExternalLink,
-  Cpu, Monitor, HardDrive, Clock, Wifi, Loader2, Zap, AlertTriangle,
+  Plus, Trash2, Check, X, Search, Upload, ExternalLink,
+  Cpu, Monitor, HardDrive, Clock, Wifi, Loader2, Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -41,6 +41,7 @@ export default function MonitorTab({ showConfirm }: { showConfirm: (opts: Omit<C
     if (cr.ok) { setChecks(cr.data.results || []); setTargets(cr.data.targets || []); }
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   const handleDetectIcon = async () => {

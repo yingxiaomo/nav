@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { req, API, ConfirmState } from '../admin-tabs';
 import { Key, Copy, Check, RefreshCw, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
 
 export default function SettingsTab({ showConfirm }: { showConfirm: (opts: Omit<ConfirmState, 'open'>) => void }) {
   const [token, setToken] = useState('');

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Todo } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 
 interface TodoWidgetProps {
   todos: Todo[]
@@ -16,6 +16,7 @@ interface TodoWidgetProps {
 
 export function TodoWidget({ todos = [], onUpdate }: TodoWidgetProps) {
   const [newTodo, setNewTodo] = useState("")
+  const prefersReducedMotion = useReducedMotion()
   const todosRef = useRef(todos)
   useEffect(() => { todosRef.current = todos; }, [todos]);
 
@@ -72,7 +73,7 @@ export function TodoWidget({ todos = [], onUpdate }: TodoWidgetProps) {
 
       <ScrollArea className="flex-1 -mr-3 pr-3">
         <div className="space-y-2">
-          <AnimatePresence>
+          <AnimatePresence mode={prefersReducedMotion ? "sync" : "popLayout"}>
             {sortedTodos.map(todo => (
               <motion.div 
                 key={todo.id}
@@ -116,6 +117,7 @@ export function TodoWidget({ todos = [], onUpdate }: TodoWidgetProps) {
                   whileTap={{ scale: 0.95 }}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
+                  aria-label={`删除待办「${todo.text}」`}
                 >
                   <Trash2 className="w-4 h-4" />
                 </motion.button>

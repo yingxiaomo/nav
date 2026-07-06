@@ -89,7 +89,7 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
   const [selectedId, setSelectedId] = useState<string | null>(null); 
   const selectedCategory = categories.find((c) => c.id === selectedId);
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 12 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 

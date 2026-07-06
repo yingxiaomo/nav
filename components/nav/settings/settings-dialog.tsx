@@ -86,7 +86,7 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
   return (
     <Dialog open={isSettingsOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="fixed bottom-4 right-4 z-50 rounded-full text-white/80 hover:text-white hover:bg-white/10 shadow-lg backdrop-blur-sm">
+        <Button variant="ghost" size="icon" className="fixed bottom-6 right-6 sm:bottom-4 sm:right-4 z-50 rounded-full text-white/80 hover:text-white hover:bg-white/10 shadow-lg backdrop-blur-sm">
           <Settings className="h-5 w-5" />
           {hasUnsavedChanges && !syncError && (
             <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-black/20" />

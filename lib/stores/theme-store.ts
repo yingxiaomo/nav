@@ -34,15 +34,6 @@ const ACCENT_MAP: Record<string, { light: string; dark: string }> = {
   amber:  { light: '#f97316', dark: '#fb923c' },
 };
 
-const THEME_DEFAULTS = {
-  theme: 'system' as const,
-  accentColor: 'blue',
-  overlayDarkness: 20,
-  cardOpacity: 10,
-  fontFamily: 'system' as const,
-  blurLevel: 'medium' as const,
-};
-
 function applyCSS(state: ThemeState) {
   if (typeof window === 'undefined') return;
   const root = document.documentElement;

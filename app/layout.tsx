@@ -118,8 +118,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://api.github.com" crossOrigin="anonymous" />
         {/* CSP 由 next.config.ts 的 headers() 统一管理，仅在非 export 模式下生效 */}
         {/* 静态导出模式下如需 CSP，请在托管平台（Vercel/Cloudflare）的自定义响应头中配置 */}
-        {/* 全局禁用浏览器默认右键菜单（自定义菜单通过 JS 控制） */}
-        <script dangerouslySetInnerHTML={{ __html: "document.addEventListener('contextmenu',e=>e.preventDefault())" }} />
+        {/* 注意：各组件自行管理 contextmenu 事件（如 SystemStatusFloater） */}
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

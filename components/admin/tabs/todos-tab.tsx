@@ -15,6 +15,7 @@ export default function TodosTab() {
     if (Array.isArray(data)) setTodos(data);
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   const addTodo = async () => {

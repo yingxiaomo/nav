@@ -19,6 +19,7 @@ export default function LogsTab() {
     }
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   if (error) return <div className="rounded-md bg-destructive/10 border border-destructive/25 p-2.5 text-sm text-destructive" role="alert">{error}</div>;

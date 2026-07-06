@@ -109,11 +109,6 @@ function getDuckDuckGoFallbackIcon(url: string): string | null {
   try { return `https://icons.duckduckgo.com/ip3/${new URL(url).hostname}.ico`; } catch { return null; }
 }
 
-/** 判断图标值是否为图片 URL */
-function isImageIcon(val: string | null): val is string {
-  return !!val && (val.startsWith('http') || val.startsWith('/') || val.startsWith('data:'));
-}
-
 interface FaviconImageProps {
   icon?: string | null;
   url: string;
@@ -138,6 +133,7 @@ export function FaviconImage({ icon, url, type, className }: FaviconImageProps) 
     // 1. 自定义图标 → 直接使用，跳过缓存
     const customSrc = getLinkIcon(icon, url, type);
     if (customSrc) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCurrentSrc(customSrc);
       setFailedApi(false);
       setFailedDdg(false);
@@ -151,6 +147,7 @@ export function FaviconImage({ icon, url, type, className }: FaviconImageProps) 
         const domain = new URL(url).hostname;
         const cached = getCachedFavicon(domain);
         if (cached) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setCurrentSrc(cached);
           setFailedApi(false);
           setFailedDdg(false);
@@ -167,10 +164,11 @@ export function FaviconImage({ icon, url, type, className }: FaviconImageProps) 
     } catch {
       setCurrentSrc(null);
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFailedApi(false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFailedDdg(false);
     isAutoResolved.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [icon, url, type]);
 
   if (!currentSrc) return null;

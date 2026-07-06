@@ -11,26 +11,72 @@ export interface ContainerInfo {
   created: string;
 }
 
+export interface ContainerStats {
+  name: string;
+  cpuPercent: number;
+  memUsage: number;
+  memLimit: number;
+  memPercent: number;
+}
+
+/** 获取所有容器的实时资源占用（通过 docker stats --no-stream） */
+export function getContainerStats(): Promise<ContainerStats[]> {
+  return new Promise((resolve) => {
+    const proc = spawn('docker', ['stats', '--no-stream', '--format', '{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}'], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 10_000,
+    });
+
+    let stdout = '';
+
+    proc.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
+
+    proc.on('close', (code) => {
+      if (code !== 0) { resolve([]); return; }
+      const stats: ContainerStats[] = stdout.trim().split('\n').filter(Boolean).map(line => {
+        const parts = line.split('\t');
+        if (parts.length < 4) return null;
+        const cpu = parseFloat(parts[1].replace('%', ''));
+        const memMatch = parts[2].match(/([\d.]+)(\w+)\s*\/\s*([\d.]+)(\w+)/);
+        const memPct = parseFloat(parts[3].replace('%', ''));
+        let memUsage = 0, memLimit = 0;
+        if (memMatch) {
+          memUsage = parseMem(memMatch[1], memMatch[2]);
+          memLimit = parseMem(memMatch[3], memMatch[4]);
+        }
+        return { name: parts[0], cpuPercent: cpu || 0, memUsage, memLimit, memPercent: memPct || 0 };
+      }).filter((s): s is ContainerStats => s !== null);
+      resolve(stats);
+    });
+
+    proc.on('error', () => resolve([]));
+  });
+}
+
+function parseMem(val: string, unit: string): number {
+  const u = { B: 1, KiB: 1024, MiB: 1024 ** 2, GiB: 1024 ** 3, TiB: 1024 ** 4 };
+  const multiplier = u[unit as keyof typeof u] || 1;
+  return parseFloat(val) * multiplier;
+}
+
 /**
  * 列出所有 Docker 容器（通过 docker ps）
  * 需要 Docker socket 挂载（-v /var/run/docker.sock:/var/run/docker.sock）
  */
 export function listContainers(): Promise<ContainerInfo[]> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const proc = spawn('docker', ['ps', '-a', '--format', '{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.State}}\t{{.Status}}\t{{.Ports}}\t{{.CreatedAt}}'], {
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: 10_000,
     });
 
     let stdout = '';
-    let stderr = '';
 
     proc.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
-    proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
 
     proc.on('close', (code) => {
       if (code !== 0) {
-        reject(new Error(stderr.trim() || `docker ps 退出码 ${code}`));
+        resolve([]);
         return;
       }
 
@@ -44,8 +90,8 @@ export function listContainers(): Promise<ContainerInfo[]> {
       resolve(containers);
     });
 
-    proc.on('error', (err) => {
-      reject(new Error(`Docker 不可用: ${err.message}`));
+    proc.on('error', () => {
+      resolve([]);
     });
   });
 }
@@ -75,7 +121,7 @@ export function streamContainerLogs(containerName: string): EventEmitter {
     });
 
     proc.on('error', (err) => {
-      emitter.emit('error', `Docker 日志错误: ${err.message}`);
+      emitter.emit('error', `Docker 日志错误: ${(err as Error).message}`);
     });
 
     // 提供关闭方法

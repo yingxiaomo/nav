@@ -19,6 +19,7 @@ export default function NotesTab({ showConfirm }: { showConfirm: (opts: Omit<Con
     if (Array.isArray(data)) setNotes(data);
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   const addNote = async () => {

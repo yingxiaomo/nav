@@ -9,7 +9,7 @@ RUN apk add --no-cache libc6-compat
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-COPY package.json package-lock.json* ./
+COPY package.json ./
 RUN npm install
 
 COPY . .
@@ -23,16 +23,21 @@ WORKDIR /app
 
 # 后端依赖（better-sqlite3 需要编译，需安装 Python）
 COPY server/package.json server/package-lock.json ./
-RUN apk add --no-cache --virtual .build-deps python3 make g++ && \
+RUN apk add --no-cache --virtual .build-deps python3 make g++ libc6-compat && \
     npm install --omit=dev && \
+    npm i -g tsx && \
     apk del .build-deps && \
-    npm cache clean --force
+    npm cache clean --force && \
+    rm -rf /root/.npm /tmp/*
+
+# Docker CLI（供 Docker 容器列表/日志功能使用）
+RUN apk add --no-cache --virtual .docker-cli docker-cli && \
+    cp /usr/bin/docker /usr/local/bin/docker && \
+    apk del .docker-cli && \
+    rm -rf /var/cache/apk/*
 
 # 前端静态文件（Hono 以 ./public/ 根目录 serve）
 COPY --from=frontend --chown=node /app/out ./public
-
-# 管理后台页面（与前端静态文件不冲突）
-COPY --from=frontend --chown=node /app/server/public ./public
 
 # 后端代码
 COPY --from=frontend --chown=node /app/server/src ./src
@@ -49,6 +54,4 @@ ENV CORS_ORIGIN=*
 
 EXPOSE 8642
 
-USER node
-
-CMD ["npx", "tsx", "src/index.ts"]
+CMD ["tsx", "src/index.ts"]

@@ -25,16 +25,28 @@ function calcCpuUsage(): number {
 let lastIdle = 0, lastTotal = 0;
 
 function readMemory(): { total: number; free: number } {
+  // 尝试读取宿主机内存（Docker 内 /proc/meminfo 仍包含宿主数据）
   try {
     const mem = fs.readFileSync('/proc/meminfo', 'utf-8');
     const get = (key: string): number => {
       const m = mem.match(new RegExp(`^${key}:\\s+(\\d+)`));
       return m ? parseInt(m[1]) * 1024 : 0;
     };
-    return { total: get('MemTotal'), free: get('MemAvailable') };
-  } catch {
-    return { total: os.totalmem(), free: os.freemem() };
-  }
+    const total = get('MemTotal');
+    if (total > 0) {
+      // MemAvailable 优先
+      let free = get('MemAvailable');
+      if (free > 0) return { total, free };
+      // 回退：MemFree + Cached + Buffers
+      free = get('MemFree') + get('Cached') + get('Buffers');
+      if (free > 0) return { total, free };
+    }
+  } catch { /* fall through */ }
+
+  // 最终兜底：Node.js API（Docker 内返回容器 cgroup 视图）
+  const total = os.totalmem();
+  const free = os.freemem();
+  return { total, free };
 }
 
 function readDisk(): { total: number; free: number } {
@@ -56,17 +68,17 @@ function readUptime(): number {
   } catch { return Math.floor(os.uptime()); }
 }
 
-let initialized = false;
+// 模块加载时预热 CPU 采样，确保首次请求返回真实值
+calcCpuUsage();
+setTimeout(() => calcCpuUsage(), 500);
 
 export function getSystemInfo(): SystemInfo {
-  if (!initialized) { initialized = true; calcCpuUsage(); }
-
   const mem = readMemory();
   const disk = readDisk();
   const uptime = readUptime();
 
   return {
-    cpu: { usage: initialized ? calcCpuUsage() : 0, cores: os.cpus().length },
+    cpu: { usage: calcCpuUsage(), cores: os.cpus().length },
     memory: {
       total: mem.total,
       used: mem.total - mem.free,

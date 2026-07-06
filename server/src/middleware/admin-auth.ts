@@ -58,8 +58,12 @@ export const adminAuthMiddleware = createMiddleware(async (c, next) => {
     return;
   }
 
-  // 允许前端页面获取监控数据（只读 GET）
-  if (c.req.method === 'GET' && path.startsWith('/api/v1/admin/monitor/')) {
+  // 允许前端页面获取监控数据（只读 GET + Docker 容器）
+  if (c.req.method === 'GET' && (
+    path.startsWith('/api/v1/admin/monitor/') ||
+    path === '/api/v1/admin/docker/containers' ||
+    path === '/api/v1/admin/docker/stats'
+  )) {
     await next();
     return;
   }

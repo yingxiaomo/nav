@@ -22,12 +22,12 @@ const INTERNAL_KEYS = ['admin_password_hash', 'admin_session_secret', 'api_token
 
 /** 导出所有表数据 */
 export function exportFullBackup(): FullBackup {
-  const settingRows = db.select().from(settingsTable);
-  const catRows = db.select().from(categoriesTable).orderBy(asc(categoriesTable.order));
-  const bmRows = db.select().from(bookmarksTable).orderBy(asc(bookmarksTable.order));
-  const todoRows = db.select().from(todosTable).orderBy(asc(todosTable.createdAt));
-  const noteRows = db.select().from(notesTable).orderBy(desc(notesTable.updatedAt));
-  const monitorRows = db.select().from(monitorTargetsTable);
+  const settingRows = db.select().from(settingsTable).all();
+  const catRows = db.select().from(categoriesTable).orderBy(asc(categoriesTable.order)).all();
+  const bmRows = db.select().from(bookmarksTable).orderBy(asc(bookmarksTable.order)).all();
+  const todoRows = db.select().from(todosTable).orderBy(asc(todosTable.createdAt)).all();
+  const noteRows = db.select().from(notesTable).orderBy(desc(notesTable.updatedAt)).all();
+  const monitorRows = db.select().from(monitorTargetsTable).all();
 
   const settings: Record<string, string> = {};
   for (const row of settingRows) {

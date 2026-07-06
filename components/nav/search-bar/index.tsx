@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Search, Clock, X, Trash2, Link as LinkIcon, Globe, Wifi } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Input, Button } from "@/components/ui";
 import { useSearchHistory } from "@/lib";
 import { LinkItem } from "@/lib/types";
@@ -54,7 +54,8 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
     const [showDropdown, setShowDropdown] = useState(false);
     const [selectedIdx, setSelectedIdx] = useState(-1);
     const [webSuggestions, setWebSuggestions] = useState<string[]>([]);
-    const { history, addSearch, removeSearch, clearHistory } = useSearchHistory();
+    const prefersReducedMotion = useReducedMotion();
+  const { history, addSearch, removeSearch, clearHistory } = useSearchHistory();
     const containerRef = useRef<HTMLDivElement>(null);
     const blurTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -277,9 +278,9 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
     return (
       <motion.div
         className="relative w-full max-w-2xl mx-auto mb-12 z-40"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
+        initial={prefersReducedMotion ? false : { opacity: 0, y: -20 }}
+        animate={{ opacity: prefersReducedMotion ? 1 : 1, y: 0 }}
+        transition={{ duration: prefersReducedMotion ? 0 : 0.6, ease: "easeOut" }}
       >
         {/* 搜索引擎标签 */}
         <div className="flex flex-wrap justify-center gap-1.5 mb-3">
@@ -365,9 +366,9 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
           {/* ── 下拉候选面板 ──────────────────────────────── */}
           {showDropdown && suggestions.length > 0 && (
             <motion.div
-              initial={{ opacity: 0, y: -6 }}
+              initial={prefersReducedMotion ? false : { opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.12 }}
+              transition={{ duration: prefersReducedMotion ? 0 : 0.12 }}
               className="absolute top-full left-0 right-0 mt-1.5 overflow-hidden
                          bg-white/10 dark:bg-black/30 backdrop-blur-2xl
                          border border-white/20 rounded-xl shadow-2xl"

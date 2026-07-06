@@ -25,6 +25,7 @@ export default function BookmarksTab({ showConfirm }: { showConfirm: (opts: Omit
     if (cr.ok) setCats(cr.data);
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   const addBm = async () => {

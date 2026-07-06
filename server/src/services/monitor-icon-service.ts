@@ -94,7 +94,7 @@ function extractFaviconFromHtml(html: string, baseUrl: string): string | null {
 
 /** 解析相对 URL 为绝对地址 */
 function resolveUrl(href: string, base: string): string {
-  if (href.startsWith('http://') || href.startsWith('https://')) return href;
+  if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('data:')) return href;
   try {
     base = base.replace(/\/+$/, '');
     if (href.startsWith('/')) return `${base}${href}`;

@@ -367,7 +367,7 @@ export function SystemStatusFloater() {
               const dockerC = containers.find(c => 'docker:' + c.name === contextMenu.id);
               const name = check?.name || dockerC?.name || contextMenu.id.replace('docker:', '');
               const url = check?.url || (dockerC ? parseContainerUrl(dockerC.ports) : undefined);
-              const icon = check?.id ? getIcon(check.id) : undefined;
+              const icon = check?.id ? (getIcon(check.id) || undefined) : undefined;
               if (url && baseUrl) {
                 try {
                   const h = { ...authHeaders, 'Content-Type': 'application/json' };

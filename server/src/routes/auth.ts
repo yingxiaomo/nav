@@ -182,4 +182,33 @@ authRoutes.post('/api-token', async (c) => {
   });
 });
 
+// ===== POST /api/v1/auth/change-password — 修改管理员密码 =====
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, '请输入当前密码'),
+  newPassword: z.string().min(6, '新密码至少 6 位'),
+});
+
+authRoutes.post('/change-password', zValidator('json', changePasswordSchema), async (c) => {
+  if (!checkSession(c)) {
+    return c.json({ error: '未登录' }, 401);
+  }
+
+  const { currentPassword, newPassword } = c.req.valid('json');
+
+  if (!verifyAdminPassword(currentPassword)) {
+    warn(`[auth] change-password failed — wrong current password`);
+    return c.json({ error: '当前密码错误' }, 403);
+  }
+
+  saveAdminPassword(newPassword);
+  rotateSessionSecret(); // 使所有现有 session 失效，强制重新登录
+  info(`[auth] password changed successfully`);
+
+  return c.json({
+    success: true,
+    message: '密码已修改，请重新登录',
+  });
+});
+
 export default authRoutes;

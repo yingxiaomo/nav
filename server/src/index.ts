@@ -6,6 +6,9 @@ import { readFileSync } from 'node:fs';
 import { authMiddleware } from './middleware/auth.ts';
 import { adminAuthMiddleware } from './middleware/admin-auth.ts';
 import { apiError } from './utils/response.ts';
+import { hasAdminPassword, saveAdminPassword } from './services/admin-service.ts';
+import { isPrivateHost } from './services/security.ts';
+import os from 'node:os';
 import categoryRoutes from './routes/categories.ts';
 import bookmarkRoutes from './routes/bookmarks.ts';
 import settingRoutes from './routes/settings.ts';
@@ -90,6 +93,25 @@ app.use('/*', serveStatic({ root: './public' }));
 
 // ===== 启动 =====
 const port = parseInt(process.env.PORT ?? '8642', 10);
+
+// 同源/内网环境自动初始化管理员密码
+if (!hasAdminPassword() && !process.env.ROOT_PASSWORD) {
+  const interfaces = os.networkInterfaces();
+  const isLocal = Object.values(interfaces).flat().some((i: any) =>
+    i?.family === 'IPv4' && !i?.internal &&
+    (i.address.startsWith('192.168.') || i.address.startsWith('10.') || i.address === '127.0.0.1')
+  );
+  if (isLocal) {
+    saveAdminPassword('admin');
+    console.log('');
+    console.log('  ╔══════════════════════════════════════════════╗');
+    console.log('  ║  管理员密码已自动初始化                       ║');
+    console.log('  ║  默认密码: admin                             ║');
+    console.log('  ║  请登录后立即修改密码！                       ║');
+    console.log('  ╚══════════════════════════════════════════════╝');
+    console.log('');
+  }
+}
 
 console.log(`Nav Server 启动成功`);
 console.log(`  地址: http://localhost:${port}`);

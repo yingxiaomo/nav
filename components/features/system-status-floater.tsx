@@ -90,16 +90,11 @@ export function SystemStatusFloater() {
   const [containers, setContainers] = useState<ContainerInfo[]>([]);
   const [containerStats, setContainerStats] = useState<ContainerStats[]>([]);
   const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [addName, setAddName] = useState('');
-  const [addUrl, setAddUrl] = useState('');
-  const [isAdding, setIsAdding] = useState(false);
-  const [editTarget, setEditTarget] = useState<{ id: string; name: string; icon?: string } | null>(null);
+  const [editTarget, setEditTarget] = useState<{ id: string; name: string; icon?: string; url?: string } | null>(null);
 
 
   const { baseUrl, authHeaders, isActive } = useMonitorConfig();
   const menuRef = useRef<HTMLDivElement>(null);
-  const addNameRef = useRef<HTMLInputElement>(null);
 
   const fetchData = useCallback(async () => {
     if (!baseUrl) return;
@@ -134,26 +129,6 @@ export function SystemStatusFloater() {
     return () => document.removeEventListener('mousedown', handler);
   }, [contextMenu]);
 
-  const handleAddTarget = async () => {
-    if (!addName.trim() || !addUrl.trim()) return;
-    setIsAdding(true);
-    try {
-      const h = authHeaders;
-      const res = await fetch(`${baseUrl}/api/v1/admin/monitor/checks`, {
-        method: 'POST',
-        headers: { ...h, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: addName.trim(), url: addUrl.trim() }),
-      });
-      if (res.ok) {
-        setAddName('');
-        setAddUrl('');
-        setShowAddDialog(false);
-        fetchData();
-      }
-    } catch { /* silent */ }
-    finally { setIsAdding(false); }
-  };
-
   if (!isActive) return null;
 
   const getIcon = (id: string): string | undefined =>
@@ -178,8 +153,8 @@ export function SystemStatusFloater() {
   const memC = memPct > 80 ? '#ef4444' : memPct > 50 ? '#06b6d4' : '#22c55e';
   const diskC = diskPct > 85 ? '#ef4444' : diskPct > 60 ? '#06b6d4' : '#22c55e';
 
-  const runningCount = checks.filter(c => c.status === 'ok').length;
-  const stoppedCount = checks.length - runningCount;
+  const runningCount = checks.filter(c => c.status === 'ok').length + containers.filter(c => c.state === 'running').length;
+  const stoppedCount = (checks.length + containers.length) - runningCount;
 
   const glassPanel = 'bg-background/70 dark:bg-background/60 backdrop-blur-xl border border-border/40';
   const WIDTH = 'min(360px, calc(100vw - 32px))';
@@ -268,7 +243,7 @@ export function SystemStatusFloater() {
               </div>
               <button
                 className="flex items-center gap-1 px-2 py-1 rounded-lg bg-muted/40 dark:bg-white/5 border border-border/30 backdrop-blur-sm text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                onClick={() => { setAddName(''); setAddUrl(''); setShowAddDialog(true); setTimeout(() => addNameRef.current?.focus(), 100); }}
+                onClick={() => setEditTarget({ id: '', name: '', url: '' })}
               >
                 <Plus className="w-3 h-3" />
                 添加
@@ -373,53 +348,6 @@ export function SystemStatusFloater() {
         </div>
       </div>
 
-      {/* ── Add dialog ── */}
-      {showAddDialog && (
-        <div
-          className="fixed inset-0 z-[80] flex items-center justify-center"
-          style={{ background: 'rgba(0,0,0,0.4)' }}
-          onClick={() => setShowAddDialog(false)}
-        >
-          <div
-            className={cn('rounded-2xl backdrop-blur-xl border border-border/40 p-5 w-80 shadow-2xl', glassPanel)}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="text-sm font-medium text-foreground mb-3">添加监控目标</div>
-            <input
-              ref={addNameRef}
-              className="w-full px-3 py-2 rounded-xl text-sm bg-muted/50 dark:bg-white/[0.06] border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors mb-2"
-              placeholder="名称（如 Nginx 服务）"
-              value={addName}
-              onChange={e => setAddName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addUrl && handleAddTarget()}
-            />
-            <input
-              className="w-full px-3 py-2 rounded-xl text-sm bg-muted/50 dark:bg-white/[0.06] border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors mb-3"
-              placeholder="http://192.168.1.xxx:8080"
-              value={addUrl}
-              onChange={e => setAddUrl(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addName && handleAddTarget()}
-            />
-            <div className="flex gap-2">
-              <button
-                className="flex-1 px-3 py-1.5 rounded-xl text-sm font-medium text-foreground bg-muted/50 dark:bg-white/[0.06] border border-border/30 hover:bg-accent transition-colors"
-                onClick={() => setShowAddDialog(false)}
-              >
-                取消
-              </button>
-              <button
-                className="flex-1 px-3 py-1.5 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50"
-                style={{ background: '#6366f1' }}
-                disabled={isAdding || !addName.trim() || !addUrl.trim()}
-                onClick={handleAddTarget}
-              >
-                {isAdding ? '添加中...' : '确认'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ── Context menu ── */}
       {contextMenu && (
         <div
@@ -438,6 +366,7 @@ export function SystemStatusFloater() {
               const dockerC = containers.find(c => 'docker:' + c.name === contextMenu.id);
               const name = check?.name || dockerC?.name || contextMenu.id.replace('docker:', '');
               const url = check?.url || (dockerC ? parseContainerUrl(dockerC.ports) : undefined);
+              const icon = check?.id ? getIcon(check.id) : undefined;
               if (url && baseUrl) {
                 try {
                   const h = { ...authHeaders, 'Content-Type': 'application/json' };
@@ -449,9 +378,9 @@ export function SystemStatusFloater() {
                     const cr = await fetch(`${baseUrl}/api/v1/categories`, { method: 'POST', headers: h, body: JSON.stringify({ title: '固定服务' }) });
                     if (cr.ok) catId = (await cr.json()).id;
                   }
-                  // 添加书签
+                  // 添加书签（带图标）
                   if (catId) {
-                    await fetch(`${baseUrl}/api/v1/bookmarks`, { method: 'POST', headers: h, body: JSON.stringify({ categoryId: catId, title: name, url }) });
+                    await fetch(`${baseUrl}/api/v1/bookmarks`, { method: 'POST', headers: h, body: JSON.stringify({ categoryId: catId, title: name, url, icon }) });
                   }
                 } catch { /* silent */ }
               }
@@ -461,9 +390,17 @@ export function SystemStatusFloater() {
           >
             <Pin className="w-3 h-3" /> 固定到主页
           </button>
-          {checks.some(c => c.id === contextMenu.id) && (
+          {(checks.some(c => c.id === contextMenu.id) || contextMenu.id.startsWith('docker:')) && (
             <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-foreground/80 hover:bg-accent rounded-lg transition-colors"
-              onClick={() => { const c = checks.find(ch => ch.id === contextMenu.id); if (c) setEditTarget({ id: c.id, name: c.name, icon: getIcon(c.id) }); setContextMenu(null); }}
+              onClick={() => {
+                const c = checks.find(ch => ch.id === contextMenu.id);
+                if (c) { setEditTarget({ id: c.id, name: c.name, icon: getIcon(c.id), url: c.url }); }
+                else {
+                  const dc = containers.find(ch => 'docker:' + ch.name === contextMenu.id);
+                  if (dc) setEditTarget({ id: contextMenu.id, name: dc.name, url: parseContainerUrl(dc.ports) || undefined });
+                }
+                setContextMenu(null);
+              }}
               aria-label="编辑"
             >
               <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg> 编辑
@@ -509,50 +446,140 @@ export function SystemStatusFloater() {
 
 // ── 巡检目标编辑弹窗（居中模态）──
 function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSaved }: {
-  target: { id: string; name: string; icon?: string };
+  target: { id: string; name: string; icon?: string; url?: string };
   baseUrl: string; authHeaders: Record<string, string>;
   onClose: () => void; onSaved: () => void;
 }) {
   const [name, setName] = useState(target.name);
   const [icon, setIcon] = useState(target.icon || '');
+  const [url, setUrl] = useState(target.url || '');
   const [saving, setSaving] = useState(false);
   const [detecting, setDetecting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100); }, []);
 
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true);
+    const isDocker = target.id.startsWith('docker:');
     try {
-      await fetch(`${baseUrl}/api/v1/admin/monitor/checks/${target.id}`, {
-        method: 'PUT',
-        headers: { ...authHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), icon: icon || undefined }),
-      });
-      onSaved();
+      if (!target.id) {
+        // 添加模式
+        if (!url.trim()) { setSaving(false); return; }
+        await fetch(`${baseUrl}/api/v1/admin/monitor/checks`, {
+          method: 'POST',
+          headers: { ...authHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.trim(), url: url.trim(), icon: icon || undefined }),
+        });
+      } else if (!isDocker) {
+        // 编辑模式（内网巡检）
+        await fetch(`${baseUrl}/api/v1/admin/monitor/checks/${target.id}`, {
+          method: 'PUT',
+          headers: { ...authHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.trim(), icon: icon || undefined }),
+        });
+      }
     } catch { /* silent */ }
     setSaving(false);
+    onSaved();
   };
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`${baseUrl}/api/v1/upload`, { method: 'POST', body: formData });
+      if (res.ok) { const d = await res.json(); if (d.url) setIcon(d.url); }
+    } catch { /* silent */ }
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const detectIcon = async () => {
+    setDetecting(true);
+    try {
+      // 有 URL 时优先用 monitor API（从页面 HTML 提取 favicon）
+      if (target.url) {
+        const res = await fetch(`${baseUrl}/api/v1/admin/monitor/fetch-icon`, {
+          method: 'POST',
+          headers: { ...authHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: target.url }),
+        });
+        if (res.ok) { const d = await res.json(); if (d.icon) { setIcon(d.icon); return; } }
+      }
+      // Docker 回退：镜像名 → knownDomains 映射 → DuckDuckGo 图标
+      if (target.id.startsWith('docker:')) {
+        const res = await fetch(`${baseUrl}/api/v1/admin/docker/fetch-icon`, {
+          method: 'POST',
+          headers: { ...authHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: target.id.replace('docker:', '') }),
+        });
+        if (res.ok) { const d = await res.json(); if (d.icon) setIcon(d.icon); }
+      }
+    } catch { /* silent */ }
+    setDetecting(false);
+  };
+
+  const QUICK_ICONS = ['Container', 'Server', 'Globe', 'Monitor', 'Wifi', 'HardDrive', 'Database', 'Cloud', 'Terminal', 'Shield', 'Activity', 'Settings', 'Box', 'MemoryStick', 'Cpu', 'Zap'];
+  const lucideIconMap: Record<string, React.FC<{className?: string}>> = { Container, Server, Globe, Monitor, Wifi, HardDrive, Database, Cloud, Terminal, Shield, Activity, Settings, Box, MemoryStick, Cpu, Zap };
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={onClose}>
       <div className="bg-background/90 backdrop-blur-xl border border-border/40 rounded-2xl p-5 w-80 shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="text-sm font-medium text-foreground mb-3">编辑巡检目标</div>
+        <div className="text-sm font-medium text-foreground mb-3">{!target.id ? '添加监控目标' : target.id.startsWith('docker:') ? '编辑 Docker 容器' : '编辑巡检目标'}</div>
         <input ref={inputRef} value={name} onChange={e => setName(e.target.value)}
           placeholder="名称" className="w-full px-3 py-2 rounded-xl text-sm bg-muted/50 border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors mb-2"
           onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') onClose(); }}
         />
-        <div className="flex gap-2 items-center mb-3">
-          <input value={icon} onChange={e => setIcon(e.target.value)}
-            placeholder="图标 URL（可选）"
+        {!target.id && (
+        <input value={url} onChange={e => setUrl(e.target.value)}
+          placeholder="http://192.168.1.xxx:8080"
+          className="w-full px-3 py-2 rounded-xl text-sm bg-muted/50 border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors mb-2"
+          onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') onClose(); }}
+        />
+        )}
+        <div className="text-[11px] text-muted-foreground mb-1.5">图标</div>
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {QUICK_ICONS.map(ico => {
+            const isActive = icon === `:${ico}:`;
+            const Comp = lucideIconMap[ico];
+            if (!Comp) return null;
+            return (
+              <button key={ico}
+                className={`p-1.5 rounded-lg border transition-colors ${isActive ? 'bg-white/20 border-white/40' : 'bg-muted/30 border-border/30 hover:bg-accent/50'}`}
+                onClick={() => setIcon(`:${ico}:`)}
+                title={ico}
+              >
+                <Comp className="w-4 h-4" />
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex gap-1.5 items-center mb-2">
+          <input value={icon.startsWith(':') ? '' : icon} onChange={e => setIcon(e.target.value)}
+            placeholder="图标 URL / 上传 / 选中上方"
             className="flex-1 px-3 py-2 rounded-xl text-sm bg-muted/50 border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors"
           />
-          {icon && <img src={icon} alt="" className="w-8 h-8 rounded-lg shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload} />
+          <button className="shrink-0 px-2 py-2 rounded-xl text-[11px] bg-muted/50 border border-border/30 hover:bg-accent transition-colors disabled:opacity-50" disabled={uploading} onClick={() => fileRef.current?.click()}>
+            {uploading ? <Loader2 className="size-3.5 animate-spin" /> : '上传'}
+          </button>
+          <button className="shrink-0 px-2 py-2 rounded-xl text-[11px] bg-muted/50 border border-border/30 hover:bg-accent transition-colors disabled:opacity-50" disabled={detecting} onClick={detectIcon}>
+            {detecting ? <Loader2 className="size-3.5 animate-spin" /> : '识别'}
+          </button>
         </div>
+        {icon && !icon.startsWith(':') && (
+          <img src={icon} alt="" className="w-8 h-8 rounded-lg mb-2" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        )}
         <div className="flex gap-2">
           <button className="flex-1 px-3 py-1.5 rounded-xl text-sm font-medium text-foreground bg-muted/50 border border-border/30 hover:bg-accent transition-colors" onClick={onClose}>取消</button>
           <button className="flex-1 px-3 py-1.5 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50" style={{ background: '#6366f1' }} disabled={saving} onClick={save}>
-            {saving ? '保存中...' : '保存'}
+            {saving ? '保存中...' : !target.id ? '添加' : '保存'}
           </button>
         </div>
       </div>

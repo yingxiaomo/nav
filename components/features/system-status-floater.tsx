@@ -530,11 +530,12 @@ function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSaved }: {
     setDetecting(true);
     try {
       // 有 URL 时优先用 monitor API（从页面 HTML 提取 favicon）
-      if (target.url) {
+      const detectUrl = url || target.url;
+      if (detectUrl) {
         const res = await fetch(`${baseUrl}/api/v1/admin/monitor/fetch-icon`, {
           method: 'POST',
           headers: { ...authHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: target.url }),
+          body: JSON.stringify({ url: detectUrl }),
         });
         if (res.ok) { const d = await res.json(); if (d.icon) { setIcon(d.icon); return; } }
       }

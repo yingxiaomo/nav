@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import { GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, ApiServerAdapter, STORAGE_CONFIG_KEY, type StorageConfig, type StorageAdapter } from '../adapters/storage';
 import { GITHUB_CONFIG_KEY } from '../adapters/github';
+import { isPrivateHost } from '../utils/common';
 
 /**
  * 从 localStorage 读取存储配置，支持旧版配置自动迁移
@@ -44,13 +45,21 @@ export function useStorageConfig() {
       }
     }
 
-    // 更旧版的 GitHub 配置迁移
+    // 最旧版 GitHub 配置迁移
     const githubConfigStr = localStorage.getItem(GITHUB_CONFIG_KEY);
     if (githubConfigStr) {
       const githubSettings = JSON.parse(githubConfigStr);
       const migrated: StorageConfig = { type: 'github', github: githubSettings };
       localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(migrated));
       return migrated;
+    }
+
+    // 同源/内网环境自动启用 API Server（无需手动配置）
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      if (isPrivateHost(hostname)) {
+        return { type: 'api-server', apiServer: { baseUrl: '', token: '' } };
+      }
     }
 
     return null;

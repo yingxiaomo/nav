@@ -443,7 +443,7 @@ export function SystemStatusFloater() {
                   // 查找或创建固定服务分类
                   const catRes = await fetch(`${baseUrl}/api/v1/categories`, { headers: h });
                   const cats = catRes.ok ? (await catRes.json()) : [];
-                  let catId = Array.isArray(cats) ? cats.find((c: any) => c.title === '固定服务')?.id : null;
+                  let catId = Array.isArray(cats) ? cats.find((c: Record<string, unknown>) => c.title === '固定服务')?.id : null;
                   if (!catId) {
                     const cr = await fetch(`${baseUrl}/api/v1/categories`, { method: 'POST', headers: h, body: JSON.stringify({ title: '固定服务' }) });
                     if (cr.ok) catId = (await cr.json()).id;

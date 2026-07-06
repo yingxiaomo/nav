@@ -14,6 +14,7 @@ import { ThemeProvider } from "@/components/ui/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { SystemStatusFloater } from "@/components/features/system-status-floater";
+import { AuthSetupDialog } from "@/components/features/auth-setup-dialog";
 import Image from "next/image";
 
 import { useWallpaper, useNavData, useKeyboardShortcuts } from "@/lib";
@@ -301,6 +302,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
             <CheatSheet />
           </ErrorBoundary>
         </Suspense>
+        <AuthSetupDialog baseUrl={typeof window !== 'undefined' ? window.location.origin : ''} />
       </main>
     </ThemeProvider>
   );

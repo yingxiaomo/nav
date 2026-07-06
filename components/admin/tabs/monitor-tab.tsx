@@ -186,7 +186,7 @@ export default function MonitorTab({ showConfirm }: { showConfirm: (opts: Omit<C
                 onChange={e => { if (e.target.files?.[0]) handleUploadIcon(e.target.files[0]); }} />
               {newIcon && (
                 <span className="flex items-center gap-1">
-                  {newIcon.startsWith('http') || newIcon.startsWith('/uploads')
+                  {newIcon.startsWith('http') || newIcon.startsWith('/uploads') || newIcon.startsWith('data:')
                     ? <img src={newIcon} alt="" className="w-5 h-5 rounded" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                     : <span className="text-lg">{newIcon}</span>}
                   <Button variant="outline" size="sm" className="px-1.5 py-0 text-[10px]" onClick={() => setNewIcon('')}><X className="size-3" /></Button>
@@ -241,7 +241,7 @@ export default function MonitorTab({ showConfirm }: { showConfirm: (opts: Omit<C
                 <TableRow key={c.id}>
                   <TableCell className="text-center">
                     {icon ? (
-                      icon.startsWith('http') || icon.startsWith('/uploads')
+                      icon.startsWith('http') || icon.startsWith('/uploads') || icon.startsWith('data:')
                         ? <img src={icon} alt="" className="w-[18px] h-[18px] rounded mx-auto" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                         : <span className="text-base">{icon}</span>
                     ) : (

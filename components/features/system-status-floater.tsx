@@ -273,7 +273,7 @@ export function SystemStatusFloater() {
                         {(() => {
                           const icon = getIcon(c.id);
                           if (icon) {
-                            if (icon.startsWith('http') || icon.startsWith('/uploads'))
+                            if (icon.startsWith('http') || icon.startsWith('/uploads') || icon.startsWith('data:'))
                               return <img src={icon} alt="" className="w-4 h-4 rounded shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />;
                             return <span className="text-sm shrink-0">{icon}</span>;
                           }
@@ -323,7 +323,7 @@ export function SystemStatusFloater() {
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <span className={"w-1.5 h-1.5 rounded-full shrink-0 " + (c.state === "running" ? "bg-green-400" : "bg-red-400")} />
-                    {(() => { const ico = getDockerIcon(c.name); if (ico) { if (ico.startsWith('http') || ico.startsWith('/uploads')) return <img src={ico} alt="" className="w-4 h-4 rounded shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />; return <span className="text-sm shrink-0">{ico}</span>; } return null; })()}
+                    {(() => { const ico = getDockerIcon(c.name); if (ico) { if (ico.startsWith('http') || ico.startsWith('/uploads') || ico.startsWith('data:')) return <img src={ico} alt="" className="w-4 h-4 rounded shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />; return <span className="text-sm shrink-0">{ico}</span>; } return null; })()}
                     <span className="text-xs truncate text-foreground/80">{c.name}</span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-2">

@@ -229,7 +229,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
               />
             </ErrorBoundary>
           </Suspense>
-          <SystemStatusFloater />
+          {data.settings.showMonitor !== false && <div className="max-md:hidden"><SystemStatusFloater /></div>}
         </div>
 
         {/* Floating feature icons - top left */}

@@ -79,11 +79,6 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
     setConfig({ ...config, googledrive: { ...current, ...fields } });
   };
 
-  const updateApiServer = (fields: Partial<ApiServerSettings>) => {
-    const current = config.apiServer || DEFAULT_APISERVER;
-    setConfig({ ...config, apiServer: { ...current, ...fields } });
-  };
-
   const handleTestConnection = async () => {
     setIsTesting(true);
     try {
@@ -226,7 +221,6 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
   const gistCfg = config.gist || DEFAULT_GIST;
   const dropboxCfg = config.dropbox || DEFAULT_DROPBOX;
   const googleDriveCfg = config.googledrive || DEFAULT_GOOGLE_DRIVE;
-  const apiServerCfg = config.apiServer || DEFAULT_APISERVER;
 
   return (
       <div className="space-y-4 py-4 overflow-y-auto h-full px-1">
@@ -526,26 +520,13 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
 
         {config.type === 'api-server' && (
           <>
-            <div className="space-y-2">
-              <Label>后端地址</Label>
-              <Input
-                value={apiServerCfg.baseUrl || ""}
-                onChange={e => updateApiServer({ baseUrl: e.target.value })}
-                placeholder="留空则默认使用当前地址 (推荐)"
-                className="h-9"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>API 令牌</Label>
-              <Input
-                type="password"
-                value={apiServerCfg.token || ""}
-                onChange={e => updateApiServer({ token: e.target.value })}
-                placeholder="sk-..."
-                className="h-9"
-              />
+            <div className="rounded-md bg-green-500/10 p-3 border border-green-500/20">
+              <div className="flex items-center gap-2 text-green-500 mb-1">
+                <Wifi className="w-4 h-4 shrink-0" />
+                <span className="text-xs font-medium">本地后端已连接</span>
+              </div>
               <p className="text-[11px] text-muted-foreground">
-                在管理后台 /admin/ 生成。不填则使用无需认证的后端。
+                前端与后端同源运行，无需额外配置。刷新页面后数据自动从本地后端加载。
               </p>
             </div>
           </>

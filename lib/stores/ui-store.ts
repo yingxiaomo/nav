@@ -7,6 +7,8 @@ interface UIState {
   activePanel: 'todo' | 'note' | 'monitor' | null;
   /** 快捷键帮助面板是否打开 */
   isCheatSheetOpen: boolean;
+  /** 侧边栏书签是否收起 */
+  sidebarCollapsed: boolean;
 
   /** 打开/关闭设置对话框 */
   setSettingsOpen: (open: boolean) => void;
@@ -18,12 +20,15 @@ interface UIState {
   setCheatSheetOpen: (open: boolean) => void;
   /** 关闭所有浮动面板（Escape 统一回调） */
   closeAllPanels: () => void;
+  /** 切换侧边栏展开/收起 */
+  setSidebarCollapsed: (collapsed: boolean) => void;
 }
 
 const useUIStore = create<UIState>((set, get) => ({
   isSettingsOpen: false,
   activePanel: null,
   isCheatSheetOpen: false,
+  sidebarCollapsed: true,
 
   setSettingsOpen: (open) => set({ isSettingsOpen: open }),
 
@@ -35,6 +40,8 @@ const useUIStore = create<UIState>((set, get) => ({
   setActivePanel: (panelName) => set({ activePanel: panelName }),
 
   setCheatSheetOpen: (open) => set({ isCheatSheetOpen: open }),
+
+  setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
 
   closeAllPanels: () => set({
     isSettingsOpen: false,

@@ -1,7 +1,7 @@
 package model
 
 import (
-	"math/rand"
+	"crypto/rand"
 	"time"
 )
 
@@ -193,8 +193,13 @@ type SystemInfo struct {
 func NewID() string {
 	const alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-"
 	b := make([]byte, 21)
-	for i := range b {
-		b[i] = alphabet[rand.Intn(len(alphabet))]
+	randBytes := make([]byte, 21)
+	_, err := rand.Read(randBytes)
+	if err != nil {
+		panic(err)
+	}
+	for i, r := range randBytes {
+		b[i] = alphabet[int(r)%len(alphabet)]
 	}
 	return string(b)
 }

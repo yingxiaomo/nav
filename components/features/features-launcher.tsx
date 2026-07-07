@@ -17,11 +17,14 @@ interface FeaturesLauncherProps {
 
 export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }: FeaturesLauncherProps) {
   const { activePanel, togglePanel, setActivePanel } = useUIStore();
+  const sidebarCollapsed = useUIStore(s => s.sidebarCollapsed);
 
   return (
     <>
-      {/* Floating launcher buttons — top-left corner */}
-      <div className="fixed top-6 left-6 z-50 flex gap-3">
+      {/* Floating launcher buttons — top-left corner, hidden on mobile */}
+      <div className="fixed top-6 z-50 max-md:hidden flex gap-3 transition-[left] duration-300"
+        style={{ left: sidebarCollapsed ? '1.5rem' : 'calc(360px + 1.5rem)' }}
+      >
         <Button
           variant="outline"
           onClick={() => togglePanel('todo')}

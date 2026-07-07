@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Category, LinkItem } from "@/lib/types";
 import { PanelLeft, PanelLeftClose, ChevronLeft, Pin } from "lucide-react";
 import { generateFaviconUrl } from "@/lib/utils/common";
+import { useUIStore } from "@/lib/stores";
 import Image from "next/image";
 
 interface BookmarkSidebarProps {
@@ -68,7 +69,8 @@ function buildLinkTree(items: LinkItem[], _prefix: string): TreeNode[] {
 export function BookmarkSidebar({ categories, pinnedLinks, onPinLink, onUnpinLink }: BookmarkSidebarProps) {
   const tree = useMemo(() => buildTree(categories), [categories]);
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const sidebarCollapsed = useUIStore(s => s.sidebarCollapsed);
+  const setSidebarCollapsed = useUIStore(s => s.setSidebarCollapsed);
   const [navHistory, setNavHistory] = useState<TreeNode[][]>([tree]);
   const [navTitles, setNavTitles] = useState<string[]>(["书签"]);
 

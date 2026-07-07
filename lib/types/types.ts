@@ -38,6 +38,7 @@ export interface SiteSettings {
   wallpaperList: string[];
   blurLevel: 'low' | 'medium' | 'high';
   showFeatures?: boolean;
+  showMonitor?: boolean;
   homeLayout?: 'folder' | 'list' | 'sidebar';
   theme?: 'light' | 'dark' | 'system';
 }

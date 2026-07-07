@@ -113,7 +113,7 @@ function TabContent({ tab, showConfirm }: { tab: TabId; showConfirm: (opts: Omit
     case 'monitor': return <MonitorTab showConfirm={showConfirm} />;
     case 'docker': return <DockerTab />;
     case 'backup': return <BackupTab showConfirm={showConfirm} />;
-    case 'settings': return <SettingsTab showConfirm={showConfirm} />;
+    case 'settings': return <SettingsTab />;
     case 'logs': return <LogsTab />;
     case 'gallery': return <GalleryTab />;
   }

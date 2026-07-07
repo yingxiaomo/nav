@@ -92,7 +92,7 @@ export function SystemStatusFloater() {
   const [containerStats, setContainerStats] = useState<ContainerStats[]>([]);
   const [dockerMeta, setDockerMeta] = useState<Record<string, { name: string; icon?: string }>>({});
   const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [editTarget, setEditTarget] = useState<{ id: string; name: string; icon?: string; url?: string } | null>(null);
+  const [editTarget, setEditTarget] = useState<{ id: string; name: string; icon?: string; url?: string; mac?: string } | null>(null);
 
 
   const { baseUrl, authHeaders, isActive } = useMonitorConfig();
@@ -412,7 +412,7 @@ export function SystemStatusFloater() {
             <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-foreground/80 hover:bg-accent rounded-lg transition-colors"
               onClick={() => {
                 const c = checks.find(ch => ch.id === contextMenu.id);
-                if (c) { setEditTarget({ id: c.id, name: c.name, icon: getIcon(c.id), url: c.url }); }
+                if (c) { setEditTarget({ id: c.id, name: c.name, icon: getIcon(c.id), url: c.url, mac: getMac(c.id) }); }
                 else {
                   const dc = containers.find(ch => 'docker:' + ch.name === contextMenu.id);
                   if (dc) setEditTarget({ id: contextMenu.id, name: dc.name, icon: getDockerIcon(dc.name) || undefined, url: parseContainerUrl(dc.ports) || undefined });
@@ -464,13 +464,14 @@ export function SystemStatusFloater() {
 
 // ── 巡检目标编辑弹窗（居中模态）──
 function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSaved }: {
-  target: { id: string; name: string; icon?: string; url?: string };
+  target: { id: string; name: string; icon?: string; url?: string; mac?: string };
   baseUrl: string; authHeaders: Record<string, string>;
   onClose: () => void; onSaved: () => void;
 }) {
   const [name, setName] = useState(target.name);
   const [icon, setIcon] = useState(target.icon || '');
   const [url, setUrl] = useState(target.url || '');
+  const [mac, setMac] = useState(target.mac || '');
   const [saving, setSaving] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -504,7 +505,7 @@ function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSaved }: {
         await fetch(`${baseUrl}/api/v1/admin/monitor/checks/${target.id}`, {
           method: 'PUT',
           headers: { ...authHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim(), icon: icon || undefined }),
+          body: JSON.stringify({ name: name.trim(), icon: icon || undefined, mac: mac.trim() || undefined }),
         });
       }
     } catch { /* silent */ }
@@ -568,6 +569,12 @@ function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSaved }: {
           placeholder="http://192.168.1.xxx:8080"
           className="w-full px-3 py-2 rounded-xl text-sm bg-muted/50 border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors mb-2"
           onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') onClose(); }}
+        />
+        )}
+        {!target.id.startsWith('docker:') && (
+        <input value={mac} onChange={e => setMac(e.target.value)}
+          placeholder="MAC 地址（可选，用于局域网唤醒）"
+          className="w-full px-3 py-2 rounded-xl text-sm bg-muted/50 border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors mb-2"
         />
         )}
         <div className="text-[11px] text-muted-foreground mb-1.5">图标</div>

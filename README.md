@@ -58,9 +58,12 @@
     - 上传图片后自动填充链接到输入框
     - 提供详细的上传进度反馈
 
-## ☁️ 极速上手 (无需部署)
+## ☁️ 极速上手 — 静态部署（展示用途）
 
-如果你不想购买服务器或折腾 Docker，你可以直接使用我的演示站，并将数据存储在你自己的 GitHub 私有仓库或 Cloudflare R2 中。演示站是使用[Vercel](https://vercel.com)部署的，直连访问可能会加载很慢，还是推荐自行部署。
+如果你只是想快速体验前端界面，可以将前端静态部署到 Vercel 或 Cloudflare Pages，数据通过第三方存储服务同步。
+
+> ⚠️ 静态部署仅包含前端页面，**不包含后端功能**（系统监控、Docker 管理、WOL 网络唤醒等）。
+> 如需使用全部功能，请使用下方的 [Docker 部署](#-docker-部署推荐) 方案。
 
 #### 你的数据只会在 浏览器 <-> 云端存储 之间传输，演示站无法读取你的隐私数据。
 
@@ -116,20 +119,24 @@
 
 🔐 **安全提示**: 您的所有配置信息（包括访问令牌）**只会被安全地存储在您浏览器本地的缓存** 中，它不会被上传到任何服务器。这意味着只有您自己能接触到这些配置，他人无法获取，非常安全！但是更换浏览器或者清除缓存后需要重新输入。
 
-## 🐳 Docker 部署
+## 🐳 Docker 部署（推荐）
 
-项目提供两个 Docker 镜像，托管在 **GitHub Container Registry** (`ghcr.io`)：
+### Docker 镜像
 
-| 镜像       | 地址                              | 包含                   |
-| -------- | ------------------------------- | -------------------- |
-| **合体镜像** | `ghcr.io/yingxiaomo/nav`        | 前端页面 + 后端 API + 管理后台 |
-| **后端镜像** | `ghcr.io/yingxiaomo/nav-server` | 后端 API + 管理后台        |
+| 镜像 | 地址 | 包含 | 大小 |
+|------|------|------|------|
+| **合体镜像** | `ghcr.io/yingxiaomo/nav` | 前端页面 + 后端 API + 管理后台 | ~25MB |
+
+> 💡 Go 后端编译为纯静态二进制（零运行时依赖），镜像基于 scratch 基础镜像。
+
+项目提供合体 Docker 镜像，一个容器包含前端 + 后端 API + 管理后台，所有功能全开：
+系统监控、Docker 管理、WOL 网络唤醒、本地 SQLite 持久化。
+
+镜像托管在 **GitHub Container Registry** (`ghcr.io`)，基于 `scratch` 基础镜像，仅 ~25MB。
 
 国内用户可使用镜像站 `ghcr.nju.edu.cn` 替换 `ghcr.io`。
 
-### 方式一: 合体镜像 (推荐)
-
-一个容器包含前端和全部后端功能，适合小白:
+### 快速启动
 
 ```bash
 docker run -p 8642:8642 -v nav-data:/app/data ghcr.io/yingxiaomo/nav:latest
@@ -140,43 +147,71 @@ docker run -p 8642:8642 -v nav-data:/app/data ghcr.io/yingxiaomo/nav:latest
 如需使用 **Docker 容器日志** 和 **容器列表** 功能，需挂载 Docker socket：
 
 ```bash
-docker run -p 8642:8642 -v nav-data:/app/data -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/yingxiaomo/nav:latest
+docker run -p 8642:8642 \
+  -v nav-data:/app/data \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  ghcr.io/yingxiaomo/nav:latest
 ```
 
-### 方式二: 独立后端
+### docker compose 启动
 
-前端部署到 Vercel / Cloudflare Pages，后端单独运行:
-
-```bash
-docker run -p 8642:8642 -v nav-data:/app/data ghcr.io/yingxiaomo/nav-server:latest
-```
-
-前端设置 → 云同步 → 选择「本地服务器」，填入后端地址和 API 令牌。
-
-### 方式三: docker-compose
-
-项目根目录提供了两份配置:
-
-**合体模式** (`docker-compose.yml`):
+项目根目录提供了一键配置：
 
 ```bash
 docker compose up -d
 # 打开 http://localhost:8642
 ```
 
-**纯后端模式** (`server/docker-compose.yml`):
-
-```bash
-docker compose -f server/docker-compose.yml up -d
-```
-
 ### 首次启动
 
-首次打开 /admin/ 管理后台时，页面会引导你:
+首次打开 /admin/ 管理后台时，页面会引导你：
 
 1. 设置管理员密码
-2. 自动生成 API 令牌&#x20;
-3. 在前端设置中填入后端地址 + 令牌，完成连接
+2. 自动生成 API 令牌
+3. 在前端设置 → 云同步 → 选择「本地服务器」完成连接
+
+> 前端和服务端同源运行，选择「本地服务器」即可自动连接，无需填写地址和令牌。
+
+### 🔗 远程访问（可选）
+
+如果你的 NAS/服务器有公网 IP 和 DDNS，可以通过反向代理远程使用。
+
+**前置条件：** 已有域名并配置了 DDNS，已运行反向代理并申请了 SSL 证书。
+
+**Nginx 配置示例：**
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name nav.yourdomain.com;
+
+    ssl_certificate /path/to/fullchain.pem;
+    ssl_certificate_key /path/to/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8642;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Docker 日志流使用 SSE，需关闭缓冲
+        proxy_buffering off;
+        proxy_cache off;
+    }
+}
+```
+
+**Caddy 配置：**
+
+```
+nav.yourdomain.com {
+    reverse_proxy localhost:8642
+}
+```
+
+> 💡 提示：首次打开 /admin/ 时，建议在设置中配置 CORS 来源为你自己的域名，增强安全性。
 
 ***
 
@@ -217,7 +252,7 @@ node test/docker-monitor.mjs http://你的服务器IP:8642
      巡检目标: 5 个
   ✅ Docker 容器 (200)
      Docker 容器: 4 个（3 运行中）
-       🟢 nav-server          Up 12 days
+       🟢 nav                Up 12 days
        🟢 nginx               Up 3 days
        🟢 redis               Up 7 days
        🔴 some-service        Exited (1) 2 days ago

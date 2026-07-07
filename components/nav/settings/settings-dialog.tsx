@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Settings, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -68,6 +68,16 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
         settings: undefined
     };
   }, sensitiveFields);
+
+  // 同源自动检测后立即保存到 localStorage，避免显示未保存状态
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const existing = localStorage.getItem(STORAGE_CONFIG_KEY);
+      if (!existing && storageConfig.type === 'api-server' && isPrivateHost(window.location.hostname)) {
+        localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(storageConfig));
+      }
+    }
+  }, [storageConfig]);
 
   const handleOpenChange = (isOpen: boolean) => {
     setSettingsOpen(isOpen);

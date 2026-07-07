@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch" 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ImageIcon, Shuffle, Layers, Upload, Loader2, Sun, Moon, Monitor, RotateCcw, AlertTriangle, Check } from "lucide-react";
+import { ImageIcon, Shuffle, Layers, Upload, Loader2, Sun, Moon, Monitor, RotateCcw, AlertTriangle, Check, Activity } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -226,15 +226,36 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
           <span className="text-xs text-muted-foreground">在主页显示待办事项和笔记入口</span>
         </div>
         <Switch
-          checked={localData.settings.showFeatures !== false} 
+          checked={localData.settings.showFeatures !== false}
           onCheckedChange={(checked) => {
             const newData = {
               ...localData,
               settings: { ...localData.settings, showFeatures: checked },
             };
-            
+
             setLocalData(newData);
 
+            debouncedSave(newData);
+          }}
+        />
+      </div>
+
+      <div className="flex items-center justify-between border border-border/50 p-4 rounded-xl bg-muted/30">
+        <div className="space-y-0.5 flex flex-col">
+          <Label className="flex items-center gap-2">
+            <Activity className="w-4 h-4" />
+            监控面板
+          </Label>
+          <span className="text-xs text-muted-foreground">在主页右下角显示系统监控浮层</span>
+        </div>
+        <Switch
+          checked={localData.settings.showMonitor !== false}
+          onCheckedChange={(checked) => {
+            const newData = {
+              ...localData,
+              settings: { ...localData.settings, showMonitor: checked },
+            };
+            setLocalData(newData);
             debouncedSave(newData);
           }}
         />

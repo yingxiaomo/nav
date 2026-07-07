@@ -484,6 +484,54 @@ func DockerLogs(svc *service.DockerService) http.HandlerFunc {
 	}
 }
 
+// DockerStartContainer handles POST /api/v1/admin/docker/{name}/start.
+func DockerStartContainer(svc *service.DockerService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if svc == nil {
+			model.RespondJSON(w, http.StatusOK, map[string]any{"success": false, "error": "Docker 不可用"})
+			return
+		}
+		name := r.PathValue("name")
+		if err := svc.StartContainer(r.Context(), name); err != nil {
+			model.RespondJSON(w, http.StatusOK, map[string]any{"success": false, "error": err.Error()})
+			return
+		}
+		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
+	}
+}
+
+// DockerStopContainer handles POST /api/v1/admin/docker/{name}/stop.
+func DockerStopContainer(svc *service.DockerService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if svc == nil {
+			model.RespondJSON(w, http.StatusOK, map[string]any{"success": false, "error": "Docker 不可用"})
+			return
+		}
+		name := r.PathValue("name")
+		if err := svc.StopContainer(r.Context(), name); err != nil {
+			model.RespondJSON(w, http.StatusOK, map[string]any{"success": false, "error": err.Error()})
+			return
+		}
+		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
+	}
+}
+
+// DockerRestartContainer handles POST /api/v1/admin/docker/{name}/restart.
+func DockerRestartContainer(svc *service.DockerService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if svc == nil {
+			model.RespondJSON(w, http.StatusOK, map[string]any{"success": false, "error": "Docker 不可用"})
+			return
+		}
+		name := r.PathValue("name")
+		if err := svc.RestartContainer(r.Context(), name); err != nil {
+			model.RespondJSON(w, http.StatusOK, map[string]any{"success": false, "error": err.Error()})
+			return
+		}
+		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
+	}
+}
+
 // ListUploads handles GET /api/v1/admin/uploads.
 // It lists all uploaded files sorted by mtime descending.
 func ListUploads(uploadDir string) http.HandlerFunc {

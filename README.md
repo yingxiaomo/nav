@@ -8,7 +8,7 @@
 
   <p>
     <a href="https://github.com/yingxiaomo/nav/blob/main/LICENSE">
-      <img src="https://img.shields.io/github/license/yingxiaomo/nav?color=green&style=flat-square" alt="license" />
+      <img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg" alt="license" />
     </a>
     <a href="https://github.com/yingxiaomo/nav/stargazers">
       <img src="https://img.shields.io/github/stars/yingxiaomo/nav?style=flat-square" alt="stars" />
@@ -23,118 +23,68 @@
   </p>
 </div>
 
-# Clean Nav - 极简静态导航页
+# Clean Nav - 极简导航页
 
-基于 **Next.js 16** + **React 19** + **Shadcn/ui** + **Tailwind CSS 4** 构建的极简导航页，**可直接设为浏览器主页**。支持自定义壁纸、任务管理、笔记功能，并利用多种无服务器存储方案实现数据同步。
+基于 **Next.js 16** + **React 19** + **Go** + **Tailwind CSS 4** 构建的极简导航页，支持 Docker 合体部署（前端 + 后端 API + 管理后台全功能），也可纯静态部署到 Vercel / Cloudflare Pages。
 
 ## ✨ 特性
 
-- **完全免费**: 部署在 Vercel 或 Cloudflare Pages，无需数据库。
-- **极简**: 包含时间组件、聚合搜索、链接网格、任务管理和笔记功能。
-- **便捷**：直接导入浏览器书签，避免手动添加。
-- **无后端数据同步**：支持多种存储方案，配置修改会自动同步到云端，享受静态网页的极速加载，同时具备动态配置能力。
-- **多存储支持**：
-  - GitHub 私有仓库
-  - GitHub Gist
+- **双模式部署**：Docker 合体镜像全功能开箱即用，也可纯静态部署到 Vercel / Cloudflare
+- **极简**：包含时间组件、聚合搜索、链接网格、任务管理和笔记功能
+- **方便**：直接导入浏览器书签，避免手动添加
+- **多存储支持**（静态模式）：
+  - GitHub 私有仓库 / Gist
   - S3 / Cloudflare R2
   - WebDAV
-  - Dropbox
-  - Google Drive
-- **扩展功能**：
-  - **任务管理**：支持添加、编辑、完成和删除任务
-  - **笔记功能**：支持创建和管理简单笔记
-  - **系统监控**（需部署后端）：实时 CPU/内存/磁盘监控，HTTP 服务健康巡检，支持自定义图标
-  - **Docker 管理**（需 Docker socket 挂载）：容器列表查看，实时日志流式推送
-  - **Docker 浮窗监控**：系统状态浮窗直接展示容器运行状态，点击可直达暴露端口页面，支持固定到仪表盘
-  - **WOL 网络唤醒**（需配置 MAC）：一键唤醒局域网内关机设备
-- **管理体验**
-  - **书签导入**：支持一键导入浏览器书签，快速完成初始化。
-  - **自动识别**：自动抓取链接标题和图标。
-  - **拖拽排序**：在设置面板中，支持通过拖拽调整分类顺序。
-  - **图标库**：内置 400+ 精选功能性图标，支持自定义图标。
-  - **智能数据合并**：多设备同步时自动合并数据，避免冲突。
-  - **图片上传**：支持上传图片到配置的存储服务，自动生成访问链接。
-    - 支持 S3/R2、GitHub、WebDAV、Dropbox、Google Drive 等多种存储方式
-    - 上传图片后自动填充链接到输入框
-    - 提供详细的上传进度反馈
+  - Dropbox / Google Drive
+- **扩展功能**（Docker 模式）：
+  - **系统监控**：实时 CPU/内存/磁盘监控，HTTP 服务健康巡检
+  - **Docker 管理**：容器列表、实时日志、启动/停止/重启
+  - **系统状态浮窗**：直接展示容器运行状态，支持固定到主页
+  - **WOL 网络唤醒**：一键唤醒局域网内关机设备
+- **管理体验**：
+  - 书签导入、自动识别标题和图标、拖拽排序
+  - 内置 400+ 图标库，支持自定义图标
+  - 智能数据合并，多设备同步无冲突
+  - 图片上传自动生成访问链接
 
-## ☁️ 极速上手 — 静态部署（展示用途）
+## 🌐 部署与配置
 
-如果你只是想快速体验前端界面，可以将前端静态部署到 Vercel 或 Cloudflare Pages，数据通过第三方存储服务同步。
+### 1. ☁️ 静态部署（仅前端） [Vercel (推荐)](https://vercel.com) / [Cloudflare Pages ](https://pages.cloudflare.com)
 
-> ⚠️ 静态部署仅包含前端页面，**不包含后端功能**（系统监控、Docker 管理、WOL 网络唤醒等）。
-> 如需使用全部功能，请使用下方的 [Docker 部署](#-docker-部署推荐) 方案。
+将代码克隆到你的 GitHub 仓库，然后在 Vercel 或 Cloudflare Pages 中导入该项目即可。无需特殊的环境变量配置。
+### 🌩️ Cloudflare Pages / Vercel 部署注意
+由于本项目采用了纯静态导出，在配置项目时请务必检查以下设置：
+| 平台 | 构建命令 (Build Command)|输出目录 (Output Directory)|
+|--------------|-----------------------------|---------------------------|
+| Vercel        | npm run build  | 留空 (默认) ⚠️ 不要填 out          |
+| Cloudflare       | npm run build          | out (必须)          |
+| Netlify       | npm run build     | out            |
 
-#### 你的数据只会在 浏览器 <-> 云端存储 之间传输，演示站无法读取你的隐私数据。
+### 2. 启用在线编辑功能
 
-## 数据同步配置
+为了让网页能够保存你修改的数据，你需要在设置面板中配置存储选项：
 
-本项目支持多种存储后端，你可以根据喜好选择：
+1. 打开部署好的导航页，点击右下角的 **设置 (⚙️)** 图标。
+2. 切换到 **云同步** 标签页。
+3. 选择你想要使用的存储类型。
+4. 填写相应的配置信息。
+5. 点击 **测试连接** 确保配置正确。
+6. 点击 **保存** 完成配置。
 
-### 1. GitHub 私有仓库 (推荐)
+现在，你在网页上进行的任何修改都会直接同步到你配置的存储服务中！
 
-无需任何服务器，直接利用 GitHub API 读写你的私有仓库。
+> 💡 详细配置请参考 [云同步配置指南](./docs/storage-guide.md)
 
-### 2. GitHub Gist
+## 🐳 Docker 部署（推荐全功能）
 
-利用 GitHub Gist 服务存储数据，适合快速上手，无需创建新仓库。
+### 镜像
 
-### 3. S3 / Cloudflare R2 (推荐)
+| 镜像 | 地址 | 大小 |
+|------|------|------|
+| **合体镜像** | `ghcr.io/yingxiaomo/nav` | ~25MB |
 
-支持 AWS S3、Cloudflare R2 等兼容 S3 协议的对象存储。R2 提供 10GB 免费空间，速度快且稳定。
-
-### 4. WebDAV
-
-支持连接到任何 WebDAV 服务器，适合自建存储或使用 Nextcloud 等服务。
-
-### 5. Dropbox
-
-支持使用 Dropbox 存储数据，适合已有 Dropbox 账号的用户。
-
-### 6. Google Drive
-
-支持使用 Google Drive 存储数据，适合已有 Google 账号的用户。
-
-### 7. 本地服务器（推荐自部署）
-
-如果你不想依赖第三方服务，可以使用配套的后端 API 服务，将数据持久化到本地 SQLite 数据库。后端还提供网页元数据解析、搜索联想、系统监控、Docker 容器管理和 WOL 网络唤醒等增强功能。
-
-需要部署后端服务，详情见下方 Docker 部署章节。
-
-### 📘 详细配置指南
-
-请参考 [云同步配置指南](./docs/storage-guide.md) 获取完整的配置步骤和示例。
-
-***
-
-## 配置步骤
-
-1. **打开设置面板**：点击导航页右下角的 `设置 (⚙️)` 图标
-2. **选择存储类型**：在 `云同步` 标签页中选择你想要使用的存储类型
-3. **填写配置信息**：根据所选存储类型填写相应的配置信息
-4. **测试连接**：点击 `测试连接` 按钮确保配置正确
-5. **保存配置**：点击 `保存` 按钮保存配置
-
-## 数据安全
-
-🔐 **安全提示**: 您的所有配置信息（包括访问令牌）**只会被安全地存储在您浏览器本地的缓存** 中，它不会被上传到任何服务器。这意味着只有您自己能接触到这些配置，他人无法获取，非常安全！但是更换浏览器或者清除缓存后需要重新输入。
-
-## 🐳 Docker 部署（推荐）
-
-### Docker 镜像
-
-| 镜像 | 地址 | 包含 | 大小 |
-|------|------|------|------|
-| **合体镜像** | `ghcr.io/yingxiaomo/nav` | 前端页面 + 后端 API + 管理后台 | ~25MB |
-
-> 💡 Go 后端编译为纯静态二进制（零运行时依赖），镜像基于 scratch 基础镜像。
-
-项目提供合体 Docker 镜像，一个容器包含前端 + 后端 API + 管理后台，所有功能全开：
-系统监控、Docker 管理、WOL 网络唤醒、本地 SQLite 持久化。
-
-镜像托管在 **GitHub Container Registry** (`ghcr.io`)，基于 `scratch` 基础镜像，仅 ~25MB。
-
-国内用户可使用镜像站 `ghcr.nju.edu.cn` 替换 `ghcr.io`。
+Go 后端编译为纯静态二进制（零运行时依赖），镜像基于 `scratch`，极简安全。
 
 ### 快速启动
 
@@ -142,9 +92,9 @@
 docker run -p 8642:8642 -v nav-data:/app/data ghcr.io/yingxiaomo/nav:latest
 ```
 
-打开 <http://localhost:8642> 即可看到导航页，<http://localhost:8642/admin> 进入管理后台。
+打开 <http://localhost:8642> 即可使用，<http://localhost:8642/admin> 进入管理后台。
 
-如需使用 **Docker 容器日志** 和 **容器列表** 功能，需挂载 Docker socket：
+如需 **Docker 容器管理** 功能，挂载 Docker socket：
 
 ```bash
 docker run -p 8642:8642 \
@@ -153,9 +103,9 @@ docker run -p 8642:8642 \
   ghcr.io/yingxiaomo/nav:latest
 ```
 
-### docker compose 启动
+### Docker Compose
 
-项目根目录提供了一键配置：
+项目根目录的 `docker-compose.yml` 一键启动：
 
 ```bash
 docker compose up -d
@@ -164,21 +114,17 @@ docker compose up -d
 
 ### 首次启动
 
-首次打开 /admin/ 管理后台时，页面会引导你：
+首次打开前端页面时，会自动检测后端可用性：
 
-1. 设置管理员密码
-2. 自动生成 API 令牌
-3. 在前端设置 → 云同步 → 选择「本地服务器」完成连接
+1. 弹出**初始化管理员密码**窗口，输入密码即完成设置
+2. 前端自动连接后端（同源免配置）
+3. 监控面板、Docker 管理等功能自动可用
 
-> 前端和服务端同源运行，选择「本地服务器」即可自动连接，无需填写地址和令牌。
+> 💡 管理后台 `/admin` 可修改密码、管理书签、巡检目标等。
 
-### 🔗 远程访问（可选）
+### 🔗 远程访问
 
-如果你的 NAS/服务器有公网 IP 和 DDNS，可以通过反向代理远程使用。
-
-**前置条件：** 已有域名并配置了 DDNS，已运行反向代理并申请了 SSL 证书。
-
-**Nginx 配置示例：**
+通过反向代理（Nginx / Caddy）暴露到公网：
 
 ```nginx
 server {
@@ -195,108 +141,52 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-
-        # Docker 日志流使用 SSE，需关闭缓冲
         proxy_buffering off;
         proxy_cache off;
     }
 }
 ```
 
-**Caddy 配置：**
-
-```
-nav.yourdomain.com {
-    reverse_proxy localhost:8642
-}
-```
-
-> 💡 提示：首次打开 /admin/ 时，建议在设置中配置 CORS 来源为你自己的域名，增强安全性。
-
-***
-
 ## ☁️ 本地开发
 
-1. Fork 项目
-2. 将你 Fork 后的仓库克隆到本地（将 `your-username` 替换为你的 GitHub 用户名）:
-
 ```bash
-git clone https://github.com/your-username/nav.git
-cd nav
-```
-
-1. 安装与运行
-
-```bash
+# 前端
 npm install
-npm run dev
+npm run dev          # http://localhost:3000
+
+# Go 后端（需要前端开发服务器同时在运行）
+go run ./cmd/nav-server  # http://localhost:8642
 ```
 
-现在，你可以在 `http://localhost:3000` 预览你的导航页了。
+后端自动通过 next.config.ts 的 proxy rewrite (`/api/*` → `localhost:8642`) 与前端通信。
 
-### 🔍 Docker 监控接口测试
+### 测试监控服务
 
-部署后执行以下命令验证监控接口是否正常：
+启动模拟内网服务用于测试健康巡检和图标识别：
 
 ```bash
-node test/docker-monitor.mjs http://你的服务器IP:8642
+node test/test-monitor-servers.mjs
+# 正常: http://localhost:9001
+# 慢速: http://localhost:9002
+# 故障: http://localhost:9003
 ```
 
-输出示例：
-```
-🔍 Nav Docker 监控接口测试 — http://192.168.0.100:8642
+## 数据同步说明
 
-  ✅ 系统状态 (200)
-     CPU: 2% | 内存: 45% | 磁盘: 32%
-  ✅ 服务巡检 (200)
-     巡检目标: 5 个
-  ✅ Docker 容器 (200)
-     Docker 容器: 4 个（3 运行中）
-       🟢 nav                Up 12 days
-       🟢 nginx               Up 3 days
-       🟢 redis               Up 7 days
-       🔴 some-service        Exited (1) 2 days ago
-```
+### Docker 模式
+数据自动保存在容器内的 SQLite 数据库中（挂载到 `nav-data` 卷）。所有修改即时生效。
 
-## 🌐 部署与配置
-
-### 1. 部署到 [Vercel (推荐)](https://vercel.com) / [Cloudflare Pages](https://pages.cloudflare.com)&#x20;
-
-将代码推送到你的 GitHub 仓库，然后在 Vercel 或 Cloudflare Pages 中导入该项目即可。无需特殊的环境变量配置。
-
-### 🌩️ Cloudflare Pages / Vercel 部署注意
-
-由于本项目采用了纯静态导出，在配置项目时请务必检查以下设置：
-
-| 平台         | 构建命令 (Build Command) | 输出目录 (Output Directory) |
-| ---------- | -------------------- | ----------------------- |
-| Vercel     | npm run build        | 留空 (默认) ⚠️ 不要填 out      |
-| Cloudflare | npm run build        | out (必须)                |
-| Netlify    | npm run build        | out                     |
-
-### 2. 启用在线编辑功能
-
-为了让网页能够保存你修改的数据，你需要在设置面板中配置存储选项：
-
-1. 打开部署好的导航页，点击右下角的 **设置 (⚙️)** 图标。
-2. 切换到 **云同步** 标签页。
-3. 选择你想要使用的存储类型。
-4. 填写相应的配置信息。
-5. 点击 **测试连接** 确保配置正确。
-6. 点击 **保存** 完成配置。
-
-现在，你在网页上进行的任何修改都会直接同步到你配置的存储服务中！
+### 静态模式
+需要在设置 → 云同步中配置存储后端（GitHub / S3 / WebDAV 等），修改后需点击保存才会同步到云端。详细配置请参考 [云同步配置指南](./docs/storage-guide.md)。
 
 ### 🔖 如何导入浏览器书签？
-
-为了方便您快速设置，本站支持导入主流浏览器的书签文件。
 
 1. **从您的浏览器导出书签**：
    - **Chrome**: 前往 `书签` -> `书签管理器`，点击右上角的菜单 (⋮)，选择 `导出书签`。
    - **Edge**: 前往 `收藏夹` (Ctrl+Shift+O)，点击右上角的菜单 (...)，选择 `导出收藏夹`。
    - **Firefox**: 前往 `书签` -> `管理所有书签` (Ctrl+Shift+O)，在弹出的窗口中点击 `导入和备份` -> `将书签导出为 HTML...`。
 2. **在本站导入**：
-   - 点击导航页右下角的**设置 (⚙️)** 图标。
+   - 点击导航页右下角的 **设置 (⚙️)** 图标。
    - 在 **链接管理** 标签页下，找到 **导入浏览器书签** 区域，点击并选择您刚才导出的 HTML 文件即可。
 
 ### ⚠️ 注意事项
@@ -304,6 +194,6 @@ node test/docker-monitor.mjs http://你的服务器IP:8642
 - **壁纸打包**：每次构建时从 `public/wallpapers/` 目录随机选取 **5 张**壁纸打包进应用，减小镜像体积。前端「换一张」按钮在已打包的 5 张之间切换。
 - **推荐格式**：壁纸建议使用 `.webp` 格式，单张不超过 **2MB**。
 
-## 📄 License:
+## 📄 License
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)

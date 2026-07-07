@@ -65,8 +65,12 @@ func Admin(database *sql.DB) func(http.Handler) http.Handler {
 				}
 			}
 
-			// POST /fetch-icon (used by icon fetching) is public
-			if r.Method == http.MethodPost && strings.HasSuffix(path, "/fetch-icon") {
+			// POST /fetch-icon, /start, /stop, /restart (used by monitoring panel) are public
+			if r.Method == http.MethodPost &&
+				(strings.HasSuffix(path, "/fetch-icon") ||
+					strings.HasSuffix(path, "/start") ||
+					strings.HasSuffix(path, "/stop") ||
+					strings.HasSuffix(path, "/restart")) {
 				next.ServeHTTP(w, r)
 				return
 			}

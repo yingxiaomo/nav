@@ -154,6 +154,9 @@ func main() {
 	mux.Handle("POST /api/v1/admin/docker/fetch-icon", adminMW(http.HandlerFunc(handler.FetchDockerIcon())))
 	mux.Handle("GET /api/v1/admin/docker/metadata", adminMW(http.HandlerFunc(handler.GetDockerMetadata(dockerMetaStore))))
 	mux.Handle("PUT /api/v1/admin/docker/metadata/{name}", adminMW(http.HandlerFunc(handler.SetDockerMetadata(dockerMetaStore))))
+	mux.Handle("POST /api/v1/admin/docker/{name}/start", adminMW(http.HandlerFunc(handler.DockerStartContainer(dockerSvc))))
+	mux.Handle("POST /api/v1/admin/docker/{name}/stop", adminMW(http.HandlerFunc(handler.DockerStopContainer(dockerSvc))))
+	mux.Handle("POST /api/v1/admin/docker/{name}/restart", adminMW(http.HandlerFunc(handler.DockerRestartContainer(dockerSvc))))
 
 	// Monitor routes (protected by admin auth middleware)
 	mux.Handle("GET /api/v1/admin/monitor/system", adminMW(http.HandlerFunc(handler.SystemInfo())))

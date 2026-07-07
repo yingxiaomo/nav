@@ -147,6 +147,21 @@ func calcCPUPercent(s *container.StatsResponse) float64 {
 	return (float64(cpuDelta) / float64(systemDelta)) * float64(onlineCPUs) * 100.0
 }
 
+// StartContainer starts a stopped container.
+func (s *DockerService) StartContainer(ctx context.Context, id string) error {
+	return s.cli.ContainerStart(ctx, id, container.StartOptions{})
+}
+
+// StopContainer stops a running container.
+func (s *DockerService) StopContainer(ctx context.Context, id string) error {
+	return s.cli.ContainerStop(ctx, id, container.StopOptions{})
+}
+
+// RestartContainer restarts a container.
+func (s *DockerService) RestartContainer(ctx context.Context, id string) error {
+	return s.cli.ContainerRestart(ctx, id, container.StopOptions{})
+}
+
 // StreamLogs streams container logs to the given channel.
 // The channel is closed when the context is cancelled or the log stream ends.
 func (s *DockerService) StreamLogs(ctx context.Context, containerID string, lines chan<- string) error {

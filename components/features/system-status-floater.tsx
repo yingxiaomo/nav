@@ -152,6 +152,15 @@ export function SystemStatusFloater() {
     setContextMenu(null);
   };
 
+  const handleDockerAction = async (name: string, action: 'start' | 'stop' | 'restart') => {
+    try {
+      const h = authHeaders;
+      const res = await fetch(`${baseUrl}/api/v1/admin/docker/${encodeURIComponent(name)}/${action}`, { method: 'POST', headers: h });
+      if (res.ok) { setTimeout(fetchData, 1000); }
+    } catch { /* silent */ }
+    setContextMenu(null);
+  };
+
   const cpuPct = sys?.cpu?.usage ?? 0;
   const memPct = sys?.memory?.usedPercent ?? 0;
   const diskPct = sys?.disk?.usedPercent ?? 0;
@@ -433,18 +442,30 @@ export function SystemStatusFloater() {
               <Zap className="w-3 h-3" /> WOL 唤醒
             </button>
           )}
-          <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-foreground/80 hover:bg-accent rounded-lg transition-colors"
-            onClick={() => setContextMenu(null)}
-            aria-label="重启"
-          >
-            <Play className="w-3 h-3 text-green-400" /> 重启
-          </button>
-          <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-            onClick={() => setContextMenu(null)}
-            aria-label="停止"
-          >
-            <Square className="w-3 h-3" /> 停止
-          </button>
+          {contextMenu.id.startsWith('docker:') && (
+            <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
+              onClick={() => { const name = contextMenu.id.replace('docker:', ''); handleDockerAction(name, 'start'); }}
+              aria-label="启动"
+            >
+              <Play className="w-3 h-3" /> 启动
+            </button>
+          )}
+          {contextMenu.id.startsWith('docker:') && (
+            <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-foreground/80 hover:bg-accent rounded-lg transition-colors"
+              onClick={() => { const name = contextMenu.id.replace('docker:', ''); handleDockerAction(name, 'restart'); }}
+              aria-label="重启"
+            >
+              <Play className="w-3 h-3 text-green-400" /> 重启
+            </button>
+          )}
+          {contextMenu.id.startsWith('docker:') && (
+            <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+              onClick={() => { const name = contextMenu.id.replace('docker:', ''); handleDockerAction(name, 'stop'); }}
+              aria-label="停止"
+            >
+              <Square className="w-3 h-3" /> 停止
+            </button>
+          )}
         </div>
       )}
 

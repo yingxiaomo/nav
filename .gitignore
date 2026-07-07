@@ -51,6 +51,11 @@ scripts/test-*
 *.swp
 *.swo
 
+# Go
+/nav-server
+/nav-server.exe
+/tmp/
+
 # server (后端)
 server/node_modules
 server/data/

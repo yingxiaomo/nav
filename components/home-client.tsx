@@ -70,7 +70,14 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const folderNavRef = useRef<FolderModalHandle>(null);
-  const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels, isCheatSheetOpen, setCheatSheetOpen } = useUIStore();
+  const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels, isCheatSheetOpen, setCheatSheetOpen, setBackendAvailable } = useUIStore();
+
+  // 检测后端是否可用（静态部署时禁用后端功能）
+  useEffect(() => {
+    fetch('/api/v1/health').then(r => {
+      if (!r.ok) setBackendAvailable(false);
+    }).catch(() => setBackendAvailable(false));
+  }, [setBackendAvailable]);
 
   // 拍平所有书签（用于 Fuse.js 模糊搜索）
   const allBookmarks = useMemo(

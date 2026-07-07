@@ -2,6 +2,7 @@
 
 import { STORAGE_CONFIG_KEY } from '@/lib/adapters/storage';
 import { isPrivateHost } from '@/lib/utils';
+import { useUIStore } from '@/lib/stores';
 
 export interface MonitorConfig {
   baseUrl: string | null;
@@ -15,8 +16,10 @@ export interface MonitorConfig {
  * 否则返回 isActive: false，监控组件据此决定是否渲染。
  *
  * 同源/内网环境无需手动配置存储，自动启用。
+ * 静态部署时（后端不可用）自动禁用所有后端功能。
  */
 export function useMonitorConfig(): MonitorConfig {
+  const backendAvailable = useUIStore(s => s.backendAvailable);
   try {
     const raw = localStorage.getItem(STORAGE_CONFIG_KEY);
 
@@ -24,6 +27,8 @@ export function useMonitorConfig(): MonitorConfig {
     if (!raw) {
       const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
       if (hostname && isPrivateHost(hostname)) {
+        // 静态部署时后端不可用，不激活
+        if (!backendAvailable) return { baseUrl: null, authHeaders: {}, isActive: false };
         const origin = typeof window !== 'undefined' ? window.location.origin : '';
         return { baseUrl: origin, authHeaders: {}, isActive: true };
       }
@@ -42,6 +47,7 @@ export function useMonitorConfig(): MonitorConfig {
 
     // baseUrl 为空 → 同源模式（走 Next.js rewrite 代理），自动激活
     if (!config.apiServer?.baseUrl) {
+      if (!backendAvailable) return { baseUrl: null, authHeaders: {}, isActive: false };
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
       return { baseUrl: origin, authHeaders, isActive: true };
     }

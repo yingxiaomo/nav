@@ -9,6 +9,8 @@ interface UIState {
   isCheatSheetOpen: boolean;
   /** 侧边栏书签是否收起 */
   sidebarCollapsed: boolean;
+  /** 后端 API 是否可用（静态部署时为 false） */
+  backendAvailable: boolean;
 
   /** 打开/关闭设置对话框 */
   setSettingsOpen: (open: boolean) => void;
@@ -22,6 +24,8 @@ interface UIState {
   closeAllPanels: () => void;
   /** 切换侧边栏展开/收起 */
   setSidebarCollapsed: (collapsed: boolean) => void;
+  /** 设置后端可用状态 */
+  setBackendAvailable: (available: boolean) => void;
 }
 
 const useUIStore = create<UIState>((set, get) => ({
@@ -29,6 +33,7 @@ const useUIStore = create<UIState>((set, get) => ({
   activePanel: null,
   isCheatSheetOpen: false,
   sidebarCollapsed: true,
+  backendAvailable: true,
 
   setSettingsOpen: (open) => set({ isSettingsOpen: open }),
 
@@ -42,6 +47,8 @@ const useUIStore = create<UIState>((set, get) => ({
   setCheatSheetOpen: (open) => set({ isCheatSheetOpen: open }),
 
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+
+  setBackendAvailable: (available) => set({ backendAvailable: available }),
 
   closeAllPanels: () => set({
     isSettingsOpen: false,

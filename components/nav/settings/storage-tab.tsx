@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertCircle, Wifi, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { isPrivateHost } from "@/lib/utils";
+import { useUIStore } from "@/lib/stores";
 import type { DataSchema } from "@/lib/types";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
@@ -37,6 +39,7 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
   } | null>(null);
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
+  const backendAvailable = useUIStore(s => s.backendAvailable);
 
   useEffect(() => {
     if (!configRef.current.type) {
@@ -46,6 +49,10 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
 
   const handleTypeChange = (type: string) => {
     const newType = type as StorageConfig['type'];
+    if (newType === 'api-server' && !backendAvailable) {
+      toast.error('仅在 Docker 部署版中可用', { description: '本地服务器模式需要后端服务支持' });
+      return;
+    }
     setConfig({ ...config, type: newType });
   };
 
@@ -520,6 +527,17 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
 
         {config.type === 'api-server' && (
           <>
+            {!backendAvailable && (
+              <div className="rounded-md bg-amber-500/10 p-3 border border-amber-500/20 mb-3">
+                <div className="flex items-center gap-2 text-amber-500 mb-1">
+                  <AlertCircle className="size-4 shrink-0" />
+                  <span className="text-xs font-medium">当前为静态部署，本地服务器不可用</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  本地服务器模式需要后端服务支持，仅在 Docker 部署版中可用。
+                </p>
+              </div>
+            )}
             <div className="rounded-md bg-green-500/10 p-3 border border-green-500/20">
               <div className="flex items-center gap-2 text-green-500 mb-1">
                 <Wifi className="w-4 h-4 shrink-0" />

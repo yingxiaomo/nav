@@ -69,15 +69,23 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
     };
   }, sensitiveFields);
 
-  // 同源自动检测后立即保存到 localStorage，避免显示未保存状态
+  // 同源自动检测后立即保存到 localStorage；静态部署时切回 GitHub
+  const backendAvailable = useUIStore(s => s.backendAvailable);
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      if (!backendAvailable) {
+        // 静态部署：本地服务器不可用，重置为 GitHub
+        if (storageConfig.type === 'api-server') {
+          setStorageConfig({ type: 'github' });
+        }
+        return;
+      }
       const existing = localStorage.getItem(STORAGE_CONFIG_KEY);
       if (!existing && storageConfig.type === 'api-server' && isPrivateHost(window.location.hostname)) {
         localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(storageConfig));
       }
     }
-  }, [storageConfig]);
+  }, [storageConfig, backendAvailable, setStorageConfig]);
 
   const handleOpenChange = (isOpen: boolean) => {
     setSettingsOpen(isOpen);

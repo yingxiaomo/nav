@@ -8,14 +8,14 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# Stage 2: Build Go backend (static binary)
+# Stage 2: Build Go backend (static binary) + UPX 压缩
 FROM golang:1.25-alpine AS gb
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata upx
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /nav-server ./cmd/nav-server
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /nav-server ./cmd/nav-server && upx --best -q /nav-server
 
 # Stage 3: Minimal runtime
 FROM scratch

@@ -40,9 +40,24 @@ export const uint8ArrayToBase64 = (arr: Uint8Array): string => {
 };
 
 /**
- * 生成随机ID（UUID v4）
+ * 生成随机ID（UUID v4），兼容非安全上下文
  */
-export const generateId = (): string => crypto.randomUUID();
+export const generateId = (): string => {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+  } catch {}
+  const hex = "0123456789abcdef";
+  const arr = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  let id = "";
+  for (let i = 0; i < 16; i++) {
+    id += hex[arr[i] & 15];
+    if (i === 3 || i === 5 || i === 7 || i === 9) id += "-";
+  }
+  return id;
+};
 
 /**
  * 深度比较两个对象是否相等

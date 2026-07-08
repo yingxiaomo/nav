@@ -27,6 +27,23 @@ interface AddLinkTabProps {
 }
 
 export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTabProps) {
+  // 安全生成唯一 ID，兼容非 HTTPS 环境（crypto.randomUUID 在不安全上下文中不可用）
+  function generateId(): string {
+    try {
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return crypto.randomUUID();
+      }
+    } catch {}
+    const hex = "0123456789abcdef";
+    const arr = new Uint8Array(16);
+    crypto.getRandomValues(arr);
+    let id = "";
+    for (let i = 0; i < 16; i++) {
+      id += hex[arr[i] & 15];
+      if (i === 3 || i === 5 || i === 7 || i === 9) id += "-";
+    }
+    return id;
+  }
   const [newUrl, setNewUrl] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("");
@@ -122,7 +139,7 @@ export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTa
     if (newData.categories.some(c => c.title === sanitizedFolderName)) {
         return toast.error("该文件夹已存在", { description: "请使用不同的文件夹名称" });
     }
-    newData.categories.push({ id: `c-${crypto.randomUUID()}`, title: sanitizedFolderName, icon: "FolderOpen", links: [] });
+    newData.categories.push({ id: `c-${generateId()}`, title: sanitizedFolderName, icon: "FolderOpen", links: [] });
     setLocalData(newData);
     setNewCategory(sanitizedFolderName); 
     setIsCreatingFolder(false);
@@ -248,7 +265,7 @@ export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTa
     const newData = { ...localData };
     let categoryIndex = newData.categories.findIndex(c => c.title === sanitizedCategory);
     if (categoryIndex === -1) {
-      newData.categories.push({ id: `c-${crypto.randomUUID()}`, title: sanitizedCategory, icon: "FolderOpen", links: [] });
+      newData.categories.push({ id: `c-${generateId()}`, title: sanitizedCategory, icon: "FolderOpen", links: [] });
       categoryIndex = newData.categories.length - 1;
     }
     newData.categories[categoryIndex] = {
@@ -257,7 +274,7 @@ export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTa
     };
     
       newData.categories[categoryIndex].links.push({ 
-        id: `l-${crypto.randomUUID()}`, 
+        id: `l-${generateId()}`, 
         title: sanitizedTitle, 
         url: finalUrl, 
         icon: newIcon, 
@@ -320,7 +337,7 @@ export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTa
                             }
 
                             items.push({
-                                id: crypto.randomUUID(),
+                                id: generateId(),
                                 title: folderTitle,
                                 url: "",
                                 icon: "FolderOpen",
@@ -330,7 +347,7 @@ export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTa
                             totalFolders++;
                         } else if (a) {
                             items.push({
-                                id: crypto.randomUUID(),
+                                id: generateId(),
                                 title: a.innerText,
                                 url: a.href,
                                 icon: generateFaviconUrl(new URL(a.href).hostname),
@@ -353,7 +370,7 @@ export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTa
                 for (const item of rootItems) {
                     if (item.type === 'folder' && item.children) {
                         newCategories.push({
-                            id: crypto.randomUUID(),
+                            id: generateId(),
                             title: item.title,
                             icon: "FolderOpen",
                             links: item.children
@@ -365,7 +382,7 @@ export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTa
 
                 if (looseLinks.length > 0) {
                     newCategories.push({
-                        id: crypto.randomUUID(),
+                        id: generateId(),
                         title: "导入的书签",
                         icon: "FolderDown",
                         links: looseLinks

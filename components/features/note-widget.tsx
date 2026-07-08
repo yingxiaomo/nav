@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Note } from "@/lib/types"
 import { motion, AnimatePresence } from "framer-motion"
+import { generateId } from "@/lib/utils/common"
 
 interface NoteWidgetProps {
   notes: Note[]
@@ -20,7 +21,7 @@ export function NoteWidget({ notes = [], onUpdate }: NoteWidgetProps) {
 
   const addNote = () => {
     const newNote: Note = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       title: "", 
       content: "",
       updatedAt: Date.now(),

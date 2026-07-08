@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Todo } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
+import { generateId } from "@/lib/utils/common"
 
 interface TodoWidgetProps {
   todos: Todo[]
@@ -25,7 +26,7 @@ export function TodoWidget({ todos = [], onUpdate }: TodoWidgetProps) {
 
     const timestamp = Date.now()
     const newItem: Todo = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       text: newTodo.trim(),
       completed: false,
       createdAt: timestamp,

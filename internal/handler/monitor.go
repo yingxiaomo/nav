@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -193,10 +194,12 @@ func (h *Handler) MonitorAll() http.HandlerFunc {
 		}
 
 		if svc := h.DockerSvc; svc != nil {
-			if containers, err := svc.ListContainers(r.Context()); err == nil {
+			dockerCtx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+			defer cancel()
+			if containers, err := svc.ListContainers(dockerCtx); err == nil {
 				resp.Containers = containers
 			}
-			if stats, err := svc.ContainerStats(r.Context()); err == nil {
+			if stats, err := svc.ContainerStats(dockerCtx); err == nil {
 				resp.Stats = stats
 			}
 		}

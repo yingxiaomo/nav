@@ -12,8 +12,17 @@ export function useStorageConfig() {
   const getEffectiveConfig = useCallback((): StorageConfig | null => {
     if (typeof window === 'undefined') return null;
 
-    const storageConfigStr = localStorage.getItem(STORAGE_CONFIG_KEY);
+    let storageConfigStr = localStorage.getItem(STORAGE_CONFIG_KEY);
     if (storageConfigStr) {
+      // 兼容新版 base64 编码格式
+      if (storageConfigStr.startsWith('__b64__')) {
+        try {
+          storageConfigStr = atob(storageConfigStr.slice(7));
+          // 迁移为明文存储，下次写入不再是 __b64__ 格式
+          localStorage.setItem(STORAGE_CONFIG_KEY, storageConfigStr);
+        } catch { /* 解码失败，忽略 */
+        }
+      }
       try {
         const rawConfig = JSON.parse(storageConfigStr);
 

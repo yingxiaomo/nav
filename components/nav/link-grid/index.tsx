@@ -70,6 +70,7 @@ interface LinkGridProps {
   pinnedLinks?: LinkItem[];
   onPinLink?: (link: LinkItem) => void;
   onUnpinLink?: (linkId: string) => void;
+  onUpdatePinnedLink?: (updated: LinkItem) => void;
   onPinnedReorder?: (pinned: LinkItem[]) => void;
 }
 
@@ -82,6 +83,7 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
   pinnedLinks = [],
   onPinLink,
   onUnpinLink,
+  onUpdatePinnedLink,
   onPinnedReorder,
 }: LinkGridProps, ref) {
 
@@ -250,6 +252,7 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
                   key={link.id}
                   item={link}
                   onUnpin={() => onUnpinLink?.(link.id)}
+                  onUpdate={onUpdatePinnedLink}
                 />
               ))}
             </div>

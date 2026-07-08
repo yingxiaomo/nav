@@ -58,7 +58,8 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
     uploadWallpaper,
     handlePinLink,
     handleUnpinLink,
-    handlePinnedReorder
+    handlePinnedReorder,
+    handleUpdatePinnedLink,
   } = useNavData(initialWallpapers);
 
   const {
@@ -289,6 +290,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
                   onPinLink={handlePinLink}
                   onUnpinLink={handleUnpinLink}
                   onPinnedReorder={handlePinnedReorder}
+                  onUpdatePinnedLink={handleUpdatePinnedLink}
                 />
               </ErrorBoundary>
             </div>

@@ -299,6 +299,13 @@ export function useNavData(initialWallpapers: string[]) {
     updateLocalAndState({ ...data, pinnedLinks: newPinned });
   }, [data, updateLocalAndState]);
 
+  const handleUpdatePinnedLink = useCallback((updated: LinkItem) => {
+    updateLocalAndState({
+      ...data,
+      pinnedLinks: (data.pinnedLinks || []).map(l => l.id === updated.id ? updated : l),
+    });
+  }, [data, updateLocalAndState]);
+
   // ── 公共 API：壁纸上传 ──
   const uploadWallpaper = useCallback(async (file: File, onProgress?: (progress: number) => void): Promise<string> => {
     const config = getEffectiveConfig();
@@ -334,5 +341,6 @@ export function useNavData(initialWallpapers: string[]) {
     handlePinLink,
     handleUnpinLink,
     handlePinnedReorder,
+    handleUpdatePinnedLink,
   };
 }

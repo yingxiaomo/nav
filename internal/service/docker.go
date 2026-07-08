@@ -89,7 +89,9 @@ func (s *DockerService) ContainerStats(ctx context.Context) ([]model.DockerStat,
 			name = strings.TrimPrefix(c.Names[0], "/")
 		}
 
-		sData, err := dockerGet[dockerStatsJSON](ctx, s.cli, "/containers/"+c.ID+"/stats?stream=false")
+		statsCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		sData, err := dockerGet[dockerStatsJSON](statsCtx, s.cli, "/containers/"+c.ID+"/stats?stream=false")
+		cancel()
 		if err != nil {
 			slog.Warn("获取容器统计失败", "container", c.ID[:12], "error", err)
 			continue

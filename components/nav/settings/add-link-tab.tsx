@@ -17,7 +17,8 @@ import {
   sanitizeText
 } from "@/lib/utils/validation";
 import { convertToWebP } from "@/lib/utils/image-utils";
-import { STORAGE_CONFIG_KEY, StorageConfig, GithubRepoAdapter, S3Adapter, WebDavAdapter, DropboxAdapter, GoogleDriveAdapter, ApiServerAdapter } from "@/lib/adapters/storage";
+import { STORAGE_CONFIG_KEY, StorageConfig } from "@/lib/adapters/storage";
+import { GithubRepoAdapter, S3Adapter, WebDavAdapter, DropboxAdapter, GoogleDriveAdapter, ApiServerAdapter } from "@/lib/adapters";
 
 interface AddLinkTabProps {
   localData: DataSchema;

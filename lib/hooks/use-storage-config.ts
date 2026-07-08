@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, ApiServerAdapter, STORAGE_CONFIG_KEY, type StorageConfig, type StorageAdapter } from '../adapters/storage';
+import { GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, ApiServerAdapter, STORAGE_CONFIG_KEY, type StorageConfig, type StorageAdapter } from '../adapters';
 import { GITHUB_CONFIG_KEY } from '../adapters/github';
 import { isPrivateHost } from '../utils/common';
 

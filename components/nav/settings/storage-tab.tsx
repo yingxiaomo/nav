@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, DropboxSettings, GoogleDriveSettings, ApiServerSettings, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, ApiServerAdapter } from "@/lib/adapters/storage";
+import { StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, DropboxSettings, GoogleDriveSettings, ApiServerSettings } from "@/lib/adapters/storage";
+import { GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, ApiServerAdapter } from "@/lib/adapters";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";

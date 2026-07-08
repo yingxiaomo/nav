@@ -67,7 +67,7 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
         type: 'github',
         settings: undefined
     };
-  }, sensitiveFields);
+  }, []);
 
   // 同源自动检测后立即保存到 localStorage；静态部署时切回 GitHub
   const backendAvailable = useUIStore(s => s.backendAvailable);

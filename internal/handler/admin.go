@@ -227,7 +227,9 @@ func ExportBackup(db *sql.DB) http.HandlerFunc {
 		exportMTs := make([]backupMonitorTarget, 0)
 		mtRows, err := db.QueryContext(r.Context(),
 			`SELECT id, name, url, COALESCE(icon,''), COALESCE(mac,''), timeout, created_at FROM monitor_targets ORDER BY created_at`)
-		if err == nil {
+		if err != nil {
+			slog.Warn("备份导出: 获取监控目标失败", "error", err)
+		} else {
 			defer mtRows.Close()
 			for mtRows.Next() {
 				var mt backupMonitorTarget

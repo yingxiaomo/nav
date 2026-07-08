@@ -42,12 +42,12 @@ export function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSav
           body: JSON.stringify({ name: name.trim(), url: url.trim(), icon: icon || undefined }),
         });
       } else if (isDocker) {
-        // 编辑模式（Docker 容器）
+        // 编辑模式（Docker 容器）— 只存备注名和图标
         const containerName = target.id.replace('docker:', '');
         await fetch(`${baseUrl}/api/v1/admin/docker/metadata/${encodeURIComponent(containerName)}`, {
           method: 'PUT',
           headers: { ...authHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ icon: icon || undefined }),
+          body: JSON.stringify({ icon: icon || undefined, label: name.trim() !== containerName ? name.trim() : undefined }),
         });
       } else {
         // 编辑模式（内网巡检）

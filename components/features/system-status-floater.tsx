@@ -17,7 +17,7 @@ export function SystemStatusFloater() {
   const [targets, setTargets] = useState<TargetInfo[]>([]);
   const [containers, setContainers] = useState<ContainerInfo[]>([]);
   const [containerStats, setContainerStats] = useState<ContainerStats[]>([]);
-  const [dockerMeta, setDockerMeta] = useState<Record<string, { name: string; icon?: string }>>({});
+  const [dockerMeta, setDockerMeta] = useState<Record<string, { name: string; icon?: string; label?: string }>>({});
   const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [editTarget, setEditTarget] = useState<MonitorEditTarget | null>(null);
 
@@ -64,6 +64,8 @@ export function SystemStatusFloater() {
     targets.find(t => t.id === id)?.mac;
   const getDockerIcon = (containerName: string): string | undefined =>
     dockerMeta[containerName]?.icon;
+  const getDockerLabel = (containerName: string): string =>
+    dockerMeta[containerName]?.label || containerName;
 
   const handleWake = async (id: string) => {
     const mac = getMac(id);
@@ -204,7 +206,7 @@ export function SystemStatusFloater() {
                           }
                           return null;
                         })()}
-                        <span className="text-xs truncate text-foreground/80">{c.name}</span>
+                        <span className="text-xs truncate text-foreground/80">{getDockerLabel(c.name)}</span>
                       </div>
                       <div className="flex items-center gap-3 shrink-0 ml-2">
                         <span className="text-[10px] tabular-nums text-muted-foreground/60" style={{ color: mc.cpu > 50 ? '#f59e0b' : undefined }}>
@@ -253,7 +255,7 @@ export function SystemStatusFloater() {
                         return <img src={renderIcon} alt="" className="w-4 h-4 rounded shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />;
                       return <span className="text-sm shrink-0">{renderIcon}</span>;
                     })(getDockerIcon(c.name))}
-                    <span className="text-xs truncate text-foreground/80">{c.name}</span>
+                    <span className="text-xs truncate text-foreground/80">{getDockerLabel(c.name)}</span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-2">
                     {(st => st
@@ -345,7 +347,7 @@ export function SystemStatusFloater() {
                 if (c) { setEditTarget({ id: c.id, name: c.name, icon: getIcon(c.id), url: c.url, mac: getMac(c.id) }); }
                 else {
                   const dc = containers.find(ch => 'docker:' + ch.name === contextMenu.id);
-                  if (dc) setEditTarget({ id: contextMenu.id, name: dc.name, icon: getDockerIcon(dc.name) || undefined, url: parseContainerUrl(dc.ports) || undefined });
+                  if (dc) setEditTarget({ id: contextMenu.id, name: getDockerLabel(dc.name), icon: getDockerIcon(dc.name) || undefined, url: parseContainerUrl(dc.ports) || undefined });
                 }
                 setContextMenu(null);
               }}

@@ -244,14 +244,14 @@ func (h *Handler) SetDockerMetadata() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := r.PathValue("name")
 
-		type request struct{ Icon string `json:"icon,omitempty"` }
+		type request struct{ Icon string `json:"icon,omitempty"`; Label string `json:"label,omitempty"` }
 		var req request
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return
 		}
 
-		if err := h.DockerMeta.Set(name, model.DockerMetadata{Name: name, Icon: req.Icon}); err != nil {
+		if err := h.DockerMeta.Set(name, model.DockerMetadata{Name: name, Icon: req.Icon, Label: req.Label}); err != nil {
 			slog.Error("保存 Docker 元数据失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "保存失败")
 			return

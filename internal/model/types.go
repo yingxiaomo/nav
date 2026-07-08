@@ -162,8 +162,9 @@ type DockerStat struct {
 }
 
 type DockerMetadata struct {
-	Name string `json:"name"`
-	Icon string `json:"icon,omitempty"`
+	Name  string `json:"name"`
+	Icon  string `json:"icon,omitempty"`
+	Label string `json:"label,omitempty"`
 }
 
 // ===== 系统信息类型 =====

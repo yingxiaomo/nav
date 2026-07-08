@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ChevronDown, Cpu, HardDrive, Plus, XCircle, Box, MemoryStick, Container, ExternalLink } from "lucide-react";
+import { ChevronDown, Cpu, HardDrive, Plus, XCircle, Box, MemoryStick, Container, ExternalLink, FileText, X as XIcon } from "lucide-react";
 import { useMonitorConfig } from "@/lib/hooks/use-monitor-config";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -20,6 +20,8 @@ export function SystemStatusFloater() {
   const [dockerMeta, setDockerMeta] = useState<Record<string, { name: string; icon?: string; label?: string }>>({});
   const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [editTarget, setEditTarget] = useState<MonitorEditTarget | null>(null);
+  const [logContainer, setLogContainer] = useState<string | null>(null);
+  const [logLines, setLogLines] = useState<string[]>([]);
 
   const { baseUrl, authHeaders, isActive } = useMonitorConfig();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -84,6 +86,12 @@ export function SystemStatusFloater() {
       const res = await fetch(`${baseUrl}/api/v1/admin/docker/${encodeURIComponent(name)}/${action}`, { method: 'POST', headers: h });
       if (res.ok) { setTimeout(fetchData, 1000); }
     } catch (err) { console.warn('[Monitor] Docker action failed:', err); }
+    setContextMenu(null);
+  };
+
+  const handleViewLogs = (name: string) => {
+    setLogContainer(name);
+    setLogLines([]);
     setContextMenu(null);
   };
 
@@ -383,6 +391,13 @@ export function SystemStatusFloater() {
             </button>
           )}
           {contextMenu.id.startsWith('docker:') && (
+            <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-colors"
+              onClick={() => handleViewLogs(contextMenu.id.replace('docker:', ''))}
+            >
+              <FileText className="w-3 h-3" /> 日志
+            </button>
+          )}
+          {contextMenu.id.startsWith('docker:') && (
             <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
               onClick={() => handleDockerAction(contextMenu.id.replace('docker:', ''), 'stop')}
               aria-label="停止"
@@ -403,6 +418,61 @@ export function SystemStatusFloater() {
           onSaved={() => { setEditTarget(null); fetchData(); }}
         />
       )}
+
+      {/* ── Docker 日志查看器 ── */}
+      {logContainer && (
+        <LogViewer
+          containerName={logContainer}
+          baseUrl={baseUrl || ''}
+          onClose={() => setLogContainer(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** 迷你 Docker 日志查看器 */
+function LogViewer({ containerName, baseUrl, onClose }: { containerName: string; baseUrl: string; onClose: () => void }) {
+  const [lines, setLines] = useState<string[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const evRef = useRef<EventSource | null>(null);
+
+  useEffect(() => {
+    const es = new EventSource(`${baseUrl}/api/v1/admin/docker/logs/${encodeURIComponent(containerName)}`);
+    evRef.current = es;
+    es.onmessage = (e) => {
+      setLines(prev => {
+        const next = [...prev, e.data];
+        return next.length > 500 ? next.slice(-500) : next;
+      });
+    };
+    es.onerror = () => { es.close(); };
+    return () => { es.close(); };
+  }, [containerName, baseUrl]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [lines]);
+
+  return (
+    <div className="fixed inset-0 z-[999] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={onClose}>
+      <div className="bg-black/90 backdrop-blur-xl border border-white/20 rounded-2xl w-[90vw] max-w-3xl h-[70vh] shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
+          <span className="text-sm font-medium text-white/90">容器日志 — {containerName}</span>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 transition-colors">
+            <XIcon className="w-4 h-4 text-white/70" />
+          </button>
+        </div>
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 font-mono text-[12px] leading-relaxed text-green-400/90 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded">
+          {lines.length === 0 ? (
+            <span className="text-white/40">等待日志...</span>
+          ) : (
+            lines.map((line, i) => <div key={i}>{line}</div>)
+          )}
+        </div>
+      </div>
     </div>
   );
 }

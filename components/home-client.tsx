@@ -90,7 +90,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
   useKeyboardShortcuts([
     {
       key: 'meta+s',
-      handler: () => handleSave(data, initWallpaper),
+      handler: () => handleSave(data),
       label: '保存并同步',
       category: 'global',
       allowInInputs: true,
@@ -228,7 +228,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
             <ErrorBoundary name="settings" fallback={<div className="w-10 h-10" />}>
               <SettingsDialog
                 data={data}
-                onSave={(newData) => handleSave(newData, initWallpaper)}
+                onSave={(newData) => handleSave(newData)}
                 isSaving={isSaving}
                 hasUnsavedChanges={hasUnsavedChanges}
                 syncError={syncError}

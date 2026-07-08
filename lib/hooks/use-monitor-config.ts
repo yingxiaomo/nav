@@ -20,32 +20,26 @@ export interface MonitorConfig {
  */
 export function useMonitorConfig(): MonitorConfig {
   const backendAvailable = useUIStore(s => s.backendAvailable);
+
+  // 尝试从 localStorage 解析存储配置
+  let config: { type?: string; apiServer?: { baseUrl?: string; token?: string } } | null = null;
   try {
     const raw = localStorage.getItem(STORAGE_CONFIG_KEY);
-
-    // 无配置时检测是否内网环境，自动启用（同源模式）
-    if (!raw) {
-      const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-      if (hostname && isPrivateHost(hostname)) {
-        // 静态部署时后端不可用，不激活
-        if (!backendAvailable) return { baseUrl: null, authHeaders: {}, isActive: false };
-        const origin = typeof window !== 'undefined' ? window.location.origin : '';
-        return { baseUrl: origin, authHeaders: {}, isActive: true };
-      }
-      return { baseUrl: null, authHeaders: {}, isActive: false };
+    if (raw) {
+      config = JSON.parse(raw);
     }
+  } catch {
+    // localStorage 数据损坏或旧版加密格式，忽略后走自动检测
+  }
 
-    const config = JSON.parse(raw);
-    if (config.type !== 'api-server') {
-      return { baseUrl: null, authHeaders: {}, isActive: false };
-    }
-
+  // 有 API-Server 配置 → 按配置连后端
+  if (config?.type === 'api-server') {
     const authHeaders: Record<string, string> = {};
     if (config.apiServer?.token) {
       authHeaders['Authorization'] = `Bearer ${config.apiServer.token}`;
     }
 
-    // baseUrl 为空 → 同源模式（走 Next.js rewrite 代理），自动激活
+    // baseUrl 为空 → 同源模式
     if (!config.apiServer?.baseUrl) {
       if (!backendAvailable) return { baseUrl: null, authHeaders: {}, isActive: false };
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
@@ -53,14 +47,24 @@ export function useMonitorConfig(): MonitorConfig {
     }
 
     const baseUrl = config.apiServer.baseUrl.replace(/\/+$/, '');
-    const hostname = new URL(baseUrl).hostname;
-
-    if (!isPrivateHost(hostname)) {
+    try {
+      if (!isPrivateHost(new URL(baseUrl).hostname)) {
+        return { baseUrl: null, authHeaders: {}, isActive: false };
+      }
+    } catch {
       return { baseUrl: null, authHeaders: {}, isActive: false };
     }
 
     return { baseUrl, authHeaders, isActive: true };
-  } catch {
-    return { baseUrl: null, authHeaders: {}, isActive: false };
   }
+
+  // 无配置 / 配置损坏 / 非 API-Server → 同源/内网环境自动检测
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  if (hostname && isPrivateHost(hostname)) {
+    if (!backendAvailable) return { baseUrl: null, authHeaders: {}, isActive: false };
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    return { baseUrl: origin, authHeaders: {}, isActive: true };
+  }
+
+  return { baseUrl: null, authHeaders: {}, isActive: false };
 }

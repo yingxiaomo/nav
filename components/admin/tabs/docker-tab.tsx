@@ -44,10 +44,7 @@ export default function DockerTab() {
     };
 
     es.addEventListener('end', () => { es.close(); });
-    es.addEventListener('error', () => {
-      setLogs(prev => [...prev, `--- 日志流错误 ---`]);
-      es.close();
-    });
+    es.addEventListener('error', () => { es.close(); });
 
     dockerLogSources.set(name, es);
   };

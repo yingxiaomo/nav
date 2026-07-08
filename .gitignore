@@ -70,3 +70,4 @@ data/
 *.db
 *.db-shm
 *.db-wal
+package-lock.json

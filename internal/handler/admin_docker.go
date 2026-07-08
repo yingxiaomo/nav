@@ -122,11 +122,15 @@ func (h *Handler) DockerLogs() http.HandlerFunc {
 		}()
 
 		for line := range lines {
-			escaped := strings.ReplaceAll(line, "\n", "\\n")
-			escaped = strings.ReplaceAll(escaped, "\r", "")
-			fmt.Fprintf(w, "data: %s\n\n", escaped)
+			// 去除行尾换行符，避免在 SSE 中作为可见字符显示
+			cleaned := strings.TrimRight(line, "\n\r")
+			fmt.Fprintf(w, "data: %s\n\n", cleaned)
 			flusher.Flush()
 		}
+
+		// 发送 end 事件，前端监听 end 事件后关闭 EventSource
+		fmt.Fprintf(w, "event: end\ndata: \n\n")
+		flusher.Flush()
 	}
 }
 

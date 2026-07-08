@@ -41,30 +41,41 @@ export function useMonitorConfig(): MonitorConfig {
 
     // baseUrl 为空 → 同源模式
     if (!config.apiServer?.baseUrl) {
-      if (!backendAvailable) return { baseUrl: null, authHeaders: {}, isActive: false };
+      if (!backendAvailable) {
+        console.warn('[MonitorConfig] 后端不可用，跳过同源模式');
+        return { baseUrl: null, authHeaders: {}, isActive: false };
+      }
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      console.debug('[MonitorConfig] 同源模式激活', { origin, authHeaders, backendAvailable });
       return { baseUrl: origin, authHeaders, isActive: true };
     }
 
     const baseUrl = config.apiServer.baseUrl.replace(/\/+$/, '');
     try {
       if (!isPrivateHost(new URL(baseUrl).hostname)) {
+        console.warn('[MonitorConfig] 非内网地址，跳过', { baseUrl });
         return { baseUrl: null, authHeaders: {}, isActive: false };
       }
     } catch {
       return { baseUrl: null, authHeaders: {}, isActive: false };
     }
 
+    console.debug('[MonitorConfig] 远程模式激活', { baseUrl, authHeaders });
     return { baseUrl, authHeaders, isActive: true };
   }
 
   // 无配置 / 配置损坏 / 非 API-Server → 同源/内网环境自动检测
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   if (hostname && isPrivateHost(hostname)) {
-    if (!backendAvailable) return { baseUrl: null, authHeaders: {}, isActive: false };
+    if (!backendAvailable) {
+      console.warn('[MonitorConfig] 内网检测到但后端不可用', { hostname });
+      return { baseUrl: null, authHeaders: {}, isActive: false };
+    }
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    console.debug('[MonitorConfig] 内网自动检测激活', { hostname, origin });
     return { baseUrl: origin, authHeaders: {}, isActive: true };
   }
 
+  console.warn('[MonitorConfig] 未激活', { hostname, backendAvailable, config });
   return { baseUrl: null, authHeaders: {}, isActive: false };
 }

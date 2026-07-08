@@ -547,6 +547,12 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
               <p className="text-[11px] text-muted-foreground">
                 前端与后端同源运行，无需额外配置。刷新页面后数据自动从本地后端加载。
               </p>
+              <button
+                onClick={() => window.open('/admin', '_blank')}
+                className="mt-2 text-[11px] text-green-400 hover:text-green-300 underline underline-offset-2 transition-colors"
+              >
+                打开后端管理面板 →
+              </button>
             </div>
           </>
         )}

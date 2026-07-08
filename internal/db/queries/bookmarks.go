@@ -24,9 +24,11 @@ func GetBookmarksByCategory(ctx context.Context, db *sql.DB, categoryID string) 
 	var bms []model.Bookmark
 	for rows.Next() {
 		var b model.Bookmark
-		if err := rows.Scan(&b.ID, &b.CategoryID, &b.Title, &b.URL, &b.Icon, &b.Description, &b.Order, &b.CreatedAt); err != nil {
+		var desc sql.NullString
+		if err := rows.Scan(&b.ID, &b.CategoryID, &b.Title, &b.URL, &b.Icon, &desc, &b.Order, &b.CreatedAt); err != nil {
 			return nil, err
 		}
+		b.Description = desc.String
 		bms = append(bms, b)
 	}
 	if bms == nil {
@@ -50,9 +52,11 @@ func GetAllBookmarks(ctx context.Context, db *sql.DB, categoryID string) ([]mode
 	var bms []model.Bookmark
 	for rows.Next() {
 		var b model.Bookmark
-		if err := rows.Scan(&b.ID, &b.CategoryID, &b.Title, &b.URL, &b.Icon, &b.Description, &b.Order, &b.CreatedAt); err != nil {
+		var desc sql.NullString
+		if err := rows.Scan(&b.ID, &b.CategoryID, &b.Title, &b.URL, &b.Icon, &desc, &b.Order, &b.CreatedAt); err != nil {
 			return nil, err
 		}
+		b.Description = desc.String
 		bms = append(bms, b)
 	}
 	if bms == nil {
@@ -63,15 +67,17 @@ func GetAllBookmarks(ctx context.Context, db *sql.DB, categoryID string) ([]mode
 
 func GetBookmark(ctx context.Context, db *sql.DB, id string) (*model.Bookmark, error) {
 	var b model.Bookmark
+	var desc sql.NullString
 	err := db.QueryRowContext(ctx,
 		`SELECT id, category_id, title, url, icon, description, "order", created_at FROM bookmarks WHERE id = ?`, id).
-		Scan(&b.ID, &b.CategoryID, &b.Title, &b.URL, &b.Icon, &b.Description, &b.Order, &b.CreatedAt)
+		Scan(&b.ID, &b.CategoryID, &b.Title, &b.URL, &b.Icon, &desc, &b.Order, &b.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
+	b.Description = desc.String
 	return &b, nil
 }
 

@@ -202,13 +202,15 @@ func Login(db *sql.DB) http.HandlerFunc {
 		}
 
 		recordLoginAttempt(ip, true)
-
-		// Rotate session secret and sign session cookie
-		secret := generateSessionSecret()
-		if err := queries.SetSetting(r.Context(), db, "session_secret", secret); err != nil {
-			slog.Error("保存会话密钥失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+// Read or create session secret — don't rotate on login so other sessions stay valid
+		secret, _ := queries.GetSetting(r.Context(), db, "session_secret")
+		if secret == "" {
+			secret = generateSessionSecret()
+			if err := queries.SetSetting(r.Context(), db, "session_secret", secret); err != nil {
+				slog.Error("保存会话密钥失败", "error", err)
+				model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
+				return
+			}
 		}
 
 		cookieValue := session.Sign("admin", secret)

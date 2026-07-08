@@ -74,4 +74,25 @@ describe("mergeCategories", () => {
     expect(mergeCategories(remote, local)).toHaveLength(1);
     expect(mergeCategories(remote, local)[0].id).toBe("cat1");
   });
+
+  it("两边分类都为空时应返回空数组", () => {
+    expect(mergeCategories([], [])).toEqual([]);
+  });
+
+  it("远程分类有序时应保持顺序", () => {
+    const remote: Category[] = [
+      { id: "c1", title: "A", links: [] },
+      { id: "c2", title: "B", links: [] },
+    ];
+    const result = mergeCategories(remote, []);
+    expect(result[0].id).toBe("c1");
+    expect(result[1].id).toBe("c2");
+  });
+
+  it("分类内链接全部为空时应保留空分类", () => {
+    const remote: Category[] = [{ id: "c1", title: "空分类", links: [] }];
+    const result = mergeCategories(remote, []);
+    expect(result).toHaveLength(1);
+    expect(result[0].links).toEqual([]);
+  });
 });

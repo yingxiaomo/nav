@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -10,20 +9,19 @@ import (
 	"github.com/YingXiaoMo/nav/internal/model"
 )
 
-func ListTodos(db *sql.DB) http.HandlerFunc {
+func (h *Handler) ListTodos() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		todos, err := queries.GetAllTodos(r.Context(), db)
+		todos, err := queries.GetAllTodos(r.Context(), h.DB)
 		if err != nil {
 			slog.Error("获取待办列表失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, todos)
 	}
 }
 
-func CreateTodo(db *sql.DB) http.HandlerFunc {
+func (h *Handler) CreateTodo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var input model.TodoInput
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -35,19 +33,19 @@ func CreateTodo(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		todo, err := queries.CreateTodo(r.Context(), db, input.Text)
+		todo, err := queries.CreateTodo(r.Context(), h.DB, input.Text)
 		if err != nil {
 			slog.Error("创建待办失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusCreated, todo)
 	}
 }
 
-func UpdateTodo(db *sql.DB) http.HandlerFunc {
+func (h *Handler) UpdateTodo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db := h.DB
 		id := r.PathValue("id")
 
 		var input model.TodoInput
@@ -67,14 +65,12 @@ func UpdateTodo(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Merge: non-empty fields override existing values
 		text := existing.Text
 		if input.Text != "" {
 			text = input.Text
 		}
-		completed := input.Completed // always use provided value for boolean
 
-		_, err = queries.UpdateTodo(r.Context(), db, id, text, completed)
+		_, err = queries.UpdateTodo(r.Context(), db, id, text, input.Completed)
 		if err != nil {
 			slog.Error("更新待办失败", "error", err, "id", id)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
@@ -87,13 +83,13 @@ func UpdateTodo(db *sql.DB) http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, updated)
 	}
 }
 
-func DeleteTodo(db *sql.DB) http.HandlerFunc {
+func (h *Handler) DeleteTodo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db := h.DB
 		id := r.PathValue("id")
 
 		existing, err := queries.GetTodo(r.Context(), db, id)
@@ -112,7 +108,6 @@ func DeleteTodo(db *sql.DB) http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 	}
 }

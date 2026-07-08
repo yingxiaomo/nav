@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { DataSchema } from "../types/types";
 import { DEFAULT_DATA, Category, Todo, Note, LinkItem } from "../types/types";
 import { StorageAdapter, StorageConfig } from "../adapters/storage";
@@ -12,15 +12,14 @@ import { mergeCategories, mergeItems } from '../utils/data-merge';
 import { useStorageConfig } from './use-storage-config';
 
 const LOCAL_DATA_KEY = "clean-nav-local-data";
+const LAST_SYNC_KEY = "clean-nav-sync-data";
 
-// 获取远程数据（React Query 用）
 const fetchRemoteData = async (config: StorageConfig, getAdapter: (config: StorageConfig) => StorageAdapter | null): Promise<DataSchema | null> => {
   const adapter = getAdapter(config);
   if (!adapter) return null;
   return await adapter.load();
 };
 
-// 保存到云端（React Query Mutation 用）
 const saveData = async (params: {
   data: DataSchema;
   config: StorageConfig;
@@ -44,6 +43,7 @@ export function useNavData(initialWallpapers: string[]) {
     return dataCopy;
   });
 
+  const queryClient = useQueryClient();
   const dataRef = useRef(data);
   useEffect(() => { dataRef.current = data; }, [data]);
 
@@ -63,6 +63,13 @@ export function useNavData(initialWallpapers: string[]) {
   useEffect(() => {
     const wallpapers = initialWallpapersRef.current;
     async function initData() {
+      const cfg = getEffectiveConfig();
+      // Docker mode: 不依赖 localStorage，纯后端驱动
+      if (cfg?.type === 'api-server') {
+        setIsReady(true);
+        return;
+      }
+
       try {
         let loadedFromStorage = false;
 
@@ -82,9 +89,7 @@ export function useNavData(initialWallpapers: string[]) {
           }
         }
 
-        // 没有本地数据 + 未配置存储 → 从 data.json 加载默认数据
-        const config = getEffectiveConfig();
-        if (!loadedFromStorage && !config) {
+        if (!loadedFromStorage && !cfg) {
           try {
             const res = await fetch("/data.json");
             if (res.ok) {
@@ -125,9 +130,22 @@ export function useNavData(initialWallpapers: string[]) {
     retry: 1,
   });
 
-  // ── 处理远程数据 → 本地合并 ──
+  // ── 处理远程数据 ──
   useEffect(() => {
     if (remoteData) {
+      // Docker mode: backend 是唯一数据源，直接使用
+      const cfg = getEffectiveConfig();
+      if (cfg?.type === 'api-server') {
+        // Docker mode: backend is source of truth, use it directly
+        const final = { ...remoteData };
+        if (initialWallpapersRef.current.length > 0) {
+          final.settings.wallpaperList = [...initialWallpapersRef.current];
+        }
+        setTimeout(() => setData(final), 0);
+        return;
+      }
+
+      // Static mode: merge remote with local to preserve unsaved changes
       const currentData = dataRef.current;
       const localTodos = currentData.todos || [];
       const localNotes = currentData.notes || [];
@@ -171,17 +189,27 @@ export function useNavData(initialWallpapers: string[]) {
         }, 0);
       }
     }
-  }, [remoteData, dataRef]);
+  }, [remoteData, dataRef, getEffectiveConfig]);
 
-  // ── React Query：保存到云端 ──
-  const { mutate: saveMutate, isPending: isSaving } = useMutation({
+  // ── React Query：保存到云端（含指数退避重试 + 最少 400ms 展示 spinner）──
+  const [isSavingWithDelay, setIsSavingWithDelay] = useState(false);
+  const { mutateAsync: saveMutateAsync, isPending: isMutationPending } = useMutation({
     mutationFn: (params: { newData: DataSchema; config: StorageConfig; onWallpaperUpdate?: (cfg: DataSchema) => void }) => {
       const { newData, config, onWallpaperUpdate } = params;
       if (typeof window !== 'undefined') {
         localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(newData));
+        localStorage.setItem(LAST_SYNC_KEY, JSON.stringify(newData));
       }
       if (onWallpaperUpdate) onWallpaperUpdate(newData);
       return saveData({ data: newData, config, getAdapter });
+    },
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    onMutate: () => {
+      setIsSavingWithDelay(true);
+    },
+    onSettled: () => {
+      setTimeout(() => setIsSavingWithDelay(false), 400);
     },
     onSuccess: (result, variables) => {
       if (result) {
@@ -189,9 +217,12 @@ export function useNavData(initialWallpapers: string[]) {
           description: "云端更新可能受 CDN 缓存影响有 1-5 分钟延迟，请勿频繁刷新或重复保存。",
           duration: 5000,
         });
+        dataRef.current = variables.newData;
         setHasUnsavedChanges(false);
         setSyncError(false);
         setData(variables.newData);
+        queryClient.invalidateQueries({ queryKey: ['navData'] });
+        localStorage.setItem(LAST_SYNC_KEY, JSON.stringify(variables.newData));
       } else {
         toast.error("同步失败 (已暂存到本地)", {
           description: "请检查网络连接或云端配置，稍后重试",
@@ -214,6 +245,7 @@ export function useNavData(initialWallpapers: string[]) {
       setHasUnsavedChanges(true);
     },
   });
+  const isSaving = isMutationPending || isSavingWithDelay;
 
   // ── 公共 API：保存 ──
   const handleSave = useCallback(async (newData: DataSchema, onWallpaperUpdate?: (cfg: DataSchema) => void) => {
@@ -225,8 +257,12 @@ export function useNavData(initialWallpapers: string[]) {
       toast.success("本地已更新 (未配置云端)");
       return;
     }
-    saveMutate({ newData, config, onWallpaperUpdate });
-  }, [getEffectiveConfig, saveMutate, updateLocalAndState]);
+    try {
+      await saveMutateAsync({ newData, config, onWallpaperUpdate });
+    } catch {
+      // Error handled by mutation's onError
+    }
+  }, [getEffectiveConfig, saveMutateAsync, updateLocalAndState]);
 
   // ── 公共 API：链接拖拽排序 ──
   const handleLinkReorder = useCallback((categoryId: string, links: LinkItem[]) => {

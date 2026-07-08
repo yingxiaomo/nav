@@ -102,6 +102,18 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
         wallpaperList: localData.settings.wallpaperList || []
       }
     };
+    // Save to backend directly first, then update React state
+    try {
+      await fetch('/api/v1/data', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finalData),
+      });
+    } catch {
+      // handleSave in useNavData will retry
+    }
+    localStorage.setItem('clean-nav-local-data', JSON.stringify(finalData));
+    localStorage.setItem('clean-nav-sync-data', JSON.stringify(finalData));
     await onSave(finalData);
     setSettingsOpen(false);
   };

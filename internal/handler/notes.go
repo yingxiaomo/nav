@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -10,24 +9,22 @@ import (
 	"github.com/YingXiaoMo/nav/internal/model"
 )
 
-func ListNotes(db *sql.DB) http.HandlerFunc {
+func (h *Handler) ListNotes() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		notes, err := queries.GetAllNotes(r.Context(), db)
+		notes, err := queries.GetAllNotes(r.Context(), h.DB)
 		if err != nil {
 			slog.Error("获取笔记列表失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, notes)
 	}
 }
 
-func GetNote(db *sql.DB) http.HandlerFunc {
+func (h *Handler) GetNote() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
-
-		note, err := queries.GetNote(r.Context(), db, id)
+		note, err := queries.GetNote(r.Context(), h.DB, id)
 		if err != nil {
 			slog.Error("获取笔记失败", "error", err, "id", id)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
@@ -37,12 +34,11 @@ func GetNote(db *sql.DB) http.HandlerFunc {
 			model.RespondError(w, http.StatusNotFound, "笔记不存在")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, note)
 	}
 }
 
-func CreateNote(db *sql.DB) http.HandlerFunc {
+func (h *Handler) CreateNote() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var input model.NoteInput
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -50,19 +46,19 @@ func CreateNote(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		note, err := queries.CreateNote(r.Context(), db, input.Title, input.Content)
+		note, err := queries.CreateNote(r.Context(), h.DB, input.Title, input.Content)
 		if err != nil {
 			slog.Error("创建笔记失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusCreated, note)
 	}
 }
 
-func UpdateNote(db *sql.DB) http.HandlerFunc {
+func (h *Handler) UpdateNote() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db := h.DB
 		id := r.PathValue("id")
 
 		var input model.NoteInput
@@ -82,7 +78,6 @@ func UpdateNote(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Merge: non-empty fields override existing values
 		title := existing.Title
 		if input.Title != "" {
 			title = input.Title
@@ -105,13 +100,13 @@ func UpdateNote(db *sql.DB) http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, updated)
 	}
 }
 
-func DeleteNote(db *sql.DB) http.HandlerFunc {
+func (h *Handler) DeleteNote() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db := h.DB
 		id := r.PathValue("id")
 
 		existing, err := queries.GetNote(r.Context(), db, id)
@@ -130,7 +125,6 @@ func DeleteNote(db *sql.DB) http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 	}
 }

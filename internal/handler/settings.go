@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -11,27 +10,27 @@ import (
 )
 
 var protectedSettings = map[string]bool{
-	"api_token":          true,
+	"api_token":           true,
 	"admin_password_hash": true,
-	"admin_salt":         true,
-	"session_secret":     true,
+	"admin_salt":          true,
+	"session_secret":      true,
 }
 
-func ListSettings(db *sql.DB) http.HandlerFunc {
+func (h *Handler) ListSettings() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		settings, err := queries.GetAllSettings(r.Context(), db)
+		settings, err := queries.GetAllSettings(r.Context(), h.DB)
 		if err != nil {
 			slog.Error("获取设置列表失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, settings)
 	}
 }
 
-func GetSetting(db *sql.DB) http.HandlerFunc {
+func (h *Handler) GetSetting() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db := h.DB
 		key := r.PathValue("key")
 
 		value, err := queries.GetSetting(r.Context(), db, key)
@@ -41,7 +40,6 @@ func GetSetting(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		if value == "" {
-			// Distinguish empty value from missing key
 			all, err := queries.GetAllSettings(r.Context(), db)
 			if err != nil {
 				slog.Error("获取所有设置失败", "error", err)
@@ -58,8 +56,10 @@ func GetSetting(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func UpdateSettings(db *sql.DB) http.HandlerFunc {
+func (h *Handler) UpdateSettings() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db := h.DB
+
 		var body map[string]string
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
@@ -105,7 +105,7 @@ func UpdateSettings(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func UpdateSetting(db *sql.DB) http.HandlerFunc {
+func (h *Handler) UpdateSetting() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		key := r.PathValue("key")
 
@@ -122,7 +122,7 @@ func UpdateSetting(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if err := queries.SetSetting(r.Context(), db, key, body.Value); err != nil {
+		if err := queries.SetSetting(r.Context(), h.DB, key, body.Value); err != nil {
 			slog.Error("更新设置失败", "error", err, "key", key)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return

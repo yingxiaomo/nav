@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -52,19 +51,11 @@ type dataImport struct {
 
 func bookmarkToLinkItem(b model.Bookmark) model.LinkItem {
 	return model.LinkItem{
-		ID:          b.ID,
-		Title:       b.Title,
-		URL:         b.URL,
-		Icon:        b.Icon,
-		Description: b.Description,
-		UpdatedAt:   b.CreatedAt,
-		Order:       b.Order,
+		ID: b.ID, Title: b.Title, URL: b.URL, Icon: b.Icon,
+		Description: b.Description, UpdatedAt: b.CreatedAt, Order: b.Order,
 	}
 }
 
-// settingsMapToSiteSettings builds a SiteSettings from the flat key-value settings map.
-// Values that are JSON-encoded (e.g. wallpaperList) are unmarshalled;
-// plain string values are used as-is.
 func settingsMapToSiteSettings(m map[string]string) model.SiteSettings {
 	return model.SiteSettings{
 		Title:         strVal(m, "title", "Clean Nav"),
@@ -79,10 +70,17 @@ func settingsMapToSiteSettings(m map[string]string) model.SiteSettings {
 }
 
 func strVal(m map[string]string, key, def string) string {
-	if v, ok := m[key]; ok && v != "" {
-		return v
+	v, ok := m[key]
+	if !ok || v == "" {
+		return def
 	}
-	return def
+	if len(v) >= 2 && v[0] == '"' {
+		var s string
+		if json.Unmarshal([]byte(v), &s) == nil {
+			return s
+		}
+	}
+	return v
 }
 
 func strsVal(m map[string]string, key string) []string {
@@ -124,8 +122,10 @@ func extractPinnedLinks(m map[string]string) []model.LinkItem {
 // ===== Handlers =====
 
 // GetData handles GET /api/v1/data — full data export.
-func GetData(db *sql.DB) http.HandlerFunc {
+func (h *Handler) GetData() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db := h.DB
+
 		settingsMap, err := queries.GetAllSettings(r.Context(), db)
 		if err != nil {
 			slog.Error("获取设置失败", "error", err)
@@ -156,12 +156,8 @@ func GetData(db *sql.DB) http.HandlerFunc {
 				linkItems = append(linkItems, bookmarkToLinkItem(b))
 			}
 			exportCats = append(exportCats, categoryExport{
-				ID:        cat.ID,
-				Title:     cat.Title,
-				Icon:      cat.Icon,
-				Order:     cat.Order,
-				UpdatedAt: cat.CreatedAt,
-				Links:     linkItems,
+				ID: cat.ID, Title: cat.Title, Icon: cat.Icon,
+				Order: cat.Order, UpdatedAt: cat.CreatedAt, Links: linkItems,
 			})
 		}
 
@@ -179,27 +175,27 @@ func GetData(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		result := dataExport{
+		model.RespondJSON(w, http.StatusOK, dataExport{
 			Settings:    siteSettings,
 			Categories:  exportCats,
 			Todos:       todos,
 			Notes:       notes,
 			PinnedLinks: pinnedLinks,
-		}
-		model.RespondJSON(w, http.StatusOK, result)
+		})
 	}
 }
 
 // PutData handles PUT /api/v1/data — full data replacement.
-func PutData(db *sql.DB) http.HandlerFunc {
+func (h *Handler) PutData() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db := h.DB
+
 		var body dataImport
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return
 		}
 
-		// Preserve auth-related settings so the import does not lock users out.
 		authKeys := []string{"api_token", "admin_password_hash", "admin_salt", "session_secret", "admin_session_secret"}
 		preserved := make(map[string]string)
 		for _, key := range authKeys {
@@ -216,36 +212,17 @@ func PutData(db *sql.DB) http.HandlerFunc {
 		}
 		defer tx.Rollback()
 
-		// Delete existing data (bookmarks first because of FK constraint)
-		if _, err := tx.ExecContext(r.Context(), "DELETE FROM bookmarks"); err != nil {
-			slog.Error("清空书签失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		if _, err := tx.ExecContext(r.Context(), "DELETE FROM categories"); err != nil {
-			slog.Error("清空分类失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		if _, err := tx.ExecContext(r.Context(), "DELETE FROM todos"); err != nil {
-			slog.Error("清空待办失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		if _, err := tx.ExecContext(r.Context(), "DELETE FROM notes"); err != nil {
-			slog.Error("清空笔记失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		if _, err := tx.ExecContext(r.Context(), "DELETE FROM settings"); err != nil {
-			slog.Error("清空设置失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+		tables := []string{"bookmarks", "categories", "todos", "notes", "settings"}
+		for _, t := range tables {
+			if _, err := tx.ExecContext(r.Context(), "DELETE FROM "+t); err != nil {
+				slog.Error("清空表失败", "error", err, "table", t)
+				model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
+				return
+			}
 		}
 
 		now := model.Now()
 
-		// Insert categories + bookmarks
 		for _, cat := range body.Categories {
 			catID := cat.ID
 			if catID == "" {
@@ -288,7 +265,6 @@ func PutData(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		// Insert todos
 		for _, todo := range body.Todos {
 			todoID := todo.ID
 			if todoID == "" {
@@ -298,17 +274,20 @@ func PutData(db *sql.DB) http.HandlerFunc {
 			if createdAt == 0 {
 				createdAt = now
 			}
+			completed := 0
+			if todo.Completed {
+				completed = 1
+			}
 
 			if _, err := tx.ExecContext(r.Context(),
-				`INSERT INTO todos (id, text, completed, created_at) VALUES (?, ?, ?, ?)`,
-				todoID, todo.Text, todo.Completed, createdAt); err != nil {
+				"INSERT INTO todos (id, text, completed, created_at) VALUES (?, ?, ?, ?)",
+				todoID, todo.Text, completed, createdAt); err != nil {
 				slog.Error("插入待办失败", "error", err)
 				model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 				return
 			}
 		}
 
-		// Insert notes
 		for _, note := range body.Notes {
 			noteID := note.ID
 			if noteID == "" {
@@ -320,7 +299,7 @@ func PutData(db *sql.DB) http.HandlerFunc {
 			}
 
 			if _, err := tx.ExecContext(r.Context(),
-				`INSERT INTO notes (id, title, content, updated_at) VALUES (?, ?, ?, ?)`,
+				"INSERT INTO notes (id, title, content, updated_at) VALUES (?, ?, ?, ?)",
 				noteID, note.Title, note.Content, updatedAt); err != nil {
 				slog.Error("插入笔记失败", "error", err)
 				model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
@@ -328,7 +307,6 @@ func PutData(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		// Save settings from the import JSON (each key→value as a JSON-encoded string)
 		if len(body.Settings) > 0 {
 			var settingsMap map[string]any
 			if err := json.Unmarshal(body.Settings, &settingsMap); err == nil {
@@ -336,10 +314,19 @@ func PutData(db *sql.DB) http.HandlerFunc {
 					if value == nil {
 						continue
 					}
-					valBytes, _ := json.Marshal(value)
+					// Strings stored directly; other types JSON-encoded for the flat key-value table
+					var valStr string
+					switch v := value.(type) {
+					case string:
+						valStr = v
+					default:
+						valBytes, _ := json.Marshal(v)
+						valStr = string(valBytes)
+					}
+
 					if _, err := tx.ExecContext(r.Context(),
-						`INSERT INTO settings (key, value) VALUES (?, ?)`,
-						key, string(valBytes)); err != nil {
+						"INSERT INTO settings (key, value) VALUES (?, ?)",
+						key, valStr); err != nil {
 						slog.Error("插入设置失败", "error", err, "key", key)
 						model.RespondError(w, http.StatusInternalServerError, "写入设置失败")
 						return
@@ -348,11 +335,10 @@ func PutData(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		// Save pinnedLinks
 		if len(body.PinnedLinks) > 0 {
 			valBytes, _ := json.Marshal(body.PinnedLinks)
 			if _, err := tx.ExecContext(r.Context(),
-				`INSERT INTO settings (key, value) VALUES (?, ?)`,
+				"INSERT INTO settings (key, value) VALUES (?, ?)",
 				"pinnedLinks", string(valBytes)); err != nil {
 				slog.Error("插入 pinnedLinks 失败", "error", err)
 				model.RespondError(w, http.StatusInternalServerError, "写入固定链接失败")
@@ -360,10 +346,9 @@ func PutData(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		// Restore preserved auth keys
 		for key, value := range preserved {
 			if _, err := tx.ExecContext(r.Context(),
-				`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?`,
+				"INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?",
 				key, value, value); err != nil {
 				slog.Error("恢复密钥失败", "error", err, "key", key)
 				model.RespondError(w, http.StatusInternalServerError, "恢复密钥失败")

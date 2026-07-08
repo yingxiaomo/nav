@@ -21,14 +21,12 @@ import (
 
 // ===== Session helpers =====
 
-// generateSessionSecret creates a new random session secret (32 bytes → hex).
 func generateSessionSecret() string {
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
 }
 
-// setSessionCookie sets the admin session cookie on the response.
 func setSessionCookie(w http.ResponseWriter, value string, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     session.CookieName,
@@ -41,7 +39,6 @@ func setSessionCookie(w http.ResponseWriter, value string, secure bool) {
 	})
 }
 
-// clearSessionCookie removes the session cookie from the browser.
 func clearSessionCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     session.CookieName,
@@ -52,7 +49,6 @@ func clearSessionCookie(w http.ResponseWriter) {
 	})
 }
 
-// isSecureRequest determines whether the request arrived over HTTPS.
 func isSecureRequest(r *http.Request) bool {
 	if r.Header.Get("X-Forwarded-Proto") == "https" {
 		return true
@@ -60,29 +56,22 @@ func isSecureRequest(r *http.Request) bool {
 	return r.TLS != nil
 }
 
-// checkSession verifies a session cookie from the incoming request against the
-// stored session_secret, with legacy fallback to the API token.
 func checkSession(r *http.Request, db *sql.DB) bool {
 	cookie, err := r.Cookie(session.CookieName)
 	if err != nil {
 		return false
 	}
-
 	sessionSecret, _ := queries.GetSetting(r.Context(), db, "session_secret")
 	if sessionSecret != "" && session.Verify(cookie.Value, sessionSecret) {
 		return true
 	}
-
-	// Legacy compatibility: verify with api_token
 	apiToken, _ := queries.GetSetting(r.Context(), db, "api_token")
 	if apiToken != "" && session.Verify(cookie.Value, apiToken) {
 		return true
 	}
-
 	return false
 }
 
-// generateAPIToken creates a new random API token with an "sk-" prefix.
 func generateAPIToken() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -95,7 +84,7 @@ func generateAPIToken() (string, error) {
 
 type loginAttempt struct {
 	count int
-	until int64 // unix ms timestamp when the block expires
+	until int64
 }
 
 var (
@@ -106,33 +95,28 @@ var (
 const maxAttempts = 5
 const blockDuration = 15 * time.Minute
 
-// checkRateLimit returns true if the IP is allowed to attempt login.
 func checkRateLimit(ip string) bool {
 	loginAttemptsMu.Lock()
 	defer loginAttemptsMu.Unlock()
-
 	now := time.Now().UnixMilli()
 	entry, exists := loginAttempts[ip]
 	if exists && entry.until > now {
-		return false // still blocked
+		return false
 	}
 	if exists && entry.until <= now {
-		delete(loginAttempts, ip) // block expired, clean up
+		delete(loginAttempts, ip)
 	}
 	return true
 }
 
-// recordLoginAttempt records a login attempt for rate limiting purposes.
 func recordLoginAttempt(ip string, success bool) {
 	loginAttemptsMu.Lock()
 	defer loginAttemptsMu.Unlock()
-
 	now := time.Now().UnixMilli()
 	if success {
 		delete(loginAttempts, ip)
 		return
 	}
-
 	entry, exists := loginAttempts[ip]
 	if !exists {
 		entry = &loginAttempt{until: now}
@@ -148,8 +132,10 @@ func recordLoginAttempt(ip string, success bool) {
 // ===== Handlers =====
 
 // Login handles POST /api/v1/auth/login
-func Login(db *sql.DB) http.HandlerFunc {
+func (h *Handler) Login() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db := h.DB
+
 		var body struct {
 			Password string `json:"password"`
 		}
@@ -171,7 +157,6 @@ func Login(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		// Check if admin password is configured
 		pwHash, err := queries.GetSetting(r.Context(), db, "admin_password_hash")
 		if err != nil {
 			slog.Error("读取密码设置失败", "error", err)
@@ -186,14 +171,12 @@ func Login(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Rate limiting
 		if !checkRateLimit(ip) {
 			slog.Warn("登录限流", "ip", ip)
 			model.RespondError(w, http.StatusTooManyRequests, "登录尝试过于频繁，请 15 分钟后再试")
 			return
 		}
 
-		// Verify password with bcrypt
 		if err := bcrypt.CompareHashAndPassword([]byte(pwHash), []byte(body.Password)); err != nil {
 			recordLoginAttempt(ip, false)
 			slog.Warn("登录失败 - 密码错误", "ip", ip)
@@ -202,7 +185,7 @@ func Login(db *sql.DB) http.HandlerFunc {
 		}
 
 		recordLoginAttempt(ip, true)
-// Read or create session secret — don't rotate on login so other sessions stay valid
+
 		secret, _ := queries.GetSetting(r.Context(), db, "session_secret")
 		if secret == "" {
 			secret = generateSessionSecret()
@@ -222,25 +205,24 @@ func Login(db *sql.DB) http.HandlerFunc {
 }
 
 // Logout handles POST /api/v1/auth/logout
-func Logout(db *sql.DB) http.HandlerFunc {
+func (h *Handler) Logout() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Rotate session secret — invalidates all existing sessions
 		secret := generateSessionSecret()
-		if err := queries.SetSetting(r.Context(), db, "session_secret", secret); err != nil {
+		if err := queries.SetSetting(r.Context(), h.DB, "session_secret", secret); err != nil {
 			slog.Error("轮换会话密钥失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		clearSessionCookie(w)
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 	}
 }
 
 // Setup handles POST /api/v1/auth/setup — initial password and API token creation
-func Setup(db *sql.DB) http.HandlerFunc {
+func (h *Handler) Setup() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Check if already configured
+		db := h.DB
+
 		pwHash, err := queries.GetSetting(r.Context(), db, "admin_password_hash")
 		if err != nil {
 			slog.Error("读取密码设置失败", "error", err)
@@ -264,7 +246,6 @@ func Setup(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Hash password with bcrypt
 		hashed, err := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
 		if err != nil {
 			slog.Error("密码哈希失败", "error", err)
@@ -277,7 +258,6 @@ func Setup(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Generate initial API token
 		token, err := generateAPIToken()
 		if err != nil {
 			slog.Error("生成 API token 失败", "error", err)
@@ -296,26 +276,23 @@ func Setup(db *sql.DB) http.HandlerFunc {
 }
 
 // AuthStatus handles GET /api/v1/auth/status
-func AuthStatus(db *sql.DB) http.HandlerFunc {
+func (h *Handler) AuthStatus() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		pwHash, _ := queries.GetSetting(r.Context(), db, "admin_password_hash")
-		apiToken, _ := queries.GetSetting(r.Context(), db, "api_token")
+		pwHash, _ := queries.GetSetting(r.Context(), h.DB, "admin_password_hash")
+		apiToken, _ := queries.GetSetting(r.Context(), h.DB, "api_token")
 
-		hasPassword := pwHash != ""
-		hasToken := apiToken != ""
-
-			loggedIn := checkSession(r, db)
-
-			model.RespondJSON(w, http.StatusOK, map[string]any{
-				"setupRequired":   !hasPassword,
-				"tokenConfigured": hasToken,
-				"loggedIn":        loggedIn,
-			})
-		}
+		model.RespondJSON(w, http.StatusOK, map[string]any{
+			"setupRequired":   pwHash == "",
+			"tokenConfigured": apiToken != "",
+			"loggedIn":        checkSession(r, h.DB),
+		})
 	}
-func GetAPIToken(db *sql.DB) http.HandlerFunc {
+}
+
+// GetAPIToken handles GET /api/v1/auth/api-token
+func (h *Handler) GetAPIToken() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		token, err := queries.GetSetting(r.Context(), db, "api_token")
+		token, err := queries.GetSetting(r.Context(), h.DB, "api_token")
 		if err != nil {
 			slog.Error("读取 API token 失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
@@ -326,7 +303,7 @@ func GetAPIToken(db *sql.DB) http.HandlerFunc {
 }
 
 // RegenerateAPIToken handles POST /api/v1/auth/api-token
-func RegenerateAPIToken(db *sql.DB) http.HandlerFunc {
+func (h *Handler) RegenerateAPIToken() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, err := generateAPIToken()
 		if err != nil {
@@ -334,7 +311,7 @@ func RegenerateAPIToken(db *sql.DB) http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-		if err := queries.SetSetting(r.Context(), db, "api_token", token); err != nil {
+		if err := queries.SetSetting(r.Context(), h.DB, "api_token", token); err != nil {
 			slog.Error("保存 API token 失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
@@ -350,8 +327,9 @@ func RegenerateAPIToken(db *sql.DB) http.HandlerFunc {
 }
 
 // ChangePassword handles POST /api/v1/auth/change-password
-func ChangePassword(db *sql.DB) http.HandlerFunc {
+func (h *Handler) ChangePassword() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db := h.DB
 		ip := r.RemoteAddr
 		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
 			if idx := strings.Index(fwd, ","); idx != -1 {
@@ -384,7 +362,6 @@ func ChangePassword(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Verify current password
 		pwHash, err := queries.GetSetting(r.Context(), db, "admin_password_hash")
 		if err != nil {
 			slog.Error("读取密码失败", "error", err)
@@ -400,7 +377,6 @@ func ChangePassword(db *sql.DB) http.HandlerFunc {
 
 		recordLoginAttempt(ip, true)
 
-		// Hash new password
 		newHash, err := bcrypt.GenerateFromPassword([]byte(body.NewPassword), bcrypt.DefaultCost)
 		if err != nil {
 			slog.Error("密码哈希失败", "error", err)
@@ -413,7 +389,6 @@ func ChangePassword(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Rotate session secret — invalidates all existing sessions
 		secret := generateSessionSecret()
 		if err := queries.SetSetting(r.Context(), db, "session_secret", secret); err != nil {
 			slog.Error("轮换会话密钥失败", "error", err)

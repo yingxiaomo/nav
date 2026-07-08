@@ -75,7 +75,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
   // 检测后端是否可用（静态部署时禁用后端功能）
   useEffect(() => {
     fetch('/api/v1/health').then(r => {
-      if (!r.ok) setBackendAvailable(false);
+      setBackendAvailable(r.ok);
     }).catch(() => setBackendAvailable(false));
   }, [setBackendAvailable]);
 

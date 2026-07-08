@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -10,15 +9,15 @@ import (
 	"github.com/YingXiaoMo/nav/internal/model"
 )
 
-func ListCategories(db *sql.DB) http.HandlerFunc {
+func (h *Handler) ListCategories() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db := h.DB
 		cats, err := queries.GetAllCategories(r.Context(), db)
 		if err != nil {
 			slog.Error("获取分类列表失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		for i := range cats {
 			links, err := queries.GetBookmarksByCategory(r.Context(), db, cats[i].ID)
 			if err != nil {
@@ -28,13 +27,13 @@ func ListCategories(db *sql.DB) http.HandlerFunc {
 			}
 			cats[i].Links = links
 		}
-
 		model.RespondJSON(w, http.StatusOK, cats)
 	}
 }
 
-func GetCategory(db *sql.DB) http.HandlerFunc {
+func (h *Handler) GetCategory() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db := h.DB
 		id := r.PathValue("id")
 
 		cat, err := queries.GetCategory(r.Context(), db, id)
@@ -60,7 +59,7 @@ func GetCategory(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func CreateCategory(db *sql.DB) http.HandlerFunc {
+func (h *Handler) CreateCategory() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var input model.CategoryInput
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -72,19 +71,19 @@ func CreateCategory(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		cat, err := queries.CreateCategory(r.Context(), db, input)
+		cat, err := queries.CreateCategory(r.Context(), h.DB, input)
 		if err != nil {
 			slog.Error("创建分类失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusCreated, cat)
 	}
 }
 
-func UpdateCategory(db *sql.DB) http.HandlerFunc {
+func (h *Handler) UpdateCategory() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db := h.DB
 		id := r.PathValue("id")
 
 		var input model.CategoryInput
@@ -104,7 +103,6 @@ func UpdateCategory(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Apply partial updates — non-empty fields override existing values
 		if input.Title != "" {
 			existing.Title = input.Title
 		}
@@ -129,13 +127,13 @@ func UpdateCategory(db *sql.DB) http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, updated)
 	}
 }
 
-func DeleteCategory(db *sql.DB) http.HandlerFunc {
+func (h *Handler) DeleteCategory() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db := h.DB
 		id := r.PathValue("id")
 
 		existing, err := queries.GetCategory(r.Context(), db, id)
@@ -154,7 +152,6 @@ func DeleteCategory(db *sql.DB) http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 	}
 }

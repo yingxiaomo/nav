@@ -244,7 +244,7 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
       <div className="w-full max-w-5xl mx-auto pb-3 px-4 relative z-30">
         <DndContext id={pinnedDndContextId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handlePinnedDragEnd}>
           <SortableContext items={pinnedLinks.map(l => `pin-${l.id}`)} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(3.5rem,1fr))] gap-1 sm:gap-1.5">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(3.5rem,1fr))] gap-6 sm:gap-8">
               {pinnedLinks.map((link) => (
                 <SortablePinnedLinkCard
                   key={link.id}

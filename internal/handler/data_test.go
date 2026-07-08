@@ -25,13 +25,18 @@ func setupTestDB(t *testing.T) *sql.DB {
 	return database
 }
 
+func setupHandler(t *testing.T) *Handler {
+	t.Helper()
+	return &Handler{DB: setupTestDB(t)}
+}
+
 func TestGetData_EmptyDatabase(t *testing.T) {
-	database := setupTestDB(t)
+	h := setupHandler(t)
 
 	req := httptest.NewRequest("GET", "/api/v1/data", nil)
 	rec := httptest.NewRecorder()
 
-	GetData(database)(rec, req)
+	h.GetData()(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", rec.Code)
@@ -50,18 +55,17 @@ func TestGetData_EmptyDatabase(t *testing.T) {
 }
 
 func TestGetData_WithCategories(t *testing.T) {
-	database := setupTestDB(t)
+	h := setupHandler(t)
 	now := model.Now()
 
-	// Insert a category and bookmark directly
-	_, err := database.Exec(
+	_, err := h.DB.Exec(
 		`INSERT INTO categories (id, title, icon, "order", created_at) VALUES (?, ?, ?, ?, ?)`,
 		"cat-1", "测试分类", "Folder", 0, now,
 	)
 	if err != nil {
 		t.Fatalf("failed to insert category: %v", err)
 	}
-	_, err = database.Exec(
+	_, err = h.DB.Exec(
 		`INSERT INTO bookmarks (id, category_id, title, url, icon, "order", created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		"bm-1", "cat-1", "Example", "https://example.com", "", 0, now,
 	)
@@ -71,7 +75,7 @@ func TestGetData_WithCategories(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/api/v1/data", nil)
 	rec := httptest.NewRecorder()
-	GetData(database)(rec, req)
+	h.GetData()(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", rec.Code)
@@ -94,7 +98,7 @@ func TestGetData_WithCategories(t *testing.T) {
 }
 
 func TestPutData_FullRoundTrip(t *testing.T) {
-	database := setupTestDB(t)
+	h := setupHandler(t)
 
 	input := dataImport{
 		Settings: json.RawMessage(`{"title":"My Nav","wallpaper":"bg.jpg"}`),
@@ -115,21 +119,20 @@ func TestPutData_FullRoundTrip(t *testing.T) {
 	req := httptest.NewRequest("PUT", "/api/v1/data", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
-	PutData(database)(rec, req)
+	h.PutData()(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	// Read back via GetData
 	getReq := httptest.NewRequest("GET", "/api/v1/data", nil)
 	getRec := httptest.NewRecorder()
-	GetData(database)(getRec, getReq)
+	h.GetData()(getRec, getReq)
 
 	var result dataExport
 	json.NewDecoder(getRec.Body).Decode(&result)
 
-	if result.Settings.Title != `"My Nav"` {
+	if result.Settings.Title != "My Nav" {
 		t.Errorf("expected 'My Nav', got %q", result.Settings.Title)
 	}
 	if len(result.Categories) != 1 {
@@ -144,10 +147,9 @@ func TestPutData_FullRoundTrip(t *testing.T) {
 }
 
 func TestPutData_PreservesAuthSettings(t *testing.T) {
-	database := setupTestDB(t)
+	h := setupHandler(t)
 
-	// Pre-set auth settings
-	_, err := database.Exec(`INSERT INTO settings (key, value) VALUES (?, ?)`, "api_token", "sk-secret")
+	_, err := h.DB.Exec(`INSERT INTO settings (key, value) VALUES (?, ?)`, "api_token", "sk-secret")
 	if err != nil {
 		t.Fatalf("failed to set api_token: %v", err)
 	}
@@ -159,27 +161,26 @@ func TestPutData_PreservesAuthSettings(t *testing.T) {
 	req := httptest.NewRequest("PUT", "/api/v1/data", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
-	PutData(database)(rec, req)
+	h.PutData()(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	// api_token should still be the original value
 	var token string
-	database.QueryRow("SELECT value FROM settings WHERE key='api_token'").Scan(&token)
+	h.DB.QueryRow("SELECT value FROM settings WHERE key='api_token'").Scan(&token)
 	if token != "sk-secret" {
 		t.Errorf("expected preserved api_token 'sk-secret', got %q", token)
 	}
 }
 
 func TestPutData_InvalidJSON(t *testing.T) {
-	database := setupTestDB(t)
+	h := setupHandler(t)
 
 	req := httptest.NewRequest("PUT", "/api/v1/data", bytes.NewReader([]byte("{invalid")))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
-	PutData(database)(rec, req)
+	h.PutData()(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rec.Code)

@@ -49,7 +49,21 @@ export function AuthSetupDialog({ baseUrl }: Props) {
         setBusy(false);
         return;
       }
-      // 3. 刷新页面
+      // 3. 把前端数据同步到后端（避免刷新后红点）
+      try {
+        const localRaw = localStorage.getItem('clean-nav-local-data');
+        if (localRaw) {
+          await fetch(`${baseUrl}/api/v1/data`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: localRaw,
+          });
+        }
+      } catch {
+        // 静默忽略 — 刷新后合并逻辑会兜底
+      }
+
+      // 4. 刷新页面
       window.location.reload();
     } catch {
       setError('网络错误，请检查后端是否已启动');

@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -15,26 +14,23 @@ type reorderRequest struct {
 	Items []queries.ReorderItem `json:"items"`
 }
 
-func ListBookmarks(db *sql.DB) http.HandlerFunc {
+func (h *Handler) ListBookmarks() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		categoryID := r.URL.Query().Get("categoryId")
-
-		bms, err := queries.GetAllBookmarks(r.Context(), db, categoryID)
+		bms, err := queries.GetAllBookmarks(r.Context(), h.DB, categoryID)
 		if err != nil {
 			slog.Error("获取书签列表失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, bms)
 	}
 }
 
-func GetBookmark(db *sql.DB) http.HandlerFunc {
+func (h *Handler) GetBookmark() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
-
-		bm, err := queries.GetBookmark(r.Context(), db, id)
+		bm, err := queries.GetBookmark(r.Context(), h.DB, id)
 		if err != nil {
 			slog.Error("获取书签失败", "error", err, "id", id)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
@@ -44,13 +40,14 @@ func GetBookmark(db *sql.DB) http.HandlerFunc {
 			model.RespondError(w, http.StatusNotFound, "书签不存在")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, bm)
 	}
 }
 
-func CreateBookmark(db *sql.DB) http.HandlerFunc {
+func (h *Handler) CreateBookmark() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db := h.DB
+
 		var input model.BookmarkInput
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
@@ -69,7 +66,6 @@ func CreateBookmark(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Validate category exists
 		exists, err := queries.CategoryExists(r.Context(), db, input.CategoryID)
 		if err != nil {
 			slog.Error("验证分类失败", "error", err)
@@ -87,13 +83,13 @@ func CreateBookmark(db *sql.DB) http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusCreated, bm)
 	}
 }
 
-func UpdateBookmark(db *sql.DB) http.HandlerFunc {
+func (h *Handler) UpdateBookmark() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db := h.DB
 		id := r.PathValue("id")
 
 		var input model.BookmarkInput
@@ -113,9 +109,7 @@ func UpdateBookmark(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Merge: non-empty input fields override existing values
 		if input.CategoryID != "" {
-			// If category changed, validate new category exists
 			if input.CategoryID != existing.CategoryID {
 				exists, err := queries.CategoryExists(r.Context(), db, input.CategoryID)
 				if err != nil {
@@ -167,13 +161,13 @@ func UpdateBookmark(db *sql.DB) http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, updated)
 	}
 }
 
-func DeleteBookmark(db *sql.DB) http.HandlerFunc {
+func (h *Handler) DeleteBookmark() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db := h.DB
 		id := r.PathValue("id")
 
 		existing, err := queries.GetBookmark(r.Context(), db, id)
@@ -192,12 +186,11 @@ func DeleteBookmark(db *sql.DB) http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 	}
 }
 
-func ReorderBookmarks(db *sql.DB) http.HandlerFunc {
+func (h *Handler) ReorderBookmarks() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req reorderRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -212,13 +205,11 @@ func ReorderBookmarks(db *sql.DB) http.HandlerFunc {
 			model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 			return
 		}
-
-		if err := queries.ReorderBookmarks(r.Context(), db, req.Items); err != nil {
+		if err := queries.ReorderBookmarks(r.Context(), h.DB, req.Items); err != nil {
 			slog.Error("排序书签失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 	}
 }

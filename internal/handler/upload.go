@@ -36,7 +36,6 @@ func detectImageExt(head []byte) string {
 		if !match {
 			continue
 		}
-		// WebP: bytes 8-11 must be "WEBP"
 		if d.ext == "webp" && len(head) >= 12 {
 			if string(head[8:12]) != "WEBP" {
 				continue
@@ -48,12 +47,10 @@ func detectImageExt(head []byte) string {
 }
 
 // Upload handles POST /api/v1/upload — file upload with magic number detection.
-func Upload(uploadDir string) http.HandlerFunc {
+func (h *Handler) Upload() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// 1. Limit request body to 10 MB
 		r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
 
-		// 2. Parse multipart form
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
 			slog.Error("解析上传文件失败", "error", err)
 			model.RespondError(w, http.StatusBadRequest, "文件上传失败，文件可能过大")
@@ -68,7 +65,6 @@ func Upload(uploadDir string) http.HandlerFunc {
 		}
 		defer file.Close()
 
-		// 3. Read first 512 bytes for magic number detection
 		head := make([]byte, 512)
 		n, err := io.ReadAtLeast(file, head, 1)
 		if err != nil && err != io.ErrUnexpectedEOF {
@@ -88,11 +84,9 @@ func Upload(uploadDir string) http.HandlerFunc {
 			return
 		}
 
-		// 4. Generate unique filename
 		filename := model.NewID() + "." + ext
+		dst := filepath.Join(h.UploadDir, filename)
 
-		// 5. Write to upload directory (write head first, then copy remaining)
-		dst := filepath.Join(uploadDir, filename)
 		out, err := os.Create(dst)
 		if err != nil {
 			slog.Error("创建文件失败", "error", err)
@@ -112,11 +106,9 @@ func Upload(uploadDir string) http.HandlerFunc {
 			return
 		}
 
-		// 6. Return URL
-		resp := map[string]any{
+		model.RespondJSON(w, http.StatusCreated, map[string]any{
 			"url":      "/uploads/" + filename,
 			"filename": filename,
-		}
-		model.RespondJSON(w, http.StatusCreated, resp)
+		})
 	}
 }

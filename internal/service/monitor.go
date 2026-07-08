@@ -22,13 +22,17 @@ type HealthChecker struct {
 	muRun   sync.Mutex
 	ticker  *time.Ticker
 	cancel  context.CancelFunc
+	sem     chan struct{} // concurrency limiter
 }
+
+const maxConcurrentHealthChecks = 10
 
 // NewHealthChecker creates a new HealthChecker.
 func NewHealthChecker(db *sql.DB) *HealthChecker {
 	return &HealthChecker{
 		db:      db,
 		results: make(map[string]model.CheckResult),
+		sem:     make(chan struct{}, maxConcurrentHealthChecks),
 	}
 }
 
@@ -88,6 +92,7 @@ func (h *HealthChecker) GetResults() []model.CheckResult {
 }
 
 // runAllChecks performs HTTP checks against all targets in the database.
+// Uses a semaphore to limit concurrent HTTP requests.
 func (h *HealthChecker) runAllChecks(ctx context.Context) {
 	h.muRun.Lock()
 	if h.running {
@@ -112,8 +117,10 @@ func (h *HealthChecker) runAllChecks(ctx context.Context) {
 	var wg sync.WaitGroup
 	for i := range targets {
 		wg.Add(1)
+		h.sem <- struct{}{} // acquire — blocks if already at max concurrency
 		go func(t model.MonitorTarget) {
 			defer wg.Done()
+			defer func() { <-h.sem }() // release
 			result := h.checkTarget(ctx, t)
 			h.mu.Lock()
 			h.results[result.ID] = result

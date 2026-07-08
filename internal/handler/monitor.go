@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,15 +17,10 @@ import (
 // ===== Favicon extraction patterns =====
 
 var faviconPatterns = []*regexp.Regexp{
-	// <link rel="apple-touch-icon" href="...">
 	regexp.MustCompile(`(?i)<link[^>]+rel=["'](?:apple-touch-icon|apple-touch-icon-precomposed)["'][^>]+href=["']([^"']*)["']`),
-	// <link rel="icon" href="...">
 	regexp.MustCompile(`(?i)<link[^>]+rel=["']icon["'][^>]+href=["']([^"']*)["']`),
-	// <link rel="shortcut icon" href="...">
 	regexp.MustCompile(`(?i)<link[^>]+rel=["']shortcut\s+icon["'][^>]+href=["']([^"']*)["']`),
-	// <link href="..." rel="icon">
 	regexp.MustCompile(`(?i)<link[^>]+href=["']([^"']*)["'][^>]+rel=["']icon["']`),
-	// <link href="..." rel="shortcut icon">
 	regexp.MustCompile(`(?i)<link[^>]+href=["']([^"']*)["'][^>]+rel=["']shortcut\s+icon["']`),
 }
 
@@ -35,55 +29,48 @@ var faviconPatterns = []*regexp.Regexp{
 // SystemInfo handles GET /api/v1/admin/monitor/system.
 func SystemInfo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		info := service.GetSystemInfo()
-		model.RespondJSON(w, http.StatusOK, info)
+		model.RespondJSON(w, http.StatusOK, service.GetSystemInfo())
 	}
 }
 
 // ListChecks handles GET /api/v1/admin/monitor/checks.
-// It returns all monitor targets and their latest check results.
-func ListChecks(hc *service.HealthChecker) http.HandlerFunc {
+func (h *Handler) ListChecks() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		targets := hc.GetTargets()
-		results := hc.GetResults()
+		hc := h.HealthChecker
 		model.RespondJSON(w, http.StatusOK, map[string]any{
-			"targets": targets,
-			"results": results,
+			"targets": hc.GetTargets(),
+			"results": hc.GetResults(),
 		})
 	}
 }
 
 // CreateCheck handles POST /api/v1/admin/monitor/checks.
-func CreateCheck(db *sql.DB, hc *service.HealthChecker) http.HandlerFunc {
+func (h *Handler) CreateCheck() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var input model.MonitorTargetInput
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return
 		}
-
 		if input.Name == "" || input.URL == "" {
 			model.RespondError(w, http.StatusBadRequest, "名称和 URL 不能为空")
 			return
 		}
-
-		// Auto-prefix protocol if missing
 		if !strings.HasPrefix(input.URL, "http://") && !strings.HasPrefix(input.URL, "https://") {
 			input.URL = "http://" + input.URL
 		}
 
-		if _, err := hc.AddTarget(input); err != nil {
+		if _, err := h.HealthChecker.AddTarget(input); err != nil {
 			slog.Error("添加监控目标失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "添加失败")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusCreated, map[string]any{"success": true})
 	}
 }
 
 // UpdateCheck handles PUT /api/v1/admin/monitor/checks/{id}.
-func UpdateCheck(db *sql.DB, hc *service.HealthChecker) http.HandlerFunc {
+func (h *Handler) UpdateCheck() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 
@@ -93,7 +80,7 @@ func UpdateCheck(db *sql.DB, hc *service.HealthChecker) http.HandlerFunc {
 			return
 		}
 
-		if err := hc.UpdateTarget(id, input); err != nil {
+		if err := h.HealthChecker.UpdateTarget(id, input); err != nil {
 			if strings.Contains(err.Error(), "不存在") {
 				model.RespondError(w, http.StatusNotFound, "目标不存在")
 				return
@@ -102,17 +89,16 @@ func UpdateCheck(db *sql.DB, hc *service.HealthChecker) http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "更新失败")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 	}
 }
 
 // DeleteCheck handles DELETE /api/v1/admin/monitor/checks/{id}.
-func DeleteCheck(db *sql.DB, hc *service.HealthChecker) http.HandlerFunc {
+func (h *Handler) DeleteCheck() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 
-		if err := hc.DeleteTarget(id); err != nil {
+		if err := h.HealthChecker.DeleteTarget(id); err != nil {
 			if strings.Contains(err.Error(), "不存在") {
 				model.RespondError(w, http.StatusNotFound, "目标不存在")
 				return
@@ -121,38 +107,31 @@ func DeleteCheck(db *sql.DB, hc *service.HealthChecker) http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "删除失败")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 	}
 }
 
 // FetchMonitorIcon handles POST /api/v1/admin/monitor/fetch-icon.
-// It fetches the HTML of the target URL and extracts the favicon.
 func FetchMonitorIcon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		type request struct {
-			URL string `json:"url"`
-		}
+		type request struct{ URL string `json:"url"` }
 		var req request
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.URL == "" {
 			model.RespondError(w, http.StatusBadRequest, "请输入有效 URL")
 			return
 		}
-
 		iconURL := fetchFavicon(req.URL)
 		model.RespondJSON(w, http.StatusOK, map[string]any{"icon": iconURL})
 	}
 }
 
 // WOLById handles POST /api/v1/admin/monitor/wol/{id}.
-// It looks up the target's MAC address and sends a Wake-on-LAN magic packet.
-func WOLById(db *sql.DB) http.HandlerFunc {
+func (h *Handler) WOLById() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 
-		// Query target by ID directly from the database
 		var mac string
-		err := db.QueryRowContext(r.Context(),
+		err := h.DB.QueryRowContext(r.Context(),
 			"SELECT mac FROM monitor_targets WHERE id = ?", id).Scan(&mac)
 		if err != nil {
 			model.RespondError(w, http.StatusNotFound, "目标不存在")
@@ -174,12 +153,9 @@ func WOLById(db *sql.DB) http.HandlerFunc {
 }
 
 // WOLDirect handles POST /api/v1/admin/monitor/wol.
-// It sends a Wake-on-LAN magic packet to the given MAC address.
 func WOLDirect() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		type request struct {
-			MAC string `json:"mac"`
-		}
+		type request struct{ MAC string `json:"mac"` }
 		var req request
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.MAC == "" {
 			model.RespondError(w, http.StatusBadRequest, "请输入 MAC 地址")
@@ -191,34 +167,32 @@ func WOLDirect() http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "唤醒失败，请检查 MAC 地址")
 			return
 		}
-
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 	}
 }
 
 // ===== Aggregate endpoint =====
 
-// MonitorAll handles GET /api/v1/admin/monitor/all.
-// Returns system info, health check results, Docker containers, stats, and metadata in one call.
 type MonitorAllResponse struct {
-	System     model.SystemInfo             `json:"system"`
-	Targets    []model.MonitorTarget        `json:"targets"`
-	Results    []model.CheckResult          `json:"results"`
-	Containers []model.DockerContainer      `json:"containers"`
-	Stats      []model.DockerStat           `json:"stats"`
+	System     model.SystemInfo                `json:"system"`
+	Targets    []model.MonitorTarget           `json:"targets"`
+	Results    []model.CheckResult             `json:"results"`
+	Containers []model.DockerContainer         `json:"containers"`
+	Stats      []model.DockerStat              `json:"stats"`
 	Metadata   map[string]model.DockerMetadata `json:"metadata"`
 }
 
-func MonitorAll(hc *service.HealthChecker, svc *service.DockerService, meta *service.DockerMetadataStore) http.HandlerFunc {
+// MonitorAll handles GET /api/v1/admin/monitor/all.
+func (h *Handler) MonitorAll() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		resp := MonitorAllResponse{
-			System:     service.GetSystemInfo(),
-			Targets:    hc.GetTargets(),
-			Results:    hc.GetResults(),
-			Metadata:   meta.GetAll(),
+			System:   service.GetSystemInfo(),
+			Targets:  h.HealthChecker.GetTargets(),
+			Results:  h.HealthChecker.GetResults(),
+			Metadata: h.DockerMeta.GetAll(),
 		}
 
-		if svc != nil {
+		if svc := h.DockerSvc; svc != nil {
 			if containers, err := svc.ListContainers(r.Context()); err == nil {
 				resp.Containers = containers
 			}
@@ -233,11 +207,7 @@ func MonitorAll(hc *service.HealthChecker, svc *service.DockerService, meta *ser
 
 // ===== Favicon fetch helper =====
 
-// fetchFavicon fetches the HTML page at targetURL and extracts the favicon URL.
-// Falls back to /favicon.ico on the origin if no link tag is found.
-// No SSRF protection — monitor targets are admin-configured, not user-submitted.
 func fetchFavicon(targetURL string) *string {
-	// Normalize URL for parsing
 	normalizedURL := targetURL
 	if !strings.HasPrefix(normalizedURL, "http://") && !strings.HasPrefix(normalizedURL, "https://") {
 		normalizedURL = "http://" + normalizedURL
@@ -273,7 +243,6 @@ func fetchFavicon(targetURL string) *string {
 	return fallbackIcon
 }
 
-// fetchHTML fetches the HTML content of a URL with size limit and timeout.
 func fetchHTML(client *http.Client, url string) string {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -288,29 +257,22 @@ func fetchHTML(client *http.Client, url string) string {
 	}
 	defer resp.Body.Close()
 
-	// Limit to 512KB
 	limited := io.LimitReader(resp.Body, 512*1024)
 	data, err := io.ReadAll(limited)
 	if err != nil {
 		return ""
 	}
 
-	// Detect charset from Content-Type
 	contentType := resp.Header.Get("Content-Type")
 	charset := detectCharset(contentType)
-
-	// Try UTF-8 decoding first; if it fails, use latin-1 fallback
-	decoded := decodeToString(data, charset)
-	return decoded
+	return decodeToString(data, charset)
 }
 
-// extractOrigin extracts the origin (protocol + host) from a URL.
 func extractOrigin(rawURL string) string {
 	if !strings.HasPrefix(rawURL, "http://") && !strings.HasPrefix(rawURL, "https://") {
 		rawURL = "http://" + rawURL
 	}
 
-	// Simple origin extraction without url.Parse overhead
 	afterProto := rawURL
 	if strings.HasPrefix(rawURL, "https://") {
 		afterProto = rawURL[8:]
@@ -332,7 +294,6 @@ func extractOrigin(rawURL string) string {
 	return proto + "://" + host
 }
 
-// detectCharset extracts charset from Content-Type header.
 func detectCharset(contentType string) string {
 	idx := strings.Index(strings.ToLower(contentType), "charset=")
 	if idx == -1 {
@@ -345,20 +306,15 @@ func detectCharset(contentType string) string {
 	return strings.TrimSpace(charset)
 }
 
-// decodeToString decodes bytes to string using the given charset.
-// Falls back to UTF-8 if the charset is not supported.
 func decodeToString(data []byte, charset string) string {
 	switch strings.ToLower(charset) {
 	case "utf-8", "utf8", "":
 		return string(data)
 	default:
-		// For most cases, UTF-8 decoding is sufficient.
-		// If charset detection fails, we still return the raw data as string.
 		return string(data)
 	}
 }
 
-// extractFaviconFromHTML extracts favicon URL from HTML content.
 func extractFaviconFromHTML(html string, baseURL string) string {
 	for _, pattern := range faviconPatterns {
 		matches := pattern.FindStringSubmatch(html)
@@ -372,7 +328,6 @@ func extractFaviconFromHTML(html string, baseURL string) string {
 	return ""
 }
 
-// resolveURL resolves a potentially relative URL against a base URL.
 func resolveURL(href, base string) string {
 	if strings.HasPrefix(href, "http://") || strings.HasPrefix(href, "https://") || strings.HasPrefix(href, "data:") {
 		return href

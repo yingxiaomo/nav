@@ -196,6 +196,41 @@ func WOLDirect() http.HandlerFunc {
 	}
 }
 
+// ===== Aggregate endpoint =====
+
+// MonitorAll handles GET /api/v1/admin/monitor/all.
+// Returns system info, health check results, Docker containers, stats, and metadata in one call.
+type MonitorAllResponse struct {
+	System     model.SystemInfo             `json:"system"`
+	Targets    []model.MonitorTarget        `json:"targets"`
+	Results    []model.CheckResult          `json:"results"`
+	Containers []model.DockerContainer      `json:"containers"`
+	Stats      []model.DockerStat           `json:"stats"`
+	Metadata   map[string]model.DockerMetadata `json:"metadata"`
+}
+
+func MonitorAll(hc *service.HealthChecker, svc *service.DockerService, meta *service.DockerMetadataStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		resp := MonitorAllResponse{
+			System:     service.GetSystemInfo(),
+			Targets:    hc.GetTargets(),
+			Results:    hc.GetResults(),
+			Metadata:   meta.GetAll(),
+		}
+
+		if svc != nil {
+			if containers, err := svc.ListContainers(r.Context()); err == nil {
+				resp.Containers = containers
+			}
+			if stats, err := svc.ContainerStats(r.Context()); err == nil {
+				resp.Stats = stats
+			}
+		}
+
+		model.RespondJSON(w, http.StatusOK, resp)
+	}
+}
+
 // ===== Favicon fetch helper =====
 
 // fetchFavicon fetches the HTML page at targetURL and extracts the favicon URL.

@@ -18,6 +18,8 @@ type HealthChecker struct {
 	db      *sql.DB
 	results map[string]model.CheckResult
 	mu      sync.RWMutex
+	running bool
+	muRun   sync.Mutex
 	ticker  *time.Ticker
 	cancel  context.CancelFunc
 }
@@ -87,6 +89,21 @@ func (h *HealthChecker) GetResults() []model.CheckResult {
 
 // runAllChecks performs HTTP checks against all targets in the database.
 func (h *HealthChecker) runAllChecks(ctx context.Context) {
+	h.muRun.Lock()
+	if h.running {
+		h.muRun.Unlock()
+		slog.Debug("Health check already in progress, skipping this round")
+		return
+	}
+	h.running = true
+	h.muRun.Unlock()
+
+	defer func() {
+		h.muRun.Lock()
+		h.running = false
+		h.muRun.Unlock()
+	}()
+
 	targets := h.getTargets()
 	if len(targets) == 0 {
 		return

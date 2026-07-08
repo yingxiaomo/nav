@@ -160,6 +160,7 @@ func main() {
 
 	// Monitor routes (protected by admin auth middleware)
 	mux.Handle("GET /api/v1/admin/monitor/system", adminMW(http.HandlerFunc(handler.SystemInfo())))
+	mux.Handle("GET /api/v1/admin/monitor/all", adminMW(http.HandlerFunc(handler.MonitorAll(healthChecker, dockerSvc, dockerMetaStore))))
 	mux.Handle("GET /api/v1/admin/monitor/checks", adminMW(http.HandlerFunc(handler.ListChecks(healthChecker))))
 	mux.Handle("POST /api/v1/admin/monitor/checks", adminMW(http.HandlerFunc(handler.CreateCheck(database, healthChecker))))
 	mux.Handle("PUT /api/v1/admin/monitor/checks/{id}", adminMW(http.HandlerFunc(handler.UpdateCheck(database, healthChecker))))

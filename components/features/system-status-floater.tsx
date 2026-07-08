@@ -27,17 +27,16 @@ export function SystemStatusFloater() {
   const fetchData = useCallback(async () => {
     if (!baseUrl) return;
     try {
-      const h = authHeaders;
-      const sr = await fetch(`${baseUrl}/api/v1/admin/monitor/system`, { headers: h });
-      const cr = await fetch(`${baseUrl}/api/v1/admin/monitor/checks`, { headers: h });
-      const dr = await fetch(`${baseUrl}/api/v1/admin/docker/containers`, { headers: h });
-      const sr2 = await fetch(`${baseUrl}/api/v1/admin/docker/stats`, { headers: h });
-      const dmr = await fetch(`${baseUrl}/api/v1/admin/docker/metadata`, { headers: h });
-      if (sr.ok) setSys(await sr.json());
-      if (cr.ok) { const d = await cr.json(); setChecks(d.results || []); setTargets(d.targets || []); }
-      if (dr.ok) { const d = await dr.json(); setContainers(d.containers || []); }
-      if (sr2.ok) { const d = await sr2.json(); setContainerStats(d.stats || []); }
-      if (dmr.ok) setDockerMeta(await dmr.json());
+      const res = await fetch(`${baseUrl}/api/v1/admin/monitor/all`, { headers: authHeaders });
+      if (res.ok) {
+        const d = await res.json();
+        setSys(d.system);
+        setChecks(d.results || []);
+        setTargets(d.targets || []);
+        setContainers(d.containers || []);
+        setContainerStats(d.stats || []);
+        setDockerMeta(d.metadata || {});
+      }
     } catch (err) { console.warn('[Monitor] fetch data failed:', err); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseUrl]);

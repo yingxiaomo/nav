@@ -45,7 +45,6 @@ next-env.d.ts
 # scripts/test-*
 
 .1.md
-.husky
 .superpowers
 .vscode/
 .idea/

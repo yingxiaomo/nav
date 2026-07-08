@@ -36,6 +36,7 @@ export function SystemStatusFloater() {
         setContainers(d.containers || []);
         setContainerStats(d.stats || []);
         setDockerMeta(d.metadata || {});
+        // initializing 字段在 Docker stats 首次就绪前为 true，前端可据此显示骨架屏
       }
     } catch (err) { console.warn('[Monitor] fetch data failed:', err); }
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -87,6 +87,14 @@ func main() {
 	defer healthChecker.Stop()
 	slog.Info("健康检查服务已启动")
 
+		// Initialize Docker stats snapshotter（后台每 10s 轮询）
+		var dockerSnap *service.DockerSnapshotter
+		if dockerSvc != nil {
+			dockerSnap = service.NewDockerSnapshotter(dockerSvc)
+			dockerSnap.Start(context.Background())
+			slog.Info("Docker stats 快照服务已启动")
+		}
+
 	corsOrigin := os.Getenv("CORS_ORIGIN")
 	if corsOrigin == "" {
 		corsOrigin = "*"
@@ -103,6 +111,7 @@ func main() {
 		HealthChecker: healthChecker,
 		DockerSvc:     dockerSvc,
 		DockerMeta:    dockerMetaStore,
+			DockerSnap:    dockerSnap,
 		UploadDir:     uploadDir,
 		DataDir:       dataDir,
 	}

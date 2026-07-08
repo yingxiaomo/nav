@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -174,6 +173,7 @@ func WOLDirect() http.HandlerFunc {
 
 // ===== Aggregate endpoint =====
 
+// MonitorAllResponse 包含监控面板全部数据
 type MonitorAllResponse struct {
 	System     model.SystemInfo                `json:"system"`
 	Targets    []model.MonitorTarget           `json:"targets"`
@@ -181,6 +181,7 @@ type MonitorAllResponse struct {
 	Containers []model.DockerContainer         `json:"containers"`
 	Stats      []model.DockerStat              `json:"stats"`
 	Metadata   map[string]model.DockerMetadata `json:"metadata"`
+	Initializing bool                          `json:"initializing,omitempty"`
 }
 
 // MonitorAll handles GET /api/v1/admin/monitor/all.
@@ -194,13 +195,17 @@ func (h *Handler) MonitorAll() http.HandlerFunc {
 		}
 
 		if svc := h.DockerSvc; svc != nil {
-			dockerCtx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-			defer cancel()
-			if containers, err := svc.ListContainers(dockerCtx); err == nil {
+			// 容器列表轻量快速，直接请求
+			if containers, err := svc.ListContainers(r.Context()); err == nil {
 				resp.Containers = containers
 			}
-			if stats, err := svc.ContainerStats(dockerCtx); err == nil {
+			// Docker stats 从内存快照读取（<1ms），后台每 10s 刷新一次
+			if h.DockerSnap != nil {
+				stats, ready, _ := h.DockerSnap.Snapshot()
 				resp.Stats = stats
+				if !ready {
+					resp.Initializing = true
+				}
 			}
 		}
 

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/YingXiaoMo/nav/internal/model"
@@ -196,4 +197,59 @@ func (s *DockerService) StreamLogs(ctx context.Context, containerID string, line
 			return ctx.Err()
 		}
 	}
+}
+
+// DockerSnapshotter 后台轮询 Docker stats，提供内存快照
+type DockerSnapshotter struct {
+	svc     *DockerService
+	mu      sync.RWMutex
+	stats   []model.DockerStat
+	updated time.Time
+	ready   bool
+}
+
+// NewDockerSnapshotter 创建快照器
+func NewDockerSnapshotter(svc *DockerService) *DockerSnapshotter {
+	return &DockerSnapshotter{svc: svc}
+}
+
+// Start 启动后台轮询（每 10s 更新一次快照）
+func (s *DockerSnapshotter) Start(ctx context.Context) {
+	go func() {
+		// 首次运行立即执行
+		s.refresh(ctx)
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				s.refresh(ctx)
+			}
+		}
+	}()
+}
+
+// Stop 停止轮询（通过 ctx cancel 触发）
+func (s *DockerSnapshotter) Stop() {}
+
+// Snapshot 返回当前快照（读锁，不阻塞其余前端请求）
+func (s *DockerSnapshotter) Snapshot() ([]model.DockerStat, bool, time.Time) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.stats, s.ready, s.updated
+}
+
+func (s *DockerSnapshotter) refresh(ctx context.Context) {
+	stats, err := s.svc.ContainerStats(ctx)
+	if err != nil {
+		slog.Warn("Docker stats 快照刷新失败", "error", err)
+		return
+	}
+	s.mu.Lock()
+	s.stats = stats
+	s.updated = time.Now()
+	s.ready = true
+	s.mu.Unlock()
 }

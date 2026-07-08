@@ -12,6 +12,7 @@ type Handler struct {
 	HealthChecker *service.HealthChecker
 	DockerSvc     *service.DockerService
 	DockerMeta    *service.DockerMetadataStore
+	DockerSnap    *service.DockerSnapshotter
 	UploadDir     string
 	DataDir       string
 }

@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -9,7 +11,7 @@ import (
 	"github.com/YingXiaoMo/nav/internal/model"
 )
 
-// ===== Export types (match TypeScript export format exactly) =====
+// ===== 导出类型（精确匹配 TypeScript 导出格式）=====
 
 type categoryExport struct {
 	ID        string           `json:"id"`
@@ -28,7 +30,7 @@ type dataExport struct {
 	PinnedLinks []model.LinkItem   `json:"pinnedLinks,omitempty"`
 }
 
-// ===== Import types (match TypeScript import format) =====
+// ===== 导入类型（匹配 TypeScript 导入格式）=====
 
 type categoryImport struct {
 	ID        string           `json:"id"`
@@ -47,13 +49,97 @@ type dataImport struct {
 	PinnedLinks []model.LinkItem `json:"pinnedLinks,omitempty"`
 }
 
-// ===== Helper functions =====
+// ===== 辅助函数 =====
 
 func bookmarkToLinkItem(b model.Bookmark) model.LinkItem {
-	return model.LinkItem{
+	li := model.LinkItem{
 		ID: b.ID, Title: b.Title, URL: b.URL, Icon: b.Icon,
 		Description: b.Description, UpdatedAt: b.CreatedAt, Order: b.Order,
 	}
+	if b.IsFolder == 1 {
+		li.Type = "folder"
+		li.Children = []model.LinkItem{}
+	}
+	if b.URL == "" && li.Type == "" {
+		// 部分旧数据可能没有 type=folder 但有空的 URL，统一处理
+		li.URL = ""
+	}
+	return li
+}
+
+// bookmarksToTree 将扁平书签列表按 parent_id 重建成树形结构
+// 根节点（parent_id=""）之间保持原始 order 排序
+func bookmarksToTree(bms []model.Bookmark) []model.LinkItem {
+	byParent := map[string][]model.Bookmark{}
+	var roots []model.Bookmark
+
+	for _, bm := range bms {
+		if bm.ParentID == "" {
+			roots = append(roots, bm)
+		} else {
+			byParent[bm.ParentID] = append(byParent[bm.ParentID], bm)
+		}
+	}
+
+	var build func(bm model.Bookmark) model.LinkItem
+	build = func(bm model.Bookmark) model.LinkItem {
+		li := bookmarkToLinkItem(bm)
+		if children, ok := byParent[bm.ID]; ok {
+			li.Type = "folder"
+			li.Children = make([]model.LinkItem, 0, len(children))
+			for _, child := range children {
+				li.Children = append(li.Children, build(child))
+			}
+		}
+		return li
+	}
+
+	items := make([]model.LinkItem, 0, len(roots))
+	for _, root := range roots {
+		items = append(items, build(root))
+	}
+	return items
+}
+
+// saveLinksTree 递归保存书签/文件夹树（直接使用 *sql.Tx 执行）
+func saveLinksTree(ctx context.Context, tx *sql.Tx, categoryID, parentID string, links []model.LinkItem, now int64) error {
+	for i, link := range links {
+		linkID := link.ID
+		if linkID == "" {
+			linkID = model.NewID()
+		}
+		createdAt := link.UpdatedAt
+		if createdAt == 0 {
+			createdAt = now
+		}
+		order := link.Order
+		if order == 0 {
+			order = i
+		}
+
+		isFolder := 0
+		var effectiveParent any
+		if parentID != "" {
+			effectiveParent = parentID
+		}
+		if link.Type == "folder" {
+			isFolder = 1
+		}
+
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO bookmarks (id, category_id, parent_id, title, url, icon, description, "order", created_at, is_folder) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			linkID, categoryID, effectiveParent, link.Title, link.URL, link.Icon, link.Description, order, createdAt, isFolder); err != nil {
+			return err
+		}
+
+		// 递归保存子项
+		if len(link.Children) > 0 {
+			if err := saveLinksTree(ctx, tx, categoryID, linkID, link.Children, now); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func settingsMapToSiteSettings(m map[string]string) model.SiteSettings {
@@ -119,9 +205,9 @@ func extractPinnedLinks(m map[string]string) []model.LinkItem {
 	return nil
 }
 
-// ===== Handlers =====
+// ===== 处理器 =====
 
-// GetData handles GET /api/v1/data — full data export.
+// GetData 处理 GET /api/v1/data — 导出完整数据并重建文件夹树。
 func (h *Handler) GetData() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		db := h.DB
@@ -145,16 +231,15 @@ func (h *Handler) GetData() http.HandlerFunc {
 
 		exportCats := make([]categoryExport, 0, len(cats))
 		for _, cat := range cats {
-			links, err := queries.GetBookmarksByCategory(r.Context(), db, cat.ID)
+			bms, err := queries.GetBookmarksByCategory(r.Context(), db, cat.ID)
 			if err != nil {
 				slog.Error("获取分类书签失败", "error", err, "category_id", cat.ID)
 				model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 				return
 			}
-			linkItems := make([]model.LinkItem, 0, len(links))
-			for _, b := range links {
-				linkItems = append(linkItems, bookmarkToLinkItem(b))
-			}
+			// 树形重建 — 支持嵌套文件夹
+			linkItems := bookmarksToTree(bms)
+
 			exportCats = append(exportCats, categoryExport{
 				ID: cat.ID, Title: cat.Title, Icon: cat.Icon,
 				Order: cat.Order, UpdatedAt: cat.CreatedAt, Links: linkItems,
@@ -185,7 +270,7 @@ func (h *Handler) GetData() http.HandlerFunc {
 	}
 }
 
-// PutData handles PUT /api/v1/data — full data replacement.
+// PutData 处理 PUT /api/v1/data — 完整替换数据，支持文件夹树。
 func (h *Handler) PutData() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		db := h.DB
@@ -241,24 +326,10 @@ func (h *Handler) PutData() http.HandlerFunc {
 				return
 			}
 
-			for li, link := range cat.Links {
-				linkID := link.ID
-				if linkID == "" {
-					linkID = model.NewID()
-				}
-				linkCreatedAt := link.UpdatedAt
-				if linkCreatedAt == 0 {
-					linkCreatedAt = now
-				}
-				linkOrder := link.Order
-				if linkOrder == 0 {
-					linkOrder = li
-				}
-
-				if _, err := tx.ExecContext(r.Context(),
-					`INSERT INTO bookmarks (id, category_id, title, url, icon, description, "order", created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-					linkID, catID, link.Title, link.URL, link.Icon, link.Description, linkOrder, linkCreatedAt); err != nil {
-					slog.Error("插入书签失败", "error", err)
+			// 递归保存书签树（支持嵌套文件夹）
+			if len(cat.Links) > 0 {
+				if err := saveLinksTree(r.Context(), tx, catID, "", cat.Links, now); err != nil {
+					slog.Error("保存书签树失败", "error", err)
 					model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 					return
 				}
@@ -314,7 +385,6 @@ func (h *Handler) PutData() http.HandlerFunc {
 					if value == nil {
 						continue
 					}
-					// Strings stored directly; other types JSON-encoded for the flat key-value table
 					var valStr string
 					switch v := value.(type) {
 					case string:

@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// ===== Input / DTO types (match TypeScript interfaces) =====
+// ===== 输入 / DTO 类型（匹配 TypeScript 接口）=====
 
 type CategoryInput struct {
 	ID    string `json:"id,omitempty"`
@@ -21,6 +21,8 @@ type BookmarkInput struct {
 	URL         string `json:"url"`
 	Icon        string `json:"icon,omitempty"`
 	Description string `json:"description,omitempty"`
+	ParentID    string `json:"parentId,omitempty"`
+	IsFolder    bool   `json:"isFolder,omitempty"`
 	Order       int    `json:"order,omitempty"`
 }
 
@@ -42,7 +44,7 @@ type MonitorTargetInput struct {
 	Timeout int    `json:"timeout,omitempty"`
 }
 
-// ===== DB model types =====
+// ===== 数据库模型类型 =====
 
 type Category struct {
 	ID        string     `json:"id"`
@@ -56,15 +58,17 @@ type Category struct {
 type Bookmark struct {
 	ID          string `json:"id"`
 	CategoryID  string `json:"categoryId"`
+	ParentID    string `json:"parentId,omitempty"`
 	Title       string `json:"title"`
 	URL         string `json:"url"`
 	Icon        string `json:"icon,omitempty"`
 	Description string `json:"description,omitempty"`
+	IsFolder    int    `json:"-"`
 	Order       int    `json:"order"`
 	CreatedAt   int64  `json:"created_at"`
 }
 
-// ===== API response types (match TypeScript interfaces exactly) =====
+// ===== API 响应类型（精确匹配 TypeScript 接口）=====
 
 type LinkItem struct {
 	ID          string      `json:"id"`
@@ -116,7 +120,7 @@ type DataSchema struct {
 	PinnedLinks []LinkItem   `json:"pinnedLinks,omitempty"`
 }
 
-// ===== Monitor types =====
+// ===== 监控类型 =====
 
 type MonitorTarget struct {
 	ID        string `json:"id"`
@@ -137,7 +141,7 @@ type CheckResult struct {
 	LastCheck *int64 `json:"lastCheck"`
 }
 
-// ===== Docker types =====
+// ===== Docker 类型 =====
 
 type DockerContainer struct {
 	ID      string `json:"id"`
@@ -162,7 +166,7 @@ type DockerMetadata struct {
 	Icon string `json:"icon,omitempty"`
 }
 
-// ===== System info types =====
+// ===== 系统信息类型 =====
 
 type CPUInfo struct {
 	Usage float64 `json:"usage"`
@@ -188,7 +192,7 @@ type SystemInfo struct {
 	Uptime int64      `json:"uptime"`
 }
 
-// ===== Helpers =====
+// ===== 辅助函数 =====
 
 func NewID() string {
 	const alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-"

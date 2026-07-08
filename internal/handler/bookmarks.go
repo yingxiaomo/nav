@@ -61,7 +61,12 @@ func (h *Handler) CreateBookmark() http.HandlerFunc {
 			model.RespondError(w, http.StatusBadRequest, "标题不能为空")
 			return
 		}
-		if input.URL == "" || (!strings.HasPrefix(input.URL, "http://") && !strings.HasPrefix(input.URL, "https://")) {
+		if input.URL == "" && !input.IsFolder {
+			// 允许文件夹没有 URL
+			model.RespondError(w, http.StatusBadRequest, "链接不能为空")
+			return
+		}
+		if input.URL != "" && !strings.HasPrefix(input.URL, "http://") && !strings.HasPrefix(input.URL, "https://") {
 			model.RespondError(w, http.StatusBadRequest, "链接格式无效，仅允许 http/https 链接")
 			return
 		}

@@ -57,5 +57,31 @@ func Migrate(database *sql.DB) error {
 			return fmt.Errorf("迁移失败: %w\nSQL: %s", err, stmt)
 		}
 	}
+
+	// 迁移 2：为嵌套文件夹添加 parent_id 和 is_folder 列
+	if err := addColumnIfNotExists(database, "bookmarks", "parent_id",
+		`ALTER TABLE bookmarks ADD COLUMN parent_id TEXT REFERENCES bookmarks(id) ON DELETE CASCADE`); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists(database, "bookmarks", "is_folder",
+		`ALTER TABLE bookmarks ADD COLUMN is_folder INTEGER NOT NULL DEFAULT 0`); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func addColumnIfNotExists(database *sql.DB, table, column, alterSQL string) error {
+	var count int
+	if err := database.QueryRow(
+		`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name=?`, table, column,
+	).Scan(&count); err != nil {
+		return fmt.Errorf("检查列 %s.%s 失败: %w", table, column, err)
+	}
+	if count == 0 {
+		if _, err := database.Exec(alterSQL); err != nil {
+			return fmt.Errorf("添加列 %s.%s 失败: %w", table, column, err)
+		}
+	}
 	return nil
 }

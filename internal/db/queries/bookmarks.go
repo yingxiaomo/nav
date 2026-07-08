@@ -12,9 +12,24 @@ type ReorderItem struct {
 	Order int    `json:"order"`
 }
 
+const bookmarkCols = `id, category_id, parent_id, title, url, icon, description, "order", created_at, is_folder`
+
+func scanBookmark(scanner interface {
+	Scan(dest ...any) error
+	}, b *model.Bookmark) error {
+	var desc sql.NullString
+	var parentID sql.NullString
+	if err := scanner.Scan(&b.ID, &b.CategoryID, &parentID, &b.Title, &b.URL, &b.Icon, &desc, &b.Order, &b.CreatedAt, &b.IsFolder); err != nil {
+		return err
+	}
+	b.Description = desc.String
+	b.ParentID = parentID.String
+	return nil
+}
+
 func GetBookmarksByCategory(ctx context.Context, db *sql.DB, categoryID string) ([]model.Bookmark, error) {
 	rows, err := db.QueryContext(ctx,
-		`SELECT id, category_id, title, url, icon, description, "order", created_at FROM bookmarks WHERE category_id = ? ORDER BY "order" ASC`,
+		`SELECT `+bookmarkCols+` FROM bookmarks WHERE category_id = ? ORDER BY "order" ASC`,
 		categoryID)
 	if err != nil {
 		return nil, err
@@ -24,11 +39,9 @@ func GetBookmarksByCategory(ctx context.Context, db *sql.DB, categoryID string) 
 	var bms []model.Bookmark
 	for rows.Next() {
 		var b model.Bookmark
-		var desc sql.NullString
-		if err := rows.Scan(&b.ID, &b.CategoryID, &b.Title, &b.URL, &b.Icon, &desc, &b.Order, &b.CreatedAt); err != nil {
+		if err := scanBookmark(rows, &b); err != nil {
 			return nil, err
 		}
-		b.Description = desc.String
 		bms = append(bms, b)
 	}
 	if bms == nil {
@@ -43,7 +56,7 @@ func GetAllBookmarks(ctx context.Context, db *sql.DB, categoryID string) ([]mode
 	}
 
 	rows, err := db.QueryContext(ctx,
-		`SELECT id, category_id, title, url, icon, description, "order", created_at FROM bookmarks ORDER BY "order" ASC`)
+		`SELECT `+bookmarkCols+` FROM bookmarks ORDER BY "order" ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -52,11 +65,9 @@ func GetAllBookmarks(ctx context.Context, db *sql.DB, categoryID string) ([]mode
 	var bms []model.Bookmark
 	for rows.Next() {
 		var b model.Bookmark
-		var desc sql.NullString
-		if err := rows.Scan(&b.ID, &b.CategoryID, &b.Title, &b.URL, &b.Icon, &desc, &b.Order, &b.CreatedAt); err != nil {
+		if err := scanBookmark(rows, &b); err != nil {
 			return nil, err
 		}
-		b.Description = desc.String
 		bms = append(bms, b)
 	}
 	if bms == nil {
@@ -67,18 +78,35 @@ func GetAllBookmarks(ctx context.Context, db *sql.DB, categoryID string) ([]mode
 
 func GetBookmark(ctx context.Context, db *sql.DB, id string) (*model.Bookmark, error) {
 	var b model.Bookmark
-	var desc sql.NullString
-	err := db.QueryRowContext(ctx,
-		`SELECT id, category_id, title, url, icon, description, "order", created_at FROM bookmarks WHERE id = ?`, id).
-		Scan(&b.ID, &b.CategoryID, &b.Title, &b.URL, &b.Icon, &desc, &b.Order, &b.CreatedAt)
-	if err == sql.ErrNoRows {
+	if err := scanBookmark(db.QueryRowContext(ctx,
+		`SELECT `+bookmarkCols+` FROM bookmarks WHERE id = ?`, id), &b); err == sql.ErrNoRows {
 		return nil, nil
+	} else if err != nil {
+		return nil, err
 	}
+	return &b, nil
+}
+
+func GetBookmarksByParent(ctx context.Context, db *sql.DB, parentID string) ([]model.Bookmark, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT `+bookmarkCols+` FROM bookmarks WHERE parent_id = ? ORDER BY "order" ASC`, parentID)
 	if err != nil {
 		return nil, err
 	}
-	b.Description = desc.String
-	return &b, nil
+	defer rows.Close()
+
+	var bms []model.Bookmark
+	for rows.Next() {
+		var b model.Bookmark
+		if err := scanBookmark(rows, &b); err != nil {
+			return nil, err
+		}
+		bms = append(bms, b)
+	}
+	if bms == nil {
+		bms = []model.Bookmark{}
+	}
+	return bms, rows.Err()
 }
 
 func CreateBookmark(ctx context.Context, db *sql.DB, input model.BookmarkInput) (*model.Bookmark, error) {
@@ -90,9 +118,14 @@ func CreateBookmark(ctx context.Context, db *sql.DB, input model.BookmarkInput) 
 		order = maxOrder + 1
 	}
 
+	isFolder := 0
+	if input.IsFolder {
+		isFolder = 1
+	}
+
 	_, err := db.ExecContext(ctx,
-		`INSERT INTO bookmarks (id, category_id, title, url, icon, description, "order", created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, input.CategoryID, input.Title, input.URL, input.Icon, input.Description, order, now)
+		`INSERT INTO bookmarks (id, category_id, parent_id, title, url, icon, description, "order", created_at, is_folder) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, input.CategoryID, nullIfEmpty(input.ParentID), input.Title, input.URL, input.Icon, input.Description, order, now, isFolder)
 	if err != nil {
 		return nil, err
 	}
@@ -100,10 +133,12 @@ func CreateBookmark(ctx context.Context, db *sql.DB, input model.BookmarkInput) 
 	return &model.Bookmark{
 		ID:          id,
 		CategoryID:  input.CategoryID,
+		ParentID:    input.ParentID,
 		Title:       input.Title,
 		URL:         input.URL,
 		Icon:        input.Icon,
 		Description: input.Description,
+		IsFolder:    isFolder,
 		Order:       order,
 		CreatedAt:   now,
 	}, nil
@@ -111,8 +146,8 @@ func CreateBookmark(ctx context.Context, db *sql.DB, input model.BookmarkInput) 
 
 func UpdateBookmark(ctx context.Context, db *sql.DB, id string, input model.BookmarkInput) (int64, error) {
 	result, err := db.ExecContext(ctx,
-		`UPDATE bookmarks SET category_id = ?, title = ?, url = ?, icon = ?, description = ? WHERE id = ?`,
-		input.CategoryID, input.Title, input.URL, input.Icon, input.Description, id)
+		`UPDATE bookmarks SET category_id = ?, title = ?, url = ?, icon = ?, description = ?, parent_id = ?, is_folder = ? WHERE id = ?`,
+		input.CategoryID, input.Title, input.URL, input.Icon, input.Description, nullIfEmpty(input.ParentID), boolToInt(input.IsFolder), id)
 	if err != nil {
 		return 0, err
 	}
@@ -120,6 +155,7 @@ func UpdateBookmark(ctx context.Context, db *sql.DB, id string, input model.Book
 }
 
 func DeleteBookmark(ctx context.Context, db *sql.DB, id string) error {
+	// CASCADE 由外键约束自动递归删除子项
 	_, err := db.ExecContext(ctx, `DELETE FROM bookmarks WHERE id = ?`, id)
 	return err
 }
@@ -168,4 +204,19 @@ func CategoryExists(ctx context.Context, db *sql.DB, id string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// nullIfEmpty 将空字符串转为 nil（映射为 SQL NULL），非空则返回原值
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }

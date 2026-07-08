@@ -2,23 +2,13 @@ package middleware
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
 	"crypto/subtle"
 	"database/sql"
-	"encoding/base64"
-	"encoding/hex"
 	"net/http"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/YingXiaoMo/nav/internal/model"
-)
-
-const (
-	sessionCookieName = "admin_web_session"
-	sessionDuration   = 7 * 24 * time.Hour // 7 days, used when signing sessions
+	"github.com/YingXiaoMo/nav/internal/session"
 )
 
 // publicPaths are endpoints that do not require any authentication.
@@ -97,7 +87,7 @@ func Admin(database *sql.DB) func(http.Handler) http.Handler {
 			}
 
 			// Try session cookie
-			cookie, err := r.Cookie(sessionCookieName)
+			cookie, err := r.Cookie(session.CookieName)
 			if err != nil {
 				model.RespondError(w, http.StatusUnauthorized, "未登录，请先登录管理后台")
 				return
@@ -105,14 +95,14 @@ func Admin(database *sql.DB) func(http.Handler) http.Handler {
 
 			// Read session_secret from database
 			sessionSecret := getSetting(r.Context(), database, "session_secret")
-			if sessionSecret != "" && verifySessionCookie(cookie.Value, sessionSecret) {
+			if sessionSecret != "" && session.Verify(cookie.Value, sessionSecret) {
 				next.ServeHTTP(w, r)
 				return
 			}
 
 			// Legacy compatibility: verify cookie with API token as HMAC secret
 			apiToken := getSetting(r.Context(), database, "api_token")
-			if apiToken != "" && verifySessionCookie(cookie.Value, apiToken) {
+			if apiToken != "" && session.Verify(cookie.Value, apiToken) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -122,46 +112,6 @@ func Admin(database *sql.DB) func(http.Handler) http.Handler {
 	}
 }
 
-// verifySessionCookie checks the session cookie format and HMAC signature.
-// Format: base64("userID:expiresAtUnixMs") + "." + hmac_hex
-func verifySessionCookie(cookieValue, secret string) bool {
-	// Split on the last dot to separate the payload base64 from the HMAC hex
-	dotIdx := strings.LastIndex(cookieValue, ".")
-	if dotIdx < 0 {
-		return false
-	}
-	payloadBase64 := cookieValue[:dotIdx]
-	sigHex := cookieValue[dotIdx+1:]
-
-	payloadBytes, err := base64.StdEncoding.DecodeString(payloadBase64)
-	if err != nil {
-		return false
-	}
-	payload := string(payloadBytes)
-
-	// Split payload on ":" to get userID and expiresAt
-	colonIdx := strings.LastIndex(payload, ":")
-	if colonIdx < 0 {
-		return false
-	}
-	expiresStr := payload[colonIdx+1:]
-
-	expires, err := strconv.ParseInt(expiresStr, 10, 64)
-	if err != nil || time.Now().UnixMilli() > expires {
-		return false
-	}
-
-	// Verify HMAC: HMAC-SHA256(secret, payload)
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(payload))
-	expectedHex := hex.EncodeToString(mac.Sum(nil))
-
-	if subtle.ConstantTimeCompare([]byte(sigHex), []byte(expectedHex)) != 1 {
-		return false
-	}
-
-	return true
-}
 
 // verifyAPIToken checks the Authorization Bearer token against the stored api_token.
 func verifyAPIToken(r *http.Request, database *sql.DB, token string) bool {

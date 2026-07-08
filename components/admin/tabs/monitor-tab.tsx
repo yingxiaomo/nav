@@ -61,7 +61,7 @@ export default function MonitorTab({ showConfirm }: { showConfirm: (opts: Omit<C
         const data = await res.json();
         if (data.url) setNewIcon(data.url);
       }
-    } catch { /* silent */ }
+    } catch (err) { console.warn('[Admin] icon upload failed:', err); }
   };
 
   const doAdd = async () => {

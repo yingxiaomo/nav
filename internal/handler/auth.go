@@ -1,17 +1,13 @@
 package handler
 
 import (
-	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
-	"crypto/subtle"
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,12 +16,10 @@ import (
 
 	"github.com/YingXiaoMo/nav/internal/db/queries"
 	"github.com/YingXiaoMo/nav/internal/model"
+	"github.com/YingXiaoMo/nav/internal/session"
 )
 
-// ===== Session cookie constants =====
-
-const sessionCookieName = "admin_web_session"
-const sessionDuration = 7 * 24 * time.Hour
+// ===== Session helpers =====
 
 // generateSessionSecret creates a new random session secret (32 bytes → hex).
 func generateSessionSecret() string {
@@ -34,25 +28,10 @@ func generateSessionSecret() string {
 	return hex.EncodeToString(b)
 }
 
-// signSessionCookie creates a signed session cookie value.
-// Format: base64("admin:<expiresAtUnixMs>") + "." + hmac_hex
-// This matches the format expected by middleware.Admin's verifySessionCookie.
-func signSessionCookie(secret string) string {
-	expires := time.Now().Add(sessionDuration).UnixMilli()
-	payload := "admin:" + strconv.FormatInt(expires, 10)
-	payloadBase64 := base64.StdEncoding.EncodeToString([]byte(payload))
-
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(payload))
-	sig := hex.EncodeToString(mac.Sum(nil))
-
-	return payloadBase64 + "." + sig
-}
-
 // setSessionCookie sets the admin session cookie on the response.
 func setSessionCookie(w http.ResponseWriter, value string, secure bool) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
+		Name:     session.CookieName,
 		Value:    value,
 		Path:     "/",
 		HttpOnly: true,
@@ -65,7 +44,7 @@ func setSessionCookie(w http.ResponseWriter, value string, secure bool) {
 // clearSessionCookie removes the session cookie from the browser.
 func clearSessionCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
+		Name:     session.CookieName,
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
@@ -81,57 +60,22 @@ func isSecureRequest(r *http.Request) bool {
 	return r.TLS != nil
 }
 
-// verifySessionCookie checks the cookie format, expiration, and HMAC signature.
-// Format: base64("userID:expiresAtUnixMs") + "." + hmac_hex
-// HMAC is computed over the decoded payload string using the provided secret.
-func verifySessionCookie(cookieValue, secret string) bool {
-	dotIdx := strings.LastIndex(cookieValue, ".")
-	if dotIdx < 0 {
-		return false
-	}
-	payloadBase64 := cookieValue[:dotIdx]
-	sigHex := cookieValue[dotIdx+1:]
-
-	payloadBytes, err := base64.StdEncoding.DecodeString(payloadBase64)
-	if err != nil {
-		return false
-	}
-	payload := string(payloadBytes)
-
-	colonIdx := strings.LastIndex(payload, ":")
-	if colonIdx < 0 {
-		return false
-	}
-	expiresStr := payload[colonIdx+1:]
-
-	expires, err := strconv.ParseInt(expiresStr, 10, 64)
-	if err != nil || time.Now().UnixMilli() > expires {
-		return false
-	}
-
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(payload))
-	expectedHex := hex.EncodeToString(mac.Sum(nil))
-
-	return subtle.ConstantTimeCompare([]byte(sigHex), []byte(expectedHex)) == 1
-}
-
 // checkSession verifies a session cookie from the incoming request against the
 // stored session_secret, with legacy fallback to the API token.
 func checkSession(r *http.Request, db *sql.DB) bool {
-	cookie, err := r.Cookie(sessionCookieName)
+	cookie, err := r.Cookie(session.CookieName)
 	if err != nil {
 		return false
 	}
 
 	sessionSecret, _ := queries.GetSetting(r.Context(), db, "session_secret")
-	if sessionSecret != "" && verifySessionCookie(cookie.Value, sessionSecret) {
+	if sessionSecret != "" && session.Verify(cookie.Value, sessionSecret) {
 		return true
 	}
 
 	// Legacy compatibility: verify with api_token
 	apiToken, _ := queries.GetSetting(r.Context(), db, "api_token")
-	if apiToken != "" && verifySessionCookie(cookie.Value, apiToken) {
+	if apiToken != "" && session.Verify(cookie.Value, apiToken) {
 		return true
 	}
 
@@ -267,7 +211,7 @@ func Login(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		cookieValue := signSessionCookie(secret)
+		cookieValue := session.Sign("admin", secret)
 		setSessionCookie(w, cookieValue, isSecureRequest(r))
 
 		slog.Info("登录成功", "ip", ip)

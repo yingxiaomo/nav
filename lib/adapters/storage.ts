@@ -760,7 +760,8 @@ export class ApiServerAdapter implements StorageAdapter {
       const res = await this.request('/api/v1/data');
       if (!res.ok) return null;
       return res.json() as Promise<DataSchema>;
-    } catch {
+    } catch (err) {
+      console.warn('[ApiServerAdapter] load failed:', err);
       return null;
     }
   }
@@ -772,7 +773,8 @@ export class ApiServerAdapter implements StorageAdapter {
         body: JSON.stringify(data),
       });
       return res.ok;
-    } catch {
+    } catch (err) {
+      console.warn('[ApiServerAdapter] save failed:', err);
       return false;
     }
   }

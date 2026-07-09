@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, ApiServerAdapter, STORAGE_CONFIG_KEY, type StorageConfig, type StorageAdapter } from '../adapters';
+import { GithubRepoAdapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, ApiServerAdapter, STORAGE_CONFIG_KEY, type StorageConfig, type StorageAdapter } from '../adapters';
 import { GITHUB_CONFIG_KEY } from '../adapters/github';
 import { isPrivateHost } from '../utils/common';
 
@@ -74,10 +74,10 @@ export function useStorageConfig() {
     return null;
   }, []);
 
-  const getAdapter = useCallback((config: StorageConfig): StorageAdapter | null => {
+  const getAdapter = useCallback(async (config: StorageConfig): Promise<StorageAdapter | null> => {
     switch (config.type) {
       case 'github': return config.github ? new GithubRepoAdapter(config.github) : null;
-      case 's3': return config.s3 ? new S3Adapter(config.s3) : null;
+      case 's3': return config.s3 ? new (await import('../adapters/s3-adapter')).S3Adapter(config.s3) : null;
       case 'webdav': return config.webdav ? new WebDavAdapter(config.webdav) : null;
       case 'gist': return config.gist ? new GistAdapter(config.gist) : null;
       case 'dropbox': return config.dropbox ? new DropboxAdapter(config.dropbox) : null;

@@ -95,4 +95,49 @@ describe("mergeCategories", () => {
     expect(result).toHaveLength(1);
     expect(result[0].links).toEqual([]);
   });
+
+  it("应合并包含嵌套文件夹的链接（按 updatedAt 取最新版本）", () => {
+    const remote: Category[] = [{
+      id: "cat1", title: "Dev", links: [
+        { id: "f1", title: "Frontend", url: "", type: "folder", updatedAt: 100, children: [
+          { id: "l1", title: "React", url: "https://react.dev", updatedAt: 100 },
+        ]},
+        { id: "l2", title: "GitHub", url: "https://github.com", updatedAt: 100 },
+      ],
+    }];
+    const local: Category[] = [{
+      id: "cat1", title: "Dev", links: [
+        { id: "f1", title: "前端", url: "", type: "folder", updatedAt: 200, children: [
+          { id: "l1", title: "React 中文", url: "https://react.cn", updatedAt: 200 },
+        ]},
+      ],
+    }];
+    const result = mergeCategories(remote, local);
+    // 本地 folder 更新更晚 → 整个 folder 被本地版本替换
+    const folder = result[0].links.find(l => l.id === "f1")!;
+    expect(folder.title).toBe("前端");
+    // 远程独有的链接（GitHub）应该保留
+    expect(result[0].links.find(l => l.id === "l2")).toBeDefined();
+  });
+
+  it("远程分类顺序变更应在合并后保持", () => {
+    const remote: Category[] = [
+      { id: "c1", title: "C", links: [{ id: "l1", title: "L1", url: "https://a.com" }] },
+      { id: "c2", title: "A", links: [] },
+    ];
+    const local: Category[] = [
+      { id: "c1", title: "C", links: [{ id: "l1", title: "L1", url: "https://a.com", updatedAt: 99 }] },
+    ];
+    const result = mergeCategories(remote, local);
+    expect(result[0].id).toBe("c1");
+    expect(result[1].id).toBe("c2");
+  });
+
+  it("Todos 按 remote 驱动（本地新增不补回）", () => {
+    const remote = [{ id: "t1", text: "Do this", completed: false, createdAt: 100 }];
+    const local = [{ id: "t2", text: "Local only", completed: false, createdAt: 200 }];
+    const result = mergeItems(remote, local);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("t1");
+  });
 });

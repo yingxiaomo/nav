@@ -26,7 +26,7 @@ export default function DockerTab() {
     setLoading(true);
     const { ok, data } = await req<{ containers: ContainerItem[] }>('GET', `${API}/admin/docker/containers`);
     if (ok) { setContainers(data.containers || []); setError(''); }
-    else { setError((data as { error?: string }).error || '无法连接 Docker'); }
+    else { setError((data as { message?: string }).message || (data as { error?: string }).error || '无法连接 Docker'); }
     setLoading(false);
   }, []);
 

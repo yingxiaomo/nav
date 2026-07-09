@@ -59,13 +59,13 @@ func (h *Handler) DockerContainers() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		svc := h.DockerSvc
 		if svc == nil {
-			model.RespondJSON(w, http.StatusOK, map[string]any{"containers": []any{}, "error": "Docker 不可用"})
+			model.RespondError(w, http.StatusServiceUnavailable, "Docker 不可用，需要挂载 Docker socket")
 			return
 		}
 		containers, err := svc.ListContainers(r.Context())
 		if err != nil {
 			slog.Warn("获取 Docker 容器列表失败", "error", err)
-			model.RespondJSON(w, http.StatusOK, map[string]any{"containers": []any{}, "error": err.Error()})
+			model.RespondError(w, http.StatusBadGateway, err.Error())
 			return
 		}
 		model.RespondJSON(w, http.StatusOK, map[string]any{"containers": containers})
@@ -77,13 +77,13 @@ func (h *Handler) DockerStats() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		svc := h.DockerSvc
 		if svc == nil {
-			model.RespondJSON(w, http.StatusOK, map[string]any{"stats": []any{}, "error": "Docker 不可用"})
+			model.RespondError(w, http.StatusServiceUnavailable, "Docker 不可用，需要挂载 Docker socket")
 			return
 		}
 		stats, err := svc.ContainerStats(r.Context())
 		if err != nil {
 			slog.Warn("获取 Docker 容器统计失败", "error", err)
-			model.RespondJSON(w, http.StatusOK, map[string]any{"stats": []any{}, "error": err.Error()})
+			model.RespondError(w, http.StatusBadGateway, err.Error())
 			return
 		}
 		model.RespondJSON(w, http.StatusOK, map[string]any{"stats": stats})
@@ -139,12 +139,13 @@ func (h *Handler) DockerStartContainer() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		svc := h.DockerSvc
 		if svc == nil {
-			model.RespondJSON(w, http.StatusOK, map[string]any{"success": false, "error": "Docker 不可用"})
+			model.RespondError(w, http.StatusServiceUnavailable, "Docker 不可用，需要挂载 Docker socket")
 			return
 		}
 		name := r.PathValue("name")
 		if err := svc.StartContainer(r.Context(), name); err != nil {
-			model.RespondJSON(w, http.StatusOK, map[string]any{"success": false, "error": err.Error()})
+			slog.Warn("启动容器失败", "container", name, "error", err)
+			model.RespondError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
@@ -156,12 +157,13 @@ func (h *Handler) DockerStopContainer() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		svc := h.DockerSvc
 		if svc == nil {
-			model.RespondJSON(w, http.StatusOK, map[string]any{"success": false, "error": "Docker 不可用"})
+			model.RespondError(w, http.StatusServiceUnavailable, "Docker 不可用，需要挂载 Docker socket")
 			return
 		}
 		name := r.PathValue("name")
 		if err := svc.StopContainer(r.Context(), name); err != nil {
-			model.RespondJSON(w, http.StatusOK, map[string]any{"success": false, "error": err.Error()})
+			slog.Warn("停止容器失败", "container", name, "error", err)
+			model.RespondError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
@@ -173,12 +175,13 @@ func (h *Handler) DockerRestartContainer() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		svc := h.DockerSvc
 		if svc == nil {
-			model.RespondJSON(w, http.StatusOK, map[string]any{"success": false, "error": "Docker 不可用"})
+			model.RespondError(w, http.StatusServiceUnavailable, "Docker 不可用，需要挂载 Docker socket")
 			return
 		}
 		name := r.PathValue("name")
 		if err := svc.RestartContainer(r.Context(), name); err != nil {
-			model.RespondJSON(w, http.StatusOK, map[string]any{"success": false, "error": err.Error()})
+			slog.Warn("重启容器失败", "container", name, "error", err)
+			model.RespondError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})

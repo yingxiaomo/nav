@@ -14,8 +14,8 @@ import { useStorageConfig } from './use-storage-config';
 const LOCAL_DATA_KEY = "clean-nav-local-data";
 const LAST_SYNC_KEY = "clean-nav-sync-data";
 
-const fetchRemoteData = async (config: StorageConfig, getAdapter: (config: StorageConfig) => StorageAdapter | null): Promise<DataSchema | null> => {
-  const adapter = getAdapter(config);
+const fetchRemoteData = async (config: StorageConfig, getAdapter: (config: StorageConfig) => Promise<StorageAdapter | null>): Promise<DataSchema | null> => {
+  const adapter = await getAdapter(config);
   if (!adapter) return null;
   return await adapter.load();
 };
@@ -23,10 +23,10 @@ const fetchRemoteData = async (config: StorageConfig, getAdapter: (config: Stora
 const saveData = async (params: {
   data: DataSchema;
   config: StorageConfig;
-  getAdapter: (config: StorageConfig) => StorageAdapter | null;
+  getAdapter: (config: StorageConfig) => Promise<StorageAdapter | null>;
 }): Promise<boolean> => {
   const { data, config, getAdapter } = params;
-  const adapter = getAdapter(config);
+  const adapter = await getAdapter(config);
   if (!adapter) return false;
   return await adapter.save(data);
 };
@@ -311,7 +311,7 @@ export function useNavData(initialWallpapers: string[]) {
     const config = getEffectiveConfig();
     if (!config) throw new Error("未配置存储，无法上传");
 
-    const adapter = getAdapter(config);
+    const adapter = await getAdapter(config);
     if (!adapter || !adapter.uploadFile) {
       throw new Error("当前存储方式不支持文件上传");
     }

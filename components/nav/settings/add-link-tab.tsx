@@ -391,11 +391,54 @@ export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTa
             }
 
             if (newCategories.length > 0) {
-                setLocalData(prevData => ({
-                    ...prevData,
-                    categories: [...prevData.categories, ...newCategories],
-                }));
-                toast.success(`成功导入 ${newCategories.length} 个顶级文件夹（共 ${totalFolders} 个文件夹）和 ${totalLinks} 个链接！`);
+                // 收集现有所有书签 URL，用于去重
+                const existingUrls = new Set<string>();
+                const collectUrls = (items: LinkItem[]) => {
+                    for (const item of items) {
+                        if (item.url) existingUrls.add(item.url);
+                        if (item.children) collectUrls(item.children);
+                    }
+                };
+                for (const cat of localData.categories) {
+                    collectUrls(cat.links);
+                }
+
+                // 递归过滤重复链接，跳过 URL 已存在的条目
+                const filterDups = (items: LinkItem[]): [LinkItem[], number] => {
+                    let skipped = 0;
+                    const filtered = items.flatMap(item => {
+                        if (item.url && existingUrls.has(item.url)) {
+                            skipped++;
+                            return [];
+                        }
+                        if (item.children) {
+                            const [filteredKids, kidSkipped] = filterDups(item.children);
+                            skipped += kidSkipped;
+                            if (filteredKids.length === 0) return [];
+                            return [{ ...item, children: filteredKids }];
+                        }
+                        return [item];
+                    });
+                    return [filtered, skipped];
+                };
+
+                let totalSkipped = 0;
+                const filteredCategories = newCategories.map(cat => {
+                    const [filteredLinks, skipped] = filterDups(cat.links);
+                    totalSkipped += skipped;
+                    return { ...cat, links: filteredLinks };
+                }).filter(cat => cat.links.length > 0);
+
+                if (filteredCategories.length > 0) {
+                    setLocalData(prevData => ({
+                        ...prevData,
+                        categories: [...prevData.categories, ...filteredCategories],
+                    }));
+                    const actualLinks = totalLinks - totalSkipped;
+                    toast.success(`成功导入 ${filteredCategories.length} 个文件夹，共 ${actualLinks} 个链接${totalSkipped > 0 ? (`（${totalSkipped} 个重复已跳过）`) : ''}！`);
+                } else {
+                    toast.info("所有书签都已存在，无新内容可导入");
+                }
             } else {
                 toast.warning("没有找到可以导入的书签或文件夹。请确认文件格式是否正确。");
             }

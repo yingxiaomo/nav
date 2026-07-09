@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ChevronDown, Cpu, HardDrive, Plus, XCircle, Box, MemoryStick, Container, ExternalLink, FileText, X as XIcon } from "lucide-react";
+import { ChevronDown, Cpu, HardDrive, Plus, XCircle, Box, MemoryStick, Container, ExternalLink, FileText, Trash2, X as XIcon } from "lucide-react";
 import { useMonitorConfig } from "@/lib/hooks/use-monitor-config";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -78,6 +78,15 @@ export function SystemStatusFloater() {
       await fetch(`${baseUrl}/api/v1/admin/monitor/wol/${id}`, { method: 'POST', headers: h });
     } catch (err) { console.warn('[Monitor] WOL failed:', err); }
     setContextMenu(null);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const h = authHeaders;
+      await fetch(`${baseUrl}/api/v1/admin/monitor/checks/${id}`, { method: 'DELETE', headers: h });
+      setContextMenu(null);
+      setTimeout(fetchData, 500);
+    } catch (err) { console.warn('[Monitor] delete failed:', err); }
   };
 
   const handleDockerAction = async (name: string, action: 'start' | 'stop' | 'restart') => {
@@ -365,6 +374,14 @@ export function SystemStatusFloater() {
               <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg> 编辑
             </button>
           )}
+          {checks.some(c => c.id === contextMenu.id) && (
+            <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+              onClick={() => handleDelete(contextMenu.id)}
+              aria-label="删除"
+            >
+              <Trash2 className="w-3 h-3" /> 删除
+            </button>
+          )}
           {getMac(contextMenu.id) && (
             <button
               className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors"
@@ -433,6 +450,7 @@ export function SystemStatusFloater() {
 
 /** 迷你 Docker 日志查看器 */
 function LogViewer({ containerName, baseUrl, onClose }: { containerName: string; baseUrl: string; onClose: () => void }) {
+  const logDialogRef = useRef<HTMLDivElement>(null);
   const [lines, setLines] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const evRef = useRef<EventSource | null>(null);
@@ -457,8 +475,9 @@ function LogViewer({ containerName, baseUrl, onClose }: { containerName: string;
   }, [lines]);
 
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={onClose}>
-      <div className="bg-black/90 backdrop-blur-xl border border-white/20 rounded-2xl w-[90vw] max-w-3xl h-[70vh] shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[999] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}
+      onPointerDown={e => { if (logDialogRef.current && !logDialogRef.current.contains(e.target as Node)) onClose(); }}>
+      <div ref={logDialogRef} className="bg-black/90 backdrop-blur-xl border border-white/20 rounded-2xl w-[90vw] max-w-3xl h-[70vh] shadow-2xl flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
           <span className="text-sm font-medium text-white/90">容器日志 — {containerName}</span>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 transition-colors">

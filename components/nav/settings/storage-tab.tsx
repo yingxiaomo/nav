@@ -51,8 +51,7 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
   const handleTypeChange = (type: string) => {
     const newType = type as StorageConfig['type'];
     if (newType === 'api-server' && !backendAvailable) {
-      toast.error('仅在 Docker 部署版中可用', { description: '本地服务器模式需要后端服务支持' });
-      return;
+      toast.warning('后端似乎暂未就绪，可稍后重试', { description: '选择后保存若失败，请确认后端已启动' });
     }
     setConfig({ ...config, type: newType });
   };

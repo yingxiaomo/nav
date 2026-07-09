@@ -136,8 +136,9 @@ export default function DockerTab() {
 
       {/* ── 日志终端窗口 ── */}
       {logContainer && (
-        <div className="fixed inset-0 z-[1000] bg-black/60 flex items-center justify-center backdrop-blur-sm" onClick={closeLogs}>
-          <div className="bg-background/85 backdrop-blur-2xl border border-border rounded-xl w-[80vw] max-w-[960px] h-[70vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[1000] bg-black/60 flex items-center justify-center backdrop-blur-sm"
+          onPointerDown={e => { if (!(e.target as Element).closest('.dialog-log')) closeLogs(); }}>
+          <div className="bg-background/85 backdrop-blur-2xl border border-border rounded-xl w-[80vw] max-w-[960px] h-[70vh] flex flex-col shadow-2xl dialog-log">
             <div className="flex justify-between items-center px-4 py-3 border-b border-border shrink-0">
               <span className="inline-flex items-center gap-1.5 font-mono text-sm text-primary/80">
                 <Container className="size-4 shrink-0" />

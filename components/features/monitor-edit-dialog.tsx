@@ -25,6 +25,7 @@ export function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSav
   const [detecting, setDetecting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100); }, []);
 
@@ -54,7 +55,7 @@ export function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSav
         await fetch(`${baseUrl}/api/v1/admin/monitor/checks/${target.id}`, {
           method: 'PUT',
           headers: { ...authHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim(), icon: icon || undefined, mac: mac.trim() || undefined }),
+          body: JSON.stringify({ name: name.trim(), url: url.trim() || undefined, icon: icon || undefined, mac: mac.trim() || undefined }),
         });
       }
     } catch (err) { console.warn('[Monitor] save target failed:', err); }
@@ -86,7 +87,7 @@ export function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSav
           headers: { ...authHeaders, 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: detectUrl }),
         });
-        if (res.ok) { const d = await res.json(); if (d.icon) { setIcon(d.icon); return; } }
+        if (res.ok) { const d = await res.json(); if (d.icon) { setIcon(d.icon); setDetecting(false); return; } }
       }
       if (target.id.startsWith('docker:')) {
         const res = await fetch(`${baseUrl}/api/v1/admin/docker/fetch-icon`, {
@@ -94,21 +95,22 @@ export function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSav
           headers: { ...authHeaders, 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: target.id.replace('docker:', '') }),
         });
-        if (res.ok) { const d = await res.json(); if (d.icon) setIcon(d.icon); }
+        if (res.ok) { const d = await res.json(); if (d.icon) { setIcon(d.icon); } }
       }
     } catch (err) { console.warn('[Monitor] icon detection failed:', err); }
     setDetecting(false);
   };
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={onClose}>
-      <div className="bg-background/90 backdrop-blur-xl border border-border/40 rounded-2xl p-5 w-80 shadow-2xl" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[90] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}
+      onPointerDown={e => { if (dialogRef.current && !dialogRef.current.contains(e.target as Node)) onClose(); }}>
+      <div ref={dialogRef} className="bg-background/90 backdrop-blur-xl border border-border/40 rounded-2xl p-5 w-80 shadow-2xl">
         <div className="text-sm font-medium text-foreground mb-3">{!target.id ? '添加监控目标' : target.id.startsWith('docker:') ? '编辑 Docker 容器' : '编辑巡检目标'}</div>
         <input ref={inputRef} value={name} onChange={e => setName(e.target.value)}
           placeholder="名称" className="w-full px-3 py-2 rounded-xl text-sm bg-muted/50 border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors mb-2"
           onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') onClose(); }}
         />
-        {!target.id && (
+        {!target.id.startsWith("docker:") && (
         <input value={url} onChange={e => setUrl(e.target.value)}
           placeholder="http://192.168.1.xxx:8080"
           className="w-full px-3 py-2 rounded-xl text-sm bg-muted/50 border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors mb-2"

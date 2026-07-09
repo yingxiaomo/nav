@@ -73,11 +73,18 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
   const folderNavRef = useRef<FolderModalHandle>(null);
   const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels, isCheatSheetOpen, setCheatSheetOpen, setBackendAvailable } = useUIStore();
 
-  // 检测后端是否可用（静态部署时禁用后端功能）
+  // 检测后端是否可用（静态部署时禁用后端功能），定期重试
   useEffect(() => {
-    fetch('/api/v1/health').then(r => {
-      setBackendAvailable(r.ok);
-    }).catch(() => setBackendAvailable(false));
+    let cancelled = false;
+    const check = () => fetch('/api/v1/health').then(r => {
+      if (!cancelled) setBackendAvailable(r.ok);
+    }).catch(() => {
+      if (!cancelled) setBackendAvailable(false);
+    });
+
+    check();
+    const timer = setInterval(check, 15000);
+    return () => { cancelled = true; clearInterval(timer); };
   }, [setBackendAvailable]);
 
   // 拍平所有书签（用于 Fuse.js 模糊搜索）

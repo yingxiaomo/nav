@@ -3,4 +3,5 @@ export * from './use-wallpaper';
 export * from './use-nav-data';
 export * from './use-keyboard-shortcuts';
 export * from './use-search-history';
-
+export * from './use-storage-config';
+export * from './use-reduced-motion';

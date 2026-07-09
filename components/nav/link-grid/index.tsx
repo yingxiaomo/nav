@@ -1,7 +1,7 @@
 ﻿"use client";
 
-import { useState, useEffect, useId, forwardRef, useImperativeHandle } from "react";
-import { Category, LinkItem } from "@/lib/types/types";
+import { useState, useEffect, useId, forwardRef, useImperativeHandle, useCallback } from "react";
+import { Category, LinkItem } from "@/lib/types";
 import { X, ChevronLeft, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -21,7 +21,7 @@ import {
 import { IconRender } from "@/components/nav/settings/shared";
 
 import { SortableCard } from "./category-cards";
-import { LinkItemCard, SortableLinkItemCard, SortablePinnedLinkCard } from "./link-item-card";
+import { SortableLinkItemCard, SortablePinnedLinkCard } from "./link-item-card";
 import { RenderFolderContent } from "./render-folder-content";
 import { BookmarkSidebar } from "./bookmark-sidebar";
 
@@ -70,6 +70,7 @@ interface LinkGridProps {
   pinnedLinks?: LinkItem[];
   onPinLink?: (link: LinkItem) => void;
   onUnpinLink?: (linkId: string) => void;
+  onUpdatePinnedLink?: (updated: LinkItem) => void;
   onPinnedReorder?: (pinned: LinkItem[]) => void;
 }
 
@@ -82,6 +83,7 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
   pinnedLinks = [],
   onPinLink,
   onUnpinLink,
+  onUpdatePinnedLink,
   onPinnedReorder,
 }: LinkGridProps, ref) {
 
@@ -89,12 +91,31 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
   const [selectedId, setSelectedId] = useState<string | null>(null); 
   const selectedCategory = categories.find((c) => c.id === selectedId);
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 12 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   const [navStack, setNavStack] = useState<LinkItem[]>([]);
   const [allCollapsedState, setAllCollapsedState] = useState<Record<string, boolean>>({});
+
+  // displayMode 切换时清理 modal 状态
+  useEffect(() => {
+    setSelectedId(null);
+    setNavStack([]);
+  }, [displayMode]);
+
+  // closeModal 定义在 useImperativeHandle 之前，避免 TDZ 错误
+  const closeModal = useCallback(() => {
+    const idToRestore = selectedId;
+    setSelectedId(null);
+    setNavStack([]);
+    if (idToRestore) {
+      requestAnimationFrame(() => {
+        const card = document.querySelector(`[data-category-id="${idToRestore}"]`) as HTMLElement | null;
+        card?.focus();
+      });
+    }
+  }, [selectedId]);
 
   // 暴露给父组件的文件夹导航控制接口
   useImperativeHandle(ref, () => ({
@@ -116,7 +137,7 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
     },
     /** 直接关闭文件夹模态框 */
     close: closeModal,
-  }), [navStack.length, selectedId]);
+  }), [navStack.length, selectedId, closeModal]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -143,6 +164,7 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
 
   
   useEffect(() => {
+    const original = document.body.style.overflow;
     if (selectedId) {
       document.body.style.overflow = "hidden";
       onOpenChange?.(true);
@@ -150,8 +172,8 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
       document.body.style.overflow = "auto";
       onOpenChange?.(false);
     }
-    return () => { 
-      document.body.style.overflow = "auto";
+    return () => {
+      document.body.style.overflow = original || "auto";
       onOpenChange?.(false);
     };
   }, [selectedId, onOpenChange]);
@@ -193,19 +215,6 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
       }
   };
 
-  // 关闭模态框并将焦点返还给卡片
-  const closeModal = () => {
-    const idToRestore = selectedId;
-    setSelectedId(null);
-    setNavStack([]);
-    if (idToRestore) {
-      requestAnimationFrame(() => {
-        const card = document.querySelector(`[data-category-id="${idToRestore}"]`) as HTMLElement | null;
-        card?.focus();
-      });
-    }
-  };
-
   const handleLinkDragEnd = (event: DragEndEvent) => {
     if (!onLinkReorder || !selectedId) return;
     const { active, over } = event;
@@ -237,12 +246,13 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
       <div className="w-full max-w-5xl mx-auto pb-3 px-4 relative z-30">
         <DndContext id={pinnedDndContextId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handlePinnedDragEnd}>
           <SortableContext items={pinnedLinks.map(l => `pin-${l.id}`)} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-1 sm:gap-1.5">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(3.5rem,1fr))] gap-6 sm:gap-8">
               {pinnedLinks.map((link) => (
                 <SortablePinnedLinkCard
                   key={link.id}
                   item={link}
                   onUnpin={() => onUnpinLink?.(link.id)}
+                  onUpdate={onUpdatePinnedLink}
                 />
               ))}
             </div>
@@ -289,7 +299,7 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
                             />
                           ) : (
                             <div className="col-span-full py-4 text-center text-sm text-white/30">
-                                空文件夹
+                                空文件夹 · 拖入链接即可添加
                             </div>
                           )}
                       </div>
@@ -396,7 +406,7 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
                       ))}
                       {modalCurrentItems.length === 0 && (
                         <div className="col-span-full py-10 text-center text-muted-foreground">
-                          此文件夹为空
+                          此文件夹暂无链接
                         </div>
                       )}
                     </div>

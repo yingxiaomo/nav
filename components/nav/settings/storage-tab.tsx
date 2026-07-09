@@ -1,17 +1,25 @@
 "use client";
 
-import { StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, DropboxSettings, GoogleDriveSettings, GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter } from "@/lib/adapters/storage";
+import { useRef, useEffect, useState } from "react";
+import { StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, DropboxSettings, GoogleDriveSettings, ApiServerSettings } from "@/lib/adapters/storage";
+import { GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, ApiServerAdapter } from "@/lib/adapters";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertCircle, Wifi, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { isPrivateHost } from "@/lib/utils";
+import { useUIStore } from "@/lib/stores";
+import type { DataSchema } from "@/lib/types";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface StorageTabProps {
   config: StorageConfig;
   setConfig: (config: StorageConfig) => void;
+  localData: DataSchema;
+  setLocalData: (data: DataSchema) => void;
+  onSave: (newData: DataSchema) => Promise<void>;
 }
 
 const DEFAULT_GITHUB: GithubRepoSettings = { token: "", owner: "", repo: "", branch: "main", path: "public/data.json" };
@@ -20,18 +28,32 @@ const DEFAULT_WEBDAV: WebDavSettings = { url: "", username: "", password: "", pa
 const DEFAULT_GIST: GistSettings = { token: "", gistId: "", filename: "nav-data.json" };
 const DEFAULT_DROPBOX: DropboxSettings = { token: "", path: "/nav-data.json" };
 const DEFAULT_GOOGLE_DRIVE: GoogleDriveSettings = { token: "", fileId: "", filename: "nav-data.json" };
+const DEFAULT_APISERVER: ApiServerSettings = { baseUrl: "", token: "" };
 
-export function StorageTab({ config, setConfig }: StorageTabProps) {
+export function StorageTab({ config, setConfig, localData, setLocalData, onSave }: StorageTabProps) {
   const [isTesting, setIsTesting] = useState(false);
-  
+  const [isResetting, setIsResetting] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    phase: 'first' | 'second';
+    action: 'reset' | 'clear';
+  } | null>(null);
+  const configRef = useRef(config);
+  useEffect(() => { configRef.current = config; }, [config]);
+  const backendAvailable = useUIStore(s => s.backendAvailable);
+
   useEffect(() => {
-    if (!config.type) {
-      setConfig({ ...config, type: 'github' });
+    if (!configRef.current.type) {
+      setConfig({ ...configRef.current, type: 'github' });
     }
-  }, [config, setConfig]);
+  }, [setConfig]);
 
   const handleTypeChange = (type: string) => {
     const newType = type as StorageConfig['type'];
+    if (newType === 'api-server' && !backendAvailable) {
+      toast.error('仅在 Docker 部署版中可用', { description: '本地服务器模式需要后端服务支持' });
+      return;
+    }
     setConfig({ ...config, type: newType });
   };
 
@@ -116,6 +138,14 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
           description: "已成功连接到 Google Drive",
           duration: 3000
         });
+      } else if (config.type === 'api-server') {
+        const settings = config.apiServer || DEFAULT_APISERVER;
+        const adapter = new ApiServerAdapter(settings);
+        if (adapter.testConnection) await adapter.testConnection();
+        toast.success("后端连接成功！", {
+          description: `已成功连接到 ${settings.baseUrl}`,
+          duration: 3000
+        });
       }
     } catch (error: unknown) {
       console.error("Test connection failed:", error);
@@ -123,6 +153,73 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
       toast.error("连接失败", { description: errorMessage });
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const runResetDefault = async () => {
+    setIsResetting(true);
+    setConfirmDialog(null);
+    try {
+      const res = await fetch("/data.json");
+      if (!res.ok) { toast.error("无法加载默认模板"); setIsResetting(false); return; }
+      const template = await res.json();
+      const merged: DataSchema = {
+        ...template,
+        settings: { ...localData.settings, ...template.settings, wallpaperList: localData.settings.wallpaperList || template.settings.wallpaperList },
+        todos: [],
+        notes: [],
+      };
+      setLocalData(merged);
+      localStorage.setItem("clean-nav-local-data", JSON.stringify(merged));
+      await onSave(merged);
+      toast.success("已恢复默认模板并同步到云端");
+      window.location.reload();
+    } catch {
+      toast.error("恢复失败，请稍后重试");
+      setIsResetting(false);
+    }
+  };
+  const runClearAll = async () => {
+    setIsClearing(true);
+    setConfirmDialog(null);
+    try {
+      const cleared: DataSchema = {
+        ...localData,
+        categories: [],
+        todos: [],
+        notes: [],
+      };
+      cleared.settings = { ...cleared.settings, wallpaperList: localData.settings.wallpaperList || [] };
+      setLocalData(cleared);
+      localStorage.setItem("clean-nav-local-data", JSON.stringify(cleared));
+      await onSave(cleared);
+      toast.success("已清空所有书签并同步到云端");
+      window.location.reload();
+    } catch {
+      toast.error("清空失败，请稍后重试");
+      setIsClearing(false);
+    }
+  };
+
+  const confirmLabels = !confirmDialog ? { title: '', description: '', confirmText: '' } : {
+    title: confirmDialog.action === 'reset'
+      ? (confirmDialog.phase === 'first' ? '恢复默认模板' : '再次确认')
+      : (confirmDialog.phase === 'first' ? '清空所有书签' : '再次确认'),
+    description: confirmDialog.phase === 'first'
+      ? (confirmDialog.action === 'reset'
+        ? '所有当前书签将被默认模板覆盖。'
+        : '所有书签、待办和笔记将被清空。')
+      : '此操作不可撤销，确定要继续吗？',
+    confirmText: confirmDialog.action === 'reset' ? '恢复' : '清空',
+  };
+
+  const handleConfirm = () => {
+    if (!confirmDialog) return;
+    if (confirmDialog.phase === 'first') {
+      setConfirmDialog({ ...confirmDialog, phase: 'second' });
+    } else {
+      if (confirmDialog.action === 'reset') runResetDefault();
+      else runClearAll();
     }
   };
 
@@ -148,6 +245,7 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
             <SelectItem value="gist">GitHub Gist</SelectItem>
             <SelectItem value="dropbox">Dropbox</SelectItem>
             <SelectItem value="googledrive">Google Drive</SelectItem>
+            <SelectItem value="api-server">本地服务器</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -396,35 +494,66 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
           <>
             <div className="space-y-2">
               <Label>Token (需要 drive.file 权限)</Label>
-              <Input 
-                type="password" 
-                value={googleDriveCfg.token || ""} 
-                onChange={e => updateGoogleDrive({ token: e.target.value })} 
-                placeholder="ya29.xxx..." 
-                className="h-9" 
+              <Input
+                type="password"
+                value={googleDriveCfg.token || ""}
+                onChange={e => updateGoogleDrive({ token: e.target.value })}
+                placeholder="ya29.xxx..."
+                className="h-9"
               />
             </div>
             <div className="space-y-2">
               <Label>文件 ID</Label>
-              <Input 
-                value={googleDriveCfg.fileId || ""} 
-                onChange={e => updateGoogleDrive({ fileId: e.target.value })} 
-                placeholder="Google Drive 文件 ID" 
-                className="h-9" 
+              <Input
+                value={googleDriveCfg.fileId || ""}
+                onChange={e => updateGoogleDrive({ fileId: e.target.value })}
+                placeholder="Google Drive 文件 ID"
+                className="h-9"
               />
             </div>
             <div className="space-y-2">
               <Label>文件名</Label>
-              <Input 
-                value={googleDriveCfg.filename || ""} 
-                onChange={e => updateGoogleDrive({ filename: e.target.value })} 
-                placeholder="nav-data.json" 
-                className="h-9" 
+              <Input
+                value={googleDriveCfg.filename || ""}
+                onChange={e => updateGoogleDrive({ filename: e.target.value })}
+                placeholder="nav-data.json"
+                className="h-9"
               />
             </div>
             <p className="text-[11px] text-muted-foreground">
               请创建一个 Google Drive 文件，并填入其文件 ID 和文件名。
             </p>
+          </>
+        )}
+
+        {config.type === 'api-server' && (
+          <>
+            {!backendAvailable && (
+              <div className="rounded-md bg-amber-500/10 p-3 border border-amber-500/20 mb-3">
+                <div className="flex items-center gap-2 text-amber-500 mb-1">
+                  <AlertCircle className="size-4 shrink-0" />
+                  <span className="text-xs font-medium">当前为静态部署，本地服务器不可用</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  本地服务器模式需要后端服务支持，仅在 Docker 部署版中可用。
+                </p>
+              </div>
+            )}
+            <div className="rounded-md bg-green-500/10 p-3 border border-green-500/20">
+              <div className="flex items-center gap-2 text-green-500 mb-1">
+                <Wifi className="w-4 h-4 shrink-0" />
+                <span className="text-xs font-medium">本地后端已连接</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                前端与后端同源运行，无需额外配置。刷新页面后数据自动从本地后端加载。
+              </p>
+              <button
+                onClick={() => window.open('/admin', '_blank')}
+                className="mt-2 text-[11px] text-green-400 hover:text-green-300 underline underline-offset-2 transition-colors"
+              >
+                打开后端管理面板 →
+              </button>
+            </div>
           </>
         )}
       </div>
@@ -455,6 +584,49 @@ export function StorageTab({ config, setConfig }: StorageTabProps) {
             )}
             {isTesting ? "正在测试连接..." : "测试连接配置"}
         </Button>
+
+        <div className="pt-2">
+            <Button
+                variant="outline"
+                className="w-full gap-2 text-red-500 hover:text-red-400 border-red-500/30 hover:border-red-500/50"
+                onClick={() => setConfirmDialog({ phase: 'first', action: 'reset' })}
+                disabled={isResetting || isClearing}
+            >
+                {isResetting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                    <AlertCircle className="w-4 h-4" />
+                )}
+                {isResetting ? "正在恢复..." : "恢复默认模板"}
+            </Button>
+        </div>
+        <div className="pt-2">
+            <Button
+                variant="outline"
+                className="w-full gap-2 text-destructive hover:text-destructive border-destructive/30"
+                onClick={() => setConfirmDialog({ phase: 'first', action: 'clear' })}
+                disabled={isClearing || isResetting}
+            >
+                {isClearing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                    <AlertCircle className="w-4 h-4" />
+                )}
+                {isClearing ? "正在清空..." : "清空所有书签"}
+            </Button>
+        </div>
+
+        <ConfirmDialog
+          open={confirmDialog !== null}
+          onOpenChange={(open) => { if (!open) setConfirmDialog(null); }}
+          title={confirmLabels.title}
+          description={confirmLabels.description}
+          confirmText={confirmLabels.confirmText}
+          cancelText="取消"
+          variant="destructive"
+          loading={isResetting || isClearing}
+          onConfirm={handleConfirm}
+        />
       </div>
     </div>
   );

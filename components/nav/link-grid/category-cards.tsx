@@ -5,7 +5,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Category } from "@/lib/types/types";
+import { Category } from "@/lib/types";
 import { IconRender } from "@/components/nav/settings/shared";
 
 interface CardContentProps {

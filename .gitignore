@@ -9,12 +9,14 @@ node_modules
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+package-lock.json
 
 # testing
 /coverage
 
 # next.js
 /.next/
+/nav/
 /out/
 
 # production
@@ -37,9 +39,35 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-.1.md
+# Claude Code local instructions (do not commit)
+.claude/
 
+# test servers （随仓库一起提交）
+# scripts/test-*
+
+.1.md
+.superpowers
 .vscode/
 .idea/
 *.swp
 *.swo
+
+# Go
+/nav-server
+/nav-server.exe
+
+# Node.js 旧后端（已迁移到 Go）
+/server/
+
+# 开发计划文档（不推送）
+/docs/superpowers/
+
+*.md
+!README.md
+
+# data (本地数据库文件)
+data/
+*.db
+*.db-shm
+*.db-wal
+package-lock.json

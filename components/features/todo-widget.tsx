@@ -1,14 +1,14 @@
 "use client"
 
-import { useState, KeyboardEvent, useCallback } from "react"
-import { Trash2, CheckCircle2, Circle } from "lucide-react" 
+import { useState, useRef, useEffect, KeyboardEvent, useCallback } from "react"
+import { Trash2, CheckCircle2, Circle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Todo } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { v4 as uuidv4 } from "uuid"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
+import { generateId } from "@/lib/utils/common"
 
 interface TodoWidgetProps {
   todos: Todo[]
@@ -17,20 +17,23 @@ interface TodoWidgetProps {
 
 export function TodoWidget({ todos = [], onUpdate }: TodoWidgetProps) {
   const [newTodo, setNewTodo] = useState("")
+  const prefersReducedMotion = useReducedMotion()
+  const todosRef = useRef(todos)
+  useEffect(() => { todosRef.current = todos; }, [todos]);
 
   const addTodo = useCallback(() => {
     if (!newTodo.trim()) return
-    
+
     const timestamp = Date.now()
     const newItem: Todo = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       text: newTodo.trim(),
       completed: false,
       createdAt: timestamp,
     }
-    onUpdate([newItem, ...todos])
+    onUpdate([newItem, ...todosRef.current])
     setNewTodo("")
-  }, [newTodo, todos, onUpdate])
+  }, [newTodo, onUpdate])
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -71,7 +74,7 @@ export function TodoWidget({ todos = [], onUpdate }: TodoWidgetProps) {
 
       <ScrollArea className="flex-1 -mr-3 pr-3">
         <div className="space-y-2">
-          <AnimatePresence>
+          <AnimatePresence mode={prefersReducedMotion ? "sync" : "popLayout"}>
             {sortedTodos.map(todo => (
               <motion.div 
                 key={todo.id}
@@ -115,6 +118,7 @@ export function TodoWidget({ todos = [], onUpdate }: TodoWidgetProps) {
                   whileTap={{ scale: 0.95 }}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
+                  aria-label={`删除待办「${todo.text}」`}
                 >
                   <Trash2 className="w-4 h-4" />
                 </motion.button>

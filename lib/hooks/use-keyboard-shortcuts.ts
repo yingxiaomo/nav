@@ -71,11 +71,13 @@ function matchesKey(event: KeyboardEvent, keyDef: string): boolean {
  * ]);
  */
 export function useKeyboardShortcuts(shortcuts: Shortcut[]) {
-  // 同步到模块级注册表（CheatSheet 读取用）
-  _shortcutRegistry = shortcuts;
-
   const shortcutsRef = useRef(shortcuts);
-  shortcutsRef.current = shortcuts;
+
+  // 同步 ref 和模块级注册表（放到 effect 中，避免 render 时副作用）
+  useEffect(() => {
+    _shortcutRegistry = shortcuts;
+    shortcutsRef.current = shortcuts;
+  }, [shortcuts]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {

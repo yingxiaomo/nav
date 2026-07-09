@@ -1,0 +1,19 @@
+services:
+  nav:
+    image: ghcr.nju.edu.cn/yingxiaomo/nav:latest
+    container_name: nav
+    ports:
+      - "8642:8642"
+    volumes:
+      - nav-data:/app/data
+      # 需要 Docker 管理功能（容器列表/日志流）时取消注释：
+      # - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  nav-data:

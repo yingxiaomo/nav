@@ -17,13 +17,33 @@ import {
   sanitizeText
 } from "@/lib/utils/validation";
 import { convertToWebP } from "@/lib/utils/image-utils";
+import { STORAGE_CONFIG_KEY, StorageConfig } from "@/lib/adapters/storage";
+import { GithubRepoAdapter, S3Adapter, WebDavAdapter, DropboxAdapter, GoogleDriveAdapter, ApiServerAdapter } from "@/lib/adapters";
 
 interface AddLinkTabProps {
   localData: DataSchema;
   setLocalData: React.Dispatch<React.SetStateAction<DataSchema>>;
+  storageConfig?: StorageConfig;
 }
 
-export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
+export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTabProps) {
+  // 安全生成唯一 ID，兼容非 HTTPS 环境（crypto.randomUUID 在不安全上下文中不可用）
+  function generateId(): string {
+    try {
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return crypto.randomUUID();
+      }
+    } catch {}
+    const hex = "0123456789abcdef";
+    const arr = new Uint8Array(16);
+    crypto.getRandomValues(arr);
+    let id = "";
+    for (let i = 0; i < 16; i++) {
+      id += hex[arr[i] & 15];
+      if (i === 3 || i === 5 || i === 7 || i === 9) id += "-";
+    }
+    return id;
+  }
   const [newUrl, setNewUrl] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("");
@@ -43,23 +63,51 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
     };
   }, []);
   
- const handleSmartIdentify = (rawUrl: string, isAuto: boolean = false) => {
+ const handleSmartIdentify = async (rawUrl: string, isAuto: boolean = false) => {
     if (!rawUrl) {
       if (!isAuto) toast.error("请先输入 URL", { description: "请输入要添加的链接地址" });
       return;
     }
 
     const processedUrl = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
-    
+
     if (!isAuto) {
         setNewUrl(processedUrl);
     }
-    
+
     if (!isValidUrl(processedUrl)) {
         if (!isAuto) toast.error("URL 格式不正确", { description: "请输入有效的 URL 地址，如 https://example.com" });
         return;
     }
-    
+
+    // 如果配置了本地后端，优先使用元数据解析接口
+    if (!(isAuto && titleEditedManually.current)) {
+      try {
+        const configRaw = localStorage.getItem(STORAGE_CONFIG_KEY);
+        if (configRaw) {
+          const storageConfig = JSON.parse(configRaw);
+          if (storageConfig.type === 'api-server' && storageConfig.apiServer?.baseUrl) {
+            const baseUrl = storageConfig.apiServer.baseUrl.replace(/\/$/, '');
+            const token = storageConfig.apiServer.token;
+            const headers: Record<string, string> = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch(`${baseUrl}/api/v1/parse?url=${encodeURIComponent(processedUrl)}`, { headers });
+            if (res.ok) {
+              const meta = await res.json();
+              if (meta.title) setNewTitle(meta.title);
+              if (meta.icon) setNewIcon(meta.icon);
+              if (!isAuto) toast.success("已从网页获取标题和图标", { description: meta.title || processedUrl });
+              if (meta.title) return; // 有标题才跳过客户端降级
+            }
+          }
+        }
+      } catch {
+        // 后端不可用，降级到客户端识别
+      }
+    }
+
+    // 降级：客户端 URL 解析（后端未返回标题时也执行）
     try {
       const urlObj = new URL(processedUrl);
       const hostname = urlObj.hostname;
@@ -87,11 +135,11 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
         description: "文件夹名称不能为空，长度限制1-50字符，且不能包含特殊字符（<>:\"/\\|?*）"
       });
     }
-    const newData = { ...localData };
+    const newData = { ...localData, categories: [...localData.categories] };
     if (newData.categories.some(c => c.title === sanitizedFolderName)) {
         return toast.error("该文件夹已存在", { description: "请使用不同的文件夹名称" });
     }
-    newData.categories.push({ id: `c-${crypto.randomUUID()}`, title: sanitizedFolderName, icon: "FolderOpen", links: [] });
+    newData.categories.push({ id: `c-${generateId()}`, title: sanitizedFolderName, icon: "FolderOpen", links: [] });
     setLocalData(newData);
     setNewCategory(sanitizedFolderName); 
     setIsCreatingFolder(false);
@@ -104,54 +152,89 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 检查文件类型
     if (!isValidImageFile(file)) {
       return toast.error("请选择图片文件", { description: "支持的图片格式：JPG、PNG、GIF、SVG等" });
     }
-
-    // 检查文件大小（限制为2MB）
     if (!isValidFileSize(file, 2)) {
       return toast.error("文件大小超过限制", { description: "图片大小不能超过2MB" });
     }
 
     setIsUploadingIcon(true);
     setIconUploadProgress(0);
+    let progressInterval: ReturnType<typeof setInterval> | null = null;
 
     try {
-      // 先将图片转换为WebP格式，然后再转换为Base64
+      // 1. 极限压缩：转为 WebP + 128px 限制 + 65% 质量
       setIconUploadProgress(10);
-      
-      // 转换为WebP格式
-      const webpFile = await convertToWebP(file);
+      const webpFile = await convertToWebP(file, 65, 128);
       setIconUploadProgress(50);
-      
-      // 使用 FileReader 将WebP图片转换为 Base64 格式
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64Data = event.target?.result as string;
-        setNewIcon(base64Data);
-        setIconUploadProgress(100);
-        toast.success("图标上传成功", { description: "已转换为WebP格式并设置为当前链接的图标" });
-      };
 
-      // 模拟上传进度
-      let progress = 50;
-      const progressInterval = setInterval(() => {
-        progress += 5;
-        if (progress < 90) {
-          setIconUploadProgress(progress);
+      // 2. 尝试上传到存储后端（如果当前适配器支持）
+      let iconUrl: string | null = null;
+
+      if (storageConfig && storageConfig.type !== 'gist') {
+        try {
+          let adapter: { uploadFile?: (file: File, name: string) => Promise<string> } | null = null;
+          switch (storageConfig.type) {
+            case 'github':
+              if (storageConfig.github?.token) adapter = new GithubRepoAdapter(storageConfig.github);
+              break;
+            case 's3':
+              if (storageConfig.s3?.accessKeyId) adapter = new S3Adapter(storageConfig.s3);
+              break;
+            case 'webdav':
+              if (storageConfig.webdav?.url) adapter = new WebDavAdapter(storageConfig.webdav);
+              break;
+            case 'dropbox':
+              if (storageConfig.dropbox?.token) adapter = new DropboxAdapter(storageConfig.dropbox);
+              break;
+            case 'googledrive':
+              if (storageConfig.googledrive?.token) adapter = new GoogleDriveAdapter(storageConfig.googledrive);
+              break;
+            case 'api-server':
+              if (storageConfig.apiServer?.baseUrl) adapter = new ApiServerAdapter(storageConfig.apiServer);
+              break;
+          }
+
+          if (adapter?.uploadFile) {
+            const url = await adapter.uploadFile(webpFile, `icon-${Date.now()}.webp`);
+            iconUrl = url;
+          }
+        } catch {
+          // 上传失败 → 降级到 data URI
         }
-      }, 100);
+      }
 
-      reader.onloadend = () => {
-        clearInterval(progressInterval);
+      // 3. 设置最终图标（URL 优先，否则 data URI）
+      if (iconUrl) {
+        setNewIcon(iconUrl);
+        setIconUploadProgress(100);
+        toast.success("图标已上传到云端并设置为当前链接的图标");
         setIsUploadingIcon(false);
-      };
-
-      reader.readAsDataURL(webpFile);
+      } else {
+        // 降级：转 data URI
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64Data = event.target?.result as string;
+          setNewIcon(base64Data);
+          setIconUploadProgress(100);
+          toast.success("图标已压缩并设置为当前链接的图标");
+        };
+        let progress = 50;
+        progressInterval = setInterval(() => {
+          progress += 5;
+          if (progress < 90) setIconUploadProgress(progress);
+        }, 100);
+        reader.onloadend = () => {
+          if (progressInterval) clearInterval(progressInterval);
+          setIsUploadingIcon(false);
+        };
+        reader.readAsDataURL(webpFile);
+      }
     } catch (error) {
       console.error("Icon upload error:", error);
       toast.error("图标上传失败", { description: "请重试或选择其他图标" });
+      if (progressInterval) clearInterval(progressInterval);
       setIsUploadingIcon(false);
     }
   };
@@ -182,12 +265,16 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
     const newData = { ...localData };
     let categoryIndex = newData.categories.findIndex(c => c.title === sanitizedCategory);
     if (categoryIndex === -1) {
-      newData.categories.push({ id: `c-${crypto.randomUUID()}`, title: sanitizedCategory, icon: "FolderOpen", links: [] });
+      newData.categories.push({ id: `c-${generateId()}`, title: sanitizedCategory, icon: "FolderOpen", links: [] });
       categoryIndex = newData.categories.length - 1;
     }
+    newData.categories[categoryIndex] = {
+      ...newData.categories[categoryIndex],
+      links: [...newData.categories[categoryIndex].links],
+    };
     
       newData.categories[categoryIndex].links.push({ 
-        id: `l-${crypto.randomUUID()}`, 
+        id: `l-${generateId()}`, 
         title: sanitizedTitle, 
         url: finalUrl, 
         icon: newIcon, 
@@ -250,7 +337,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
                             }
 
                             items.push({
-                                id: crypto.randomUUID(),
+                                id: generateId(),
                                 title: folderTitle,
                                 url: "",
                                 icon: "FolderOpen",
@@ -260,7 +347,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
                             totalFolders++;
                         } else if (a) {
                             items.push({
-                                id: crypto.randomUUID(),
+                                id: generateId(),
                                 title: a.innerText,
                                 url: a.href,
                                 icon: generateFaviconUrl(new URL(a.href).hostname),
@@ -283,7 +370,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
                 for (const item of rootItems) {
                     if (item.type === 'folder' && item.children) {
                         newCategories.push({
-                            id: crypto.randomUUID(),
+                            id: generateId(),
                             title: item.title,
                             icon: "FolderOpen",
                             links: item.children
@@ -295,7 +382,7 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
 
                 if (looseLinks.length > 0) {
                     newCategories.push({
-                        id: crypto.randomUUID(),
+                        id: generateId(),
                         title: "导入的书签",
                         icon: "FolderDown",
                         links: looseLinks
@@ -304,11 +391,54 @@ export function AddLinkTab({ localData, setLocalData }: AddLinkTabProps) {
             }
 
             if (newCategories.length > 0) {
-                setLocalData(prevData => ({
-                    ...prevData,
-                    categories: [...prevData.categories, ...newCategories],
-                }));
-                toast.success(`成功导入 ${newCategories.length} 个顶级文件夹（共 ${totalFolders} 个文件夹）和 ${totalLinks} 个链接！`);
+                // 收集现有所有书签 URL，用于去重
+                const existingUrls = new Set<string>();
+                const collectUrls = (items: LinkItem[]) => {
+                    for (const item of items) {
+                        if (item.url) existingUrls.add(item.url);
+                        if (item.children) collectUrls(item.children);
+                    }
+                };
+                for (const cat of localData.categories) {
+                    collectUrls(cat.links);
+                }
+
+                // 递归过滤重复链接，跳过 URL 已存在的条目
+                const filterDups = (items: LinkItem[]): [LinkItem[], number] => {
+                    let skipped = 0;
+                    const filtered = items.flatMap(item => {
+                        if (item.url && existingUrls.has(item.url)) {
+                            skipped++;
+                            return [];
+                        }
+                        if (item.children) {
+                            const [filteredKids, kidSkipped] = filterDups(item.children);
+                            skipped += kidSkipped;
+                            if (filteredKids.length === 0) return [];
+                            return [{ ...item, children: filteredKids }];
+                        }
+                        return [item];
+                    });
+                    return [filtered, skipped];
+                };
+
+                let totalSkipped = 0;
+                const filteredCategories = newCategories.map(cat => {
+                    const [filteredLinks, skipped] = filterDups(cat.links);
+                    totalSkipped += skipped;
+                    return { ...cat, links: filteredLinks };
+                }).filter(cat => cat.links.length > 0);
+
+                if (filteredCategories.length > 0) {
+                    setLocalData(prevData => ({
+                        ...prevData,
+                        categories: [...prevData.categories, ...filteredCategories],
+                    }));
+                    const actualLinks = totalLinks - totalSkipped;
+                    toast.success(`成功导入 ${filteredCategories.length} 个文件夹，共 ${actualLinks} 个链接${totalSkipped > 0 ? (`（${totalSkipped} 个重复已跳过）`) : ''}！`);
+                } else {
+                    toast.info("所有书签都已存在，无新内容可导入");
+                }
             } else {
                 toast.warning("没有找到可以导入的书签或文件夹。请确认文件格式是否正确。");
             }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Settings, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,7 @@ import { DataSchema } from "@/lib/types";
 import { STORAGE_CONFIG_KEY, StorageConfig } from "@/lib/adapters/storage";
 import { GITHUB_CONFIG_KEY } from "@/lib/adapters/github";
 import { useLocalStorage } from "@/lib/hooks";
+import { isPrivateHost } from "@/lib/utils";
 import { useUIStore } from "@/lib/stores";
 
 import { AddLinkTab } from "./add-link-tab";
@@ -37,15 +38,6 @@ interface SettingsDialogProps {
 export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRefreshWallpaper, syncError, uploadWallpaper }: SettingsDialogProps) {
   const { isSettingsOpen, setSettingsOpen } = useUIStore();
   const [localData, setLocalData] = useState<DataSchema>(data);
-  // 定义需要加密的敏感字段路径
-  const sensitiveFields = [
-    'github.token',
-    's3.accessKeyId',
-    's3.secretAccessKey',
-    'webdav.username',
-    'webdav.password',
-    'gist.token'
-  ];
 
   const [storageConfig, setStorageConfig] = useLocalStorage<StorageConfig>(STORAGE_CONFIG_KEY, () => {
     if (typeof window !== 'undefined') {
@@ -57,12 +49,34 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
                 settings: undefined
             };
         }
+        // 同源/内网环境默认使用本地服务器
+        if (isPrivateHost(window.location.hostname)) {
+            return { type: 'api-server', apiServer: { baseUrl: '', token: '' } };
+        }
     }
     return {
         type: 'github',
         settings: undefined
     };
-  }, sensitiveFields);
+  }, []);
+
+  // 同源自动检测后立即保存到 localStorage；静态部署时切回 GitHub
+  const backendAvailable = useUIStore(s => s.backendAvailable);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (!backendAvailable) {
+        // 静态部署：本地服务器不可用，重置为 GitHub
+        if (storageConfig.type === 'api-server') {
+          setStorageConfig({ type: 'github' });
+        }
+        return;
+      }
+      const existing = localStorage.getItem(STORAGE_CONFIG_KEY);
+      if (!existing && storageConfig.type === 'api-server' && isPrivateHost(window.location.hostname)) {
+        localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(storageConfig));
+      }
+    }
+  }, [storageConfig, backendAvailable, setStorageConfig]);
 
   const handleOpenChange = (isOpen: boolean) => {
     setSettingsOpen(isOpen);
@@ -79,6 +93,18 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
         wallpaperList: localData.settings.wallpaperList || []
       }
     };
+    // Save to backend directly first, then update React state
+    try {
+      await fetch('/api/v1/data', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finalData),
+      });
+    } catch {
+      // handleSave in useNavData will retry
+    }
+    localStorage.setItem('clean-nav-local-data', JSON.stringify(finalData));
+    localStorage.setItem('clean-nav-sync-data', JSON.stringify(finalData));
     await onSave(finalData);
     setSettingsOpen(false);
   };
@@ -86,7 +112,7 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
   return (
     <Dialog open={isSettingsOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="fixed bottom-4 right-4 z-50 rounded-full text-white/80 hover:text-white hover:bg-white/10 shadow-lg backdrop-blur-sm">
+        <Button variant="ghost" size="icon" className="fixed bottom-6 right-6 sm:bottom-4 sm:right-4 z-50 rounded-full text-white/80 hover:text-white hover:bg-white/10 shadow-lg backdrop-blur-sm">
           <Settings className="h-5 w-5" />
           {hasUnsavedChanges && !syncError && (
             <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-black/20" />
@@ -95,18 +121,7 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
       </DialogTrigger>
       <DialogContent
         className="sm:max-w-[700px] h-[85vh] max-h-[800px] flex flex-col backdrop-blur-xl overflow-hidden"
-        onPointerDownOutside={(e) => {
-          // 防止关闭：点击嵌套 Radix 弹窗（下拉菜单、选择器、弹出框）时不关闭主对话框
-          const target = e.target as HTMLElement;
-          if (
-            target.closest('[data-radix-popper-content-wrapper]') ||
-            target.closest('[role="listbox"]') ||
-            target.closest('[role="menu"]') ||
-            target.closest('[data-side]')
-          ) {
-            e.preventDefault();
-          }
-        }}
+        onPointerDownOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
           <DialogTitle>设置</DialogTitle>
@@ -122,7 +137,7 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
           </TabsList>
 
           <TabsContent value="add" className="flex-1 flex flex-col min-h-0 data-[state=active]:flex">
-             <AddLinkTab localData={localData} setLocalData={setLocalData} />
+             <AddLinkTab localData={localData} setLocalData={setLocalData} storageConfig={storageConfig} />
           </TabsContent>
 
           <TabsContent value="manage" className="flex-1 flex flex-col min-h-0 data-[state=active]:flex">
@@ -140,7 +155,7 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
           </TabsContent>
 
           <TabsContent value="storage" className="flex-1 flex flex-col min-h-0 data-[state=active]:flex">
-             <StorageTab config={storageConfig} setConfig={setStorageConfig} />
+             <StorageTab config={storageConfig} setConfig={setStorageConfig} localData={localData} setLocalData={setLocalData} onSave={onSave} />
           </TabsContent>
         </Tabs>
 

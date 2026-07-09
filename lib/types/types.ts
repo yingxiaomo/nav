@@ -37,8 +37,8 @@ export interface SiteSettings {
   wallpaperType: 'custom' | 'local' | 'bing' | 'url';
   wallpaperList: string[];
   blurLevel: 'low' | 'medium' | 'high';
-  maxPackedWallpapers?: number;
-  showFeatures?: boolean; 
+  showFeatures?: boolean;
+  showMonitor?: boolean;
   homeLayout?: 'folder' | 'list' | 'sidebar';
   theme?: 'light' | 'dark' | 'system';
 }
@@ -58,7 +58,6 @@ export const DEFAULT_DATA: DataSchema = {
     wallpaperType: 'local',
     wallpaperList: [],
     blurLevel: 'medium',
-    maxPackedWallpapers: 5,
     showFeatures: true,
     homeLayout: 'folder',
     theme: 'system'

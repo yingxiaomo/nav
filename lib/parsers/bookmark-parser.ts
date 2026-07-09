@@ -9,7 +9,7 @@ function generateId(): string {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
       return crypto.randomUUID();
     }
-  } catch {}
+  } catch (err) { console.debug('crypto.randomUUID not available, using fallback', err); }
   // 降级方案：使用 getRandomValues + 时间戳
   const hex = "0123456789abcdef";
   const arr = new Uint8Array(16);

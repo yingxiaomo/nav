@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Note } from "@/lib/types"
 import { motion, AnimatePresence } from "framer-motion"
+import { generateId } from "@/lib/utils/common"
 
 interface NoteWidgetProps {
   notes: Note[]
@@ -20,7 +21,7 @@ export function NoteWidget({ notes = [], onUpdate }: NoteWidgetProps) {
 
   const addNote = () => {
     const newNote: Note = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       title: "", 
       content: "",
       updatedAt: Date.now(),
@@ -100,7 +101,7 @@ export function NoteWidget({ notes = [], onUpdate }: NoteWidgetProps) {
                  animate={{ opacity: 1 }}
                  transition={{ duration: 0.5 }}
                >
-                 暂无笔记
+                 暂无笔记 · 在下方添加第一条
                </motion.div>
             )}
           </div>
@@ -139,7 +140,7 @@ export function NoteWidget({ notes = [], onUpdate }: NoteWidgetProps) {
                 <Textarea 
                   value={activeNote.content}
                   onChange={(e) => updateNote(activeNote.id, 'content', e.target.value)}
-                  className="flex-1 resize-none border-none shadow-none px-0 focus-visible:ring-0 bg-transparent text-foreground leading-relaxed custom-scrollbar"
+                  className="flex-1 resize-none border-none shadow-none px-0 focus-visible:ring-0 bg-transparent text-foreground leading-relaxed"
                   placeholder="在此输入内容..."
                 />
               </motion.div>

@@ -1,9 +1,11 @@
 ﻿"use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Category, LinkItem } from "@/lib/types/types";
+import { Category, LinkItem } from "@/lib/types";
 import { PanelLeft, PanelLeftClose, ChevronLeft, Pin } from "lucide-react";
 import { generateFaviconUrl } from "@/lib/utils/common";
+import { useUIStore } from "@/lib/stores";
+import Image from "next/image";
 
 interface BookmarkSidebarProps {
   categories: Category[];
@@ -67,7 +69,8 @@ function buildLinkTree(items: LinkItem[], _prefix: string): TreeNode[] {
 export function BookmarkSidebar({ categories, pinnedLinks, onPinLink, onUnpinLink }: BookmarkSidebarProps) {
   const tree = useMemo(() => buildTree(categories), [categories]);
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const sidebarCollapsed = useUIStore(s => s.sidebarCollapsed);
+  const setSidebarCollapsed = useUIStore(s => s.setSidebarCollapsed);
   const [navHistory, setNavHistory] = useState<TreeNode[][]>([tree]);
   const [navTitles, setNavTitles] = useState<string[]>(["书签"]);
 
@@ -159,7 +162,7 @@ export function BookmarkSidebar({ categories, pinnedLinks, onPinLink, onUnpinLin
         {/* Items */}
         <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
           {currentNodes.length === 0 ? (
-            <p className="text-center text-white/30 text-xs py-8">空文件夹</p>
+            <p className="text-center text-white/30 text-xs py-8">暂无链接 · 在设置中添加</p>
           ) : (
             currentNodes.map((node) => {
               const isLink = node.type === "link";
@@ -177,7 +180,7 @@ export function BookmarkSidebar({ categories, pinnedLinks, onPinLink, onUnpinLin
                     style={{ minWidth: 0 }}
                   >
                     {iconSrc ? (
-                      <img src={iconSrc} alt="" className="h-4 w-4 flex-shrink-0 rounded-sm object-contain" />
+                      <Image src={iconSrc} alt="" width={16} height={16} className="h-4 w-4 flex-shrink-0 rounded-sm object-contain" unoptimized />
                     ) : (
                       <div className={"h-4 w-4 flex-shrink-0 " + (node.type === "category" ? "text-yellow-200/90" : node.type === "folder" ? "text-blue-200/90" : "text-white/40")}>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-full w-full">

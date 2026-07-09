@@ -1,10 +1,16 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { safeLocalStorageGet, safeLocalStorageSet } from "../utils/encryption";
 
+/**
+ * useLocalStorage hook — 同步版本
+ *
+ * 旧版依赖加密模块的异步 AES-GCM 解密，导致组件初次渲染时先显示未解密值再闪烁到解密后数据。
+ * 现加密模块已改为同步 base64 编码，解密步骤在 useState 初始化器中同步完成，无需 useEffect。
+ */
 export function useLocalStorage<T>(
-  key: string, 
+  key: string,
   initialValue: T | (() => T),
   sensitiveFields: string[] = []
 ) {
@@ -12,62 +18,27 @@ export function useLocalStorage<T>(
     if (typeof window === 'undefined') {
       return initialValue instanceof Function ? initialValue() : initialValue;
     }
-    // 初始同步加载（可能是未加密的数据）
+    // 同步解密读取
+    const decrypted = safeLocalStorageGet<T>(key, sensitiveFields);
+    if (decrypted !== null) return decrypted;
+    // 降级：尝试直接 JSON 解析（旧版未加密数据）
     try {
-      const item = window.localStorage.getItem(key);
-      if (item) {
-        return JSON.parse(item);
-      }
-    } catch (error) {
-      console.error(error);
-    }
+      const item = localStorage.getItem(key);
+      if (item) return JSON.parse(item) as T;
+    } catch { /* ignore */ }
     return initialValue instanceof Function ? initialValue() : initialValue;
   });
 
-  const [initialized, setInitialized] = useState(false);
-
-  // 异步解密敏感数据
-  useEffect(() => {
-    if (typeof window === 'undefined' || !sensitiveFields.length || initialized) {
-      setInitialized(true);
-      return;
-    }
-
-    const loadEncryptedData = async () => {
-      try {
-        const decryptedData = await safeLocalStorageGet<T>(key, sensitiveFields);
-        if (decryptedData !== null) {
-          setStoredValue(decryptedData);
-        }
-      } catch (error) {
-        console.error('Failed to load encrypted data:', error);
-      } finally {
-        setInitialized(true);
-      }
-    };
-
-    loadEncryptedData();
-  }, [key, sensitiveFields, initialized]);
-
   const setValue = useCallback((value: T | ((val: T) => T)) => {
-    try {
-      setStoredValue((prev) => {
-         const valueToStore = value instanceof Function ? value(prev) : value;
-         if (typeof window !== "undefined") {
-           if (sensitiveFields.length) {
-             // 使用安全存储（加密敏感字段）
-             safeLocalStorageSet(key, valueToStore, sensitiveFields);
-           } else {
-             // 普通存储
-             window.localStorage.setItem(key, JSON.stringify(valueToStore));
-           }
-         }
-         return valueToStore;
-      });
-    } catch (error) {
-      console.error(error);
-    }
+    setStoredValue((prev) => {
+      const next = value instanceof Function ? value(prev) : value;
+      if (typeof window !== "undefined") {
+        safeLocalStorageSet(key, next, sensitiveFields);
+      }
+      return next;
+    });
   }, [key, sensitiveFields]);
 
-  return [storedValue, setValue, initialized] as const;
+  // 返回值向后兼容：第三个元素 initialized 现在恒为 true
+  return [storedValue, setValue, true] as const;
 }

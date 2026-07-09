@@ -1,58 +1,32 @@
-FROM node:20-alpine AS base
-
-# 仅在需要时安装依赖
-FROM base AS deps
-# 查看 https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine 了解为什么可能需要 libc6-compat。
+# Stage 1: Build frontend static files
+FROM node:20-alpine AS frontend
+WORKDIR /app
 RUN apk add --no-cache libc6-compat
-WORKDIR /app
-
-# 根据首选的包管理器安装依赖
-COPY package.json package-lock.json* ./
-RUN npm ci
-
-# 仅在需要时重新构建源代码
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-
-# Next.js 会收集有关常规使用的完全匿名遥测数据。
-# 在此处了解更多信息：https://nextjs.org/telemetry
-# 如果您想在构建期间禁用遥测，请取消注释以下行。
 ENV NEXT_TELEMETRY_DISABLED=1
-
-ENV DOCKER_BUILD=true
-
+COPY package.json ./
+RUN npm install
+COPY . .
 RUN npm run build
 
-# 生产镜像，复制所有文件并运行 next
-FROM base AS runner
+# Stage 2: Build Go backend (static binary) + UPX 压缩
+FROM golang:1.25-alpine AS gb
+RUN apk add --no-cache ca-certificates tzdata upx
 WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /nav-server ./cmd/nav-server && upx --best -q /nav-server
 
-ENV NODE_ENV=production
-# 如果您想在运行时禁用遥测，请取消注释以下行。
-ENV NEXT_TELEMETRY_DISABLED=1
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-COPY --from=builder /app/public ./public
-
-# 为预渲染缓存设置正确的权限
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# 自动利用输出跟踪来减小镜像大小
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-USER nextjs
-
-EXPOSE 20261
-
-ENV PORT=20261
-
-# server.js 是由 next build 从独立输出创建的
-# https://nextjs.org/docs/pages/api-reference/next-config-js/output
-CMD ["node", "server.js"]
+# Stage 3: Minimal runtime
+FROM scratch
+WORKDIR /app
+COPY --from=gb /etc/ssl/certs /etc/ssl/certs
+COPY --from=gb /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=gb /nav-server /nav-server
+COPY --from=frontend /app/out ./public
+VOLUME /app/data
+ENV PORT=8642 DATABASE_URL=/app/data/nav.db UPLOAD_DIR=/app/data/uploads CORS_ORIGIN=*
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+  CMD ["/nav-server", "healthcheck"]
+EXPOSE 8642
+CMD ["/nav-server"]

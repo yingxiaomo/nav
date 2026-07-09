@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { DataSchema, Category, LinkItem } from "@/lib/types";
 import {
   DndContext,
@@ -64,6 +64,13 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   const [batchMoveTarget, setBatchMoveTarget] = useState<string | null>(null);
   const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+
+  // SSR 安全：延迟 portal 渲染到客户端
+  useEffect(() => {
+     
+    setPortalTarget(document.body);
+  }, []);
 
   // 搜索结果：平铺所有匹配链接，附带所属分类路径
   const searchResults = useMemo(() => {
@@ -101,10 +108,6 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       else next.add(id);
       return next;
     });
-  };
-
-  const selectAll = () => {
-    setSelectedIds(new Set(getVisibleLinkIds()));
   };
 
   const deselectAll = () => {
@@ -398,22 +401,22 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       return options;
   }, [localData.categories, movingLink]);
 
-  // 定义递归函数 findContainer（不依赖 hooks）
-  const findContainer = (id: string, items: (Category | LinkItem)[]): string | undefined => {
+  // 定义递归函数 findContainer（使用命名函数表达式以支持递归）
+  const findContainer = useCallback(function findContainerImpl(id: string, items: (Category | LinkItem)[]): string | undefined {
       if (items.find(i => i.id === id)) return id;
-  
+
       for (const item of items) {
           const children = getChildren(item);
           if (children) {
               if (children.find(c => c.id === id)) {
                   return item.id;
               }
-              const found = findContainer(id, children);
+              const found = findContainerImpl(id, children);
               if (found) return found;
           }
       }
       return undefined;
-  };
+  }, []);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event;
@@ -565,14 +568,16 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   }, [setLocalData]);
 
   const handleCategoryIconChange = useCallback((catId: string, icon: string) => {
-    const newData = JSON.parse(JSON.stringify(localData)) as DataSchema;
-    const catIndex = newData.categories.findIndex(c => c.id === catId);
-    if (catIndex !== -1) {
-        newData.categories[catIndex].icon = icon;
-        newData.categories[catIndex].updatedAt = Date.now();
-        setLocalData(newData);
-    }
-  }, [localData, setLocalData]);
+    setLocalData(prev => {
+        const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
+        const catIndex = newData.categories.findIndex(c => c.id === catId);
+        if (catIndex !== -1) {
+            newData.categories[catIndex].icon = icon;
+            newData.categories[catIndex].updatedAt = Date.now();
+        }
+        return newData;
+    });
+  }, [setLocalData]);
 
   const handleRenameCategory = useCallback((id: string, title: string) => {
     setLocalData(prev => {
@@ -587,24 +592,28 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   }, [setLocalData]);
 
   const handleDeleteCategory = useCallback((catId: string) => {
-    const newData = { ...localData };
-    const catIndex = newData.categories.findIndex(c => c.id === catId);
-    if (catIndex === -1) return;
-    if (newData.categories[catIndex].links.length > 0) {
-        setConfirmDeleteCategory({ id: catId, hasLinks: true });
-        return;
-    }
-    newData.categories = newData.categories.filter((_, i) => i !== catIndex);
-    setLocalData(newData);
-  }, [localData, setLocalData]);
+    setLocalData(prev => {
+        const newData = { ...prev };
+        const catIndex = newData.categories.findIndex(c => c.id === catId);
+        if (catIndex === -1) return prev;
+        if (newData.categories[catIndex].links.length > 0) {
+            setConfirmDeleteCategory({ id: catId, hasLinks: true });
+            return prev;
+        }
+        newData.categories = newData.categories.filter((_, i) => i !== catIndex);
+        return newData;
+    });
+  }, [setLocalData]);
 
   const handleConfirmDeleteCategory = useCallback(() => {
     if (!confirmDeleteCategory) return;
-    const newData = { ...localData };
-    newData.categories = newData.categories.filter(c => c.id !== confirmDeleteCategory.id);
-    setLocalData(newData);
+    setLocalData(prev => {
+        const newData = { ...prev };
+        newData.categories = newData.categories.filter(c => c.id !== confirmDeleteCategory.id);
+        return newData;
+    });
     setConfirmDeleteCategory(null);
-  }, [confirmDeleteCategory, localData, setLocalData]);
+  }, [confirmDeleteCategory, setLocalData]);
 
   const toggleCollapse = useCallback((catId: string) => {
     const newSet = new Set(collapsedCats);
@@ -642,6 +651,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
   useEffect(() => {
     if (currentFolder && !resolvedCurrentFolder) {
+         
         setFolderPath([]);
     }
   }, [currentFolder, resolvedCurrentFolder]);
@@ -924,7 +934,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
         </DialogContent>
       </Dialog>
 
-        {createPortal(
+        {portalTarget && createPortal(
             <DragOverlay dropAnimation={dropAnimation}>
                 {activeCategory && (
                      <div className="p-2 bg-background border rounded-lg shadow-xl opacity-90 w-[300px]">
@@ -943,7 +953,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
                     </div>
                 )}
             </DragOverlay>,
-            document.body
+            portalTarget
         )}
       </DndContext>
       )}

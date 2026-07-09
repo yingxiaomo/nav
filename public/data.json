@@ -9,12 +9,7 @@
       "/wallpapers/background10.webp",
       "/wallpapers/background2.webp",
       "/wallpapers/background3.webp",
-      "/wallpapers/background4.webp",
-      "/wallpapers/background5.webp",
-      "/wallpapers/background6.webp",
-      "/wallpapers/background7.webp",
-      "/wallpapers/background8.webp",
-      "/wallpapers/background9.webp"
+      "/wallpapers/background4.webp"
     ],
     "showFeatures": true,
     "homeLayout": "folder"
@@ -38,63 +33,381 @@
         },
         {
           "id": "l3",
-          "title": "ChatGPT",
-          "url": "https://chatgpt.com",
-          "icon": "Bot"
-        },
-        {
-          "id": "l4",
           "title": "YouTube",
           "url": "https://youtube.com",
           "icon": "Youtube"
+        },
+        {
+          "id": "l4",
+          "title": "B站",
+          "url": "https://bilibili.com",
+          "icon": "Video"
+        },
+        {
+          "id": "l5",
+          "title": "知乎",
+          "url": "https://zhihu.com",
+          "icon": "MessageCircle"
+        },
+        {
+          "id": "l6",
+          "title": "微博",
+          "url": "https://weibo.com",
+          "icon": "MessageSquare"
+        },
+        {
+          "id": "l7",
+          "title": "少数派",
+          "url": "https://sspai.com",
+          "icon": "Pen"
+        },
+        {
+          "id": "l8",
+          "title": "豆瓣",
+          "url": "https://douban.com",
+          "icon": "Book"
+        },
+        {
+          "id": "l9",
+          "title": "V2EX",
+          "url": "https://v2ex.com",
+          "icon": "MessageCircle"
         }
       ]
     },
     {
       "id": "c2",
-      "title": "开发资源",
+      "title": "AI · 海外",
       "links": [
         {
-          "id": "l5",
-          "title": "Vercel",
-          "url": "https://vercel.com",
-          "icon": "Triangle"
+          "id": "ai1",
+          "title": "ChatGPT",
+          "url": "https://chatgpt.com",
+          "icon": "Bot"
         },
         {
-          "id": "l6",
-          "title": "React",
-          "url": "https://react.dev",
-          "icon": "Atom"
+          "id": "ai2",
+          "title": "Claude",
+          "url": "https://claude.ai",
+          "icon": "Bot"
         },
         {
-          "id": "l7",
-          "title": "Tailwind",
-          "url": "https://tailwindcss.com",
-          "icon": "Wind"
+          "id": "ai3",
+          "title": "Gemini",
+          "url": "https://gemini.google.com",
+          "icon": "Sparkles"
         },
         {
-          "id": "l8",
-          "title": "ShadcnUI",
-          "url": "https://ui.shadcn.com",
-          "icon": "Component"
+          "id": "ai4",
+          "title": "Perplexity",
+          "url": "https://perplexity.ai",
+          "icon": "Search"
+        },
+        {
+          "id": "ai5",
+          "title": "Cursor",
+          "url": "https://cursor.sh",
+          "icon": "Terminal"
+        },
+        {
+          "id": "ai6",
+          "title": "GitHub Copilot",
+          "url": "https://github.com/features/copilot",
+          "icon": "Github"
+        },
+        {
+          "id": "ai7",
+          "title": "Hugging Face",
+          "url": "https://huggingface.co",
+          "icon": "Smile"
+        },
+        {
+          "id": "ai8",
+          "title": "Midjourney",
+          "url": "https://midjourney.com",
+          "icon": "Image"
+        },
+        {
+          "id": "ai9",
+          "title": "Runway",
+          "url": "https://runwayml.com",
+          "icon": "Video"
+        },
+        {
+          "id": "ai10",
+          "title": "ElevenLabs",
+          "url": "https://elevenlabs.io",
+          "icon": "Volume2"
+        },
+        {
+          "id": "ai11",
+          "title": "Poe",
+          "url": "https://poe.com",
+          "icon": "MessageSquare"
+        },
+        {
+          "id": "ai12",
+          "title": "Replit",
+          "url": "https://replit.com",
+          "icon": "Code"
+        },
+        {
+          "id": "ai13",
+          "title": "DeepL",
+          "url": "https://deepl.com",
+          "icon": "Languages"
+        },
+        {
+          "id": "ai14",
+          "title": "Suno",
+          "url": "https://suno.com",
+          "icon": "Music"
+        },
+        {
+          "id": "ai15",
+          "title": "Notion AI",
+          "url": "https://notion.so",
+          "icon": "FileText"
+        },
+        {
+          "id": "ai16",
+          "title": "Anthropic",
+          "url": "https://anthropic.com",
+          "icon": "Bot"
+        },
+        {
+          "id": "ai17",
+          "title": "Stability AI",
+          "url": "https://stability.ai",
+          "icon": "Image"
+        },
+        {
+          "id": "ai18",
+          "title": "Cohere",
+          "url": "https://cohere.com",
+          "icon": "Brain"
+        },
+        {
+          "id": "ai19",
+          "title": "V0 Dev",
+          "url": "https://v0.dev",
+          "icon": "Code"
+        },
+        {
+          "id": "ai20",
+          "title": "Bolt.new",
+          "url": "https://bolt.new",
+          "icon": "Zap"
         }
       ]
     },
     {
       "id": "c3",
+      "title": "AI · 国内",
+      "links": [
+        {
+          "id": "ad1",
+          "title": "豆包",
+          "url": "https://www.doubao.com",
+          "icon": "Bot"
+        },
+        {
+          "id": "ad2",
+          "title": "Kimi",
+          "url": "https://kimi.moonshot.cn",
+          "icon": "MessageCircle"
+        },
+        {
+          "id": "ad3",
+          "title": "通义千问",
+          "url": "https://tongyi.aliyun.com",
+          "icon": "Sparkles"
+        },
+        {
+          "id": "ad4",
+          "title": "文心一言",
+          "url": "https://yiyan.baidu.com",
+          "icon": "MessageSquare"
+        },
+        {
+          "id": "ad5",
+          "title": "智谱清言",
+          "url": "https://chatglm.cn",
+          "icon": "Bot"
+        },
+        {
+          "id": "ad6",
+          "title": "讯飞星火",
+          "url": "https://xinghuo.xfyun.cn",
+          "icon": "Sparkles"
+        },
+        {
+          "id": "ad7",
+          "title": "腾讯混元",
+          "url": "https://hunyuan.tencent.com",
+          "icon": "Brain"
+        },
+        {
+          "id": "ad8",
+          "title": "天工AI",
+          "url": "https://www.tiangong.cn",
+          "icon": "Search"
+        },
+        {
+          "id": "ad9",
+          "title": "百川智能",
+          "url": "https://www.baichuan-ai.com",
+          "icon": "Bot"
+        },
+        {
+          "id": "ad10",
+          "title": "秘塔AI",
+          "url": "https://metaso.cn",
+          "icon": "Search"
+        },
+        {
+          "id": "ad11",
+          "title": "扣子 (Coze)",
+          "url": "https://www.coze.cn",
+          "icon": "Bot"
+        },
+        {
+          "id": "ad12",
+          "title": "百度智能云",
+          "url": "https://cloud.baidu.com",
+          "icon": "Cloud"
+        }
+      ]
+    },
+    {
+      "id": "c4",
+      "title": "开发资源",
+      "links": [
+        {
+          "id": "l10",
+          "title": "Vercel",
+          "url": "https://vercel.com",
+          "icon": "Triangle"
+        },
+        {
+          "id": "l11",
+          "title": "React",
+          "url": "https://react.dev",
+          "icon": "Atom"
+        },
+        {
+          "id": "l12",
+          "title": "Next.js",
+          "url": "https://nextjs.org",
+          "icon": "FileText"
+        },
+        {
+          "id": "l13",
+          "title": "Tailwind",
+          "url": "https://tailwindcss.com",
+          "icon": "Wind"
+        },
+        {
+          "id": "l14",
+          "title": "ShadcnUI",
+          "url": "https://ui.shadcn.com",
+          "icon": "Component"
+        },
+        {
+          "id": "l15",
+          "title": "npm",
+          "url": "https://npmjs.com",
+          "icon": "Package"
+        },
+        {
+          "id": "l16",
+          "title": "Docker",
+          "url": "https://docker.com",
+          "icon": "Container"
+        },
+        {
+          "id": "l17",
+          "title": "Stack Overflow",
+          "url": "https://stackoverflow.com",
+          "icon": "MessageCircle"
+        },
+        {
+          "id": "l18",
+          "title": "MDN",
+          "url": "https://developer.mozilla.org",
+          "icon": "Book"
+        },
+        {
+          "id": "l19",
+          "title": "Hono",
+          "url": "https://hono.dev",
+          "icon": "Zap"
+        },
+        {
+          "id": "l20",
+          "title": "Drizzle",
+          "url": "https://orm.drizzle.team",
+          "icon": "Database"
+        },
+        {
+          "id": "l21",
+          "title": "Cloudflare",
+          "url": "https://cloudflare.com",
+          "icon": "Cloud"
+        }
+      ]
+    },
+    {
+      "id": "c5",
       "title": "设计灵感",
       "links": [
         {
-          "id": "l9",
+          "id": "l22",
           "title": "Dribbble",
           "url": "https://dribbble.com",
           "icon": "Dribbble"
         },
         {
-          "id": "l10",
+          "id": "l23",
           "title": "Unsplash",
           "url": "https://unsplash.com",
           "icon": "Image"
+        },
+        {
+          "id": "l24",
+          "title": "Pinterest",
+          "url": "https://pinterest.com",
+          "icon": "Image"
+        },
+        {
+          "id": "l25",
+          "title": "Behance",
+          "url": "https://behance.net",
+          "icon": "Dribbble"
+        },
+        {
+          "id": "l26",
+          "title": "Figma",
+          "url": "https://figma.com",
+          "icon": "Pen"
+        },
+        {
+          "id": "l27",
+          "title": "Iconify",
+          "url": "https://iconify.design",
+          "icon": "Image"
+        },
+        {
+          "id": "l28",
+          "title": "Coolors",
+          "url": "https://coolors.co",
+          "icon": "Palette"
+        },
+        {
+          "id": "l29",
+          "title": "Awwwards",
+          "url": "https://awwwards.com",
+          "icon": "Award"
         }
       ]
     }

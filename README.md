@@ -19,7 +19,7 @@
   </p>
 
   <p>
-    <a href="https://nav.ovoxo.cc">🔴 演示地址</a>
+    <a href="https://nav.ovoxo.cc">🔴 演示地址 (Vercel)</a> / <a href="https://nav.396638.xyz">🔵 演示地址 (Cloudflare)</a>
   </p>
 </div>
 

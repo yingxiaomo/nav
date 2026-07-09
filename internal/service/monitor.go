@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"fmt"
 	"log/slog"
@@ -131,6 +132,7 @@ func (h *HealthChecker) runAllChecks(ctx context.Context) {
 }
 
 // checkTarget performs a single HTTP check against a target.
+// Tries HEAD first; falls back to GET if the server doesn't support HEAD (405/501).
 func (h *HealthChecker) checkTarget(ctx context.Context, target model.MonitorTarget) model.CheckResult {
 	timeout := target.Timeout
 	if timeout <= 0 {
@@ -139,10 +141,59 @@ func (h *HealthChecker) checkTarget(ctx context.Context, target model.MonitorTar
 
 	client := &http.Client{
 		Timeout: time.Duration(timeout) * time.Millisecond,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
 	}
 
+	return h.doCheck(client, ctx, target)
+}
+
+func (h *HealthChecker) doCheck(client *http.Client, ctx context.Context, target model.MonitorTarget) model.CheckResult {
+	// Try HEAD first (faster, lighter)
 	start := time.Now()
 	req, err := http.NewRequestWithContext(ctx, "HEAD", target.URL, nil)
+	if err != nil {
+		now := model.Now()
+		return model.CheckResult{
+			ID:        target.ID,
+			Name:      target.Name,
+			URL:       target.URL,
+			Status:    "error",
+			Latency:   nil,
+			LastCheck: &now,
+		}
+	}
+
+	resp, err := client.Do(req)
+	latency := time.Since(start).Milliseconds()
+	now := model.Now()
+
+	if err != nil {
+		// HEAD failed (timeout/TLS/network) — fall back to GET
+		slog.Debug("HEAD 请求失败，回退到 GET", "url", target.URL, "error", err)
+		return h.doGetCheck(client, ctx, target)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+		return model.CheckResult{
+			ID:        target.ID,
+			Name:      target.Name,
+			URL:       target.URL,
+			Status:    "ok",
+			Latency:   &latency,
+			LastCheck: &now,
+		}
+	}
+
+	// HEAD returned 4xx/5xx — fall back to GET for a definitive status
+	return h.doGetCheck(client, ctx, target)
+}
+
+func (h *HealthChecker) doGetCheck(client *http.Client, ctx context.Context, target model.MonitorTarget) model.CheckResult {
+	start := time.Now()
+	req, err := http.NewRequestWithContext(ctx, "GET", target.URL, nil)
 	if err != nil {
 		now := model.Now()
 		return model.CheckResult{
@@ -186,7 +237,7 @@ func (h *HealthChecker) checkTarget(ctx context.Context, target model.MonitorTar
 		ID:        target.ID,
 		Name:      target.Name,
 		URL:       target.URL,
-		Status:    "timeout",
+		Status:    "error",
 		Latency:   &latency,
 		LastCheck: &now,
 	}

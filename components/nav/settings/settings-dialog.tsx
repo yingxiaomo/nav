@@ -60,16 +60,12 @@ export function SettingsDialog({ data, onSave, isSaving, hasUnsavedChanges, onRe
     };
   }, []);
 
-  // 同源自动检测后立即保存到 localStorage；静态部署时切回 GitHub
+  // 同源自动检测后立即保存到 localStorage；静态部署时提示但不覆盖用户选择
   const backendAvailable = useUIStore(s => s.backendAvailable);
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if (!backendAvailable) {
-        // 静态部署：本地服务器不可用，重置为 GitHub
-        if (storageConfig.type === 'api-server') {
-          setStorageConfig({ type: 'github' });
-        }
-        return;
+        return; // 不再自动重置，让用户手动选择
       }
       const existing = localStorage.getItem(STORAGE_CONFIG_KEY);
       if (!existing && storageConfig.type === 'api-server' && isPrivateHost(window.location.hostname)) {

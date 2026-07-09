@@ -89,6 +89,12 @@ func (h *Handler) UpdateCheck() http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "更新失败")
 			return
 		}
+
+		// 编辑后立即触发一次健康检查，刷新内存结果
+		if target := h.HealthChecker.CheckNow(id); target != nil {
+			slog.Debug("更新后触发检查", "id", id, "url", target.URL)
+		}
+
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 	}
 }

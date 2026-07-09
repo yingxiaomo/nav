@@ -78,6 +78,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminMW, authMW func(http.H
 	mux.Handle("POST /api/v1/admin/docker/fetch-icon", adminMW(http.HandlerFunc(FetchDockerIcon())))
 	mux.Handle("GET /api/v1/admin/docker/metadata", adminMW(http.HandlerFunc(h.GetDockerMetadata())))
 	mux.Handle("PUT /api/v1/admin/docker/metadata/{name}", adminMW(http.HandlerFunc(h.SetDockerMetadata())))
+	mux.Handle("PUT /api/v1/admin/docker/reorder", adminMW(http.HandlerFunc(h.ReorderContainers())))
 	mux.Handle("POST /api/v1/admin/docker/{name}/start", adminMW(http.HandlerFunc(h.DockerStartContainer())))
 	mux.Handle("POST /api/v1/admin/docker/{name}/stop", adminMW(http.HandlerFunc(h.DockerStopContainer())))
 	mux.Handle("POST /api/v1/admin/docker/{name}/restart", adminMW(http.HandlerFunc(h.DockerRestartContainer())))

@@ -251,17 +251,38 @@ func (h *Handler) SetDockerMetadata() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := r.PathValue("name")
 
-		type request struct{ Icon string `json:"icon,omitempty"`; Label string `json:"label,omitempty"` }
+		type request struct{ Icon string `json:"icon,omitempty"`; Label string `json:"label,omitempty"`; URL string `json:"url,omitempty"` }
 		var req request
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return
 		}
 
-		if err := h.DockerMeta.Set(name, model.DockerMetadata{Name: name, Icon: req.Icon, Label: req.Label}); err != nil {
+		if err := h.DockerMeta.Set(name, model.DockerMetadata{Name: name, Icon: req.Icon, Label: req.Label, URL: req.URL}); err != nil {
 			slog.Error("保存 Docker 元数据失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "保存失败")
 			return
+		}
+
+		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
+	}
+}
+
+// ReorderContainers handles PUT /api/v1/admin/docker/reorder.
+// Accepts {"order": ["containerName1", "containerName2", ...]} to set display order.
+func (h *Handler) ReorderContainers() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct{ Order []string `json:"order"` }
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
+			return
+		}
+
+		for i, name := range req.Order {
+			if meta, err := h.DockerMeta.Get(name); err == nil {
+				meta.Order = i
+				h.DockerMeta.Set(name, meta)
+			}
 		}
 
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})

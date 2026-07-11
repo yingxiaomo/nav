@@ -22,7 +22,9 @@ export function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSav
   const [icon, setIcon] = useState(target.icon || '');
   const [url, setUrl] = useState(target.url || '');
   const [mac, setMac] = useState(target.mac || '');
-  const [saving, setSaving] = useState(false);
+  const [sshUser, setSshUser] = useState(target.ssh_user || '');
+  const [sshPass, setSshPass] = useState(target.ssh_pass || '');
+const [saving, setSaving] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -59,7 +61,7 @@ export function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSav
         const res = await fetch(`${baseUrl}/api/v1/admin/monitor/checks/${target.id}`, {
           method: 'PUT',
           headers: { ...authHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim(), url: url.trim() || undefined, icon: icon || undefined, mac: mac.trim() || undefined }),
+          body: JSON.stringify({ name: name.trim(), url: url.trim() || undefined, icon: icon || undefined, mac: mac.trim() || undefined, ssh_user: sshUser.trim() || undefined, ssh_pass: sshPass.trim() || undefined }),
         });
         ok = res.ok;
       }
@@ -130,10 +132,20 @@ export function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSav
         />
         )}
         {!target.id.startsWith('docker:') && (
-        <input value={mac} onChange={e => setMac(e.target.value)}
-          placeholder="MAC 地址（可选，用于局域网唤醒）"
+        <><input value={mac} onChange={e => setMac(e.target.value)}
+placeholder="MAC 地址（可选，用于局域网唤醒）"
           className="w-full px-3 py-2 rounded-xl text-sm bg-muted/50 border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors mb-2"
         />
+        <div className="text-[11px] text-muted-foreground mt-2 mb-1">远程控制凭证（选填，用于 TG Bot）</div>
+        <input value={sshUser} onChange={e => setSshUser(e.target.value)}
+          placeholder="SSH 用户名（如 root）"
+          className="w-full px-3 py-2 rounded-xl text-sm bg-muted/50 border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors mb-2"
+        />
+        <input value={sshPass} onChange={e => setSshPass(e.target.value)}
+          type="password" placeholder="SSH 密码"
+          className="w-full px-3 py-2 rounded-xl text-sm bg-muted/50 border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors mb-2"
+        />
+        </>
         )}
         <div className="text-[11px] text-muted-foreground mb-1.5">图标</div>
         <div className="flex flex-wrap gap-1.5 mb-2">

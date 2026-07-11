@@ -7,6 +7,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os/exec"
+	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,17 +28,29 @@ type HealthChecker struct {
 	ticker  *time.Ticker
 	cancel  context.CancelFunc
 	sem     chan struct{} // concurrency limiter
+	notify  Notifier
+}
+
+// Notifier 健康检查状态变更通知接口
+type Notifier interface {
+	ShouldNotify(targetID string) bool
+	MarkNotified(targetID string)
+	Send(name, url, status string)
 }
 
 const maxConcurrentHealthChecks = 10
 
 // NewHealthChecker creates a new HealthChecker.
-func NewHealthChecker(db *sql.DB) *HealthChecker {
-	return &HealthChecker{
+func NewHealthChecker(db *sql.DB, notifier ...Notifier) *HealthChecker {
+	hc := &HealthChecker{
 		db:      db,
 		results: make(map[string]model.CheckResult),
 		sem:     make(chan struct{}, maxConcurrentHealthChecks),
 	}
+	if len(notifier) > 0 {
+		hc.notify = notifier[0]
+	}
+	return hc
 }
 
 // Start begins periodic health checks every 60 seconds.
@@ -131,9 +147,14 @@ func (h *HealthChecker) runAllChecks(ctx context.Context) {
 	wg.Wait()
 }
 
-// checkTarget performs a single HTTP check against a target.
-// Tries HEAD first; falls back to GET if the server doesn't support HEAD (405/501).
+// checkTarget performs a check against a target.
+// For HTTP targets: tries HEAD first, falls back to GET.
+// For Ping targets: uses system ping command.
 func (h *HealthChecker) checkTarget(ctx context.Context, target model.MonitorTarget) model.CheckResult {
+	if target.CheckType == "ping" {
+		return h.pingTarget(target)
+	}
+
 	timeout := target.Timeout
 	if timeout <= 0 {
 		timeout = 5000
@@ -189,6 +210,48 @@ func (h *HealthChecker) doCheck(client *http.Client, ctx context.Context, target
 
 	// HEAD returned 4xx/5xx — fall back to GET for a definitive status
 	return h.doGetCheck(client, ctx, target)
+}
+
+// pingTarget 通过 ICMP Ping 检查目标可达性
+func (h *HealthChecker) pingTarget(target model.MonitorTarget) model.CheckResult {
+	host := target.URL
+	// 去掉协议前缀
+	host = strings.TrimPrefix(host, "http://")
+	host = strings.TrimPrefix(host, "https://")
+	// 去掉路径
+	if idx := strings.Index(host, "/"); idx > 0 {
+		host = host[:idx]
+	}
+
+	count := "1"
+	timeout := target.Timeout
+	if timeout <= 0 {
+		timeout = 5000
+	}
+
+	now := model.Now()
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("ping", "-n", count, "-w", strconv.Itoa(timeout), host)
+	} else {
+		cmd = exec.Command("ping", "-c", count, "-W", strconv.Itoa(timeout/1000), host)
+	}
+
+	start := time.Now()
+	err := cmd.Run()
+	latency := time.Since(start).Milliseconds()
+
+	if err != nil {
+		return model.CheckResult{
+			ID: target.ID, Name: target.Name, URL: target.URL,
+			Status: "timeout", Latency: nil, LastCheck: &now,
+		}
+	}
+
+	return model.CheckResult{
+		ID: target.ID, Name: target.Name, URL: target.URL,
+		Status: "ok", Latency: &latency, LastCheck: &now,
+	}
 }
 
 func (h *HealthChecker) doGetCheck(client *http.Client, ctx context.Context, target model.MonitorTarget) model.CheckResult {
@@ -264,7 +327,7 @@ func (h *HealthChecker) getTargets() []model.MonitorTarget {
 	var targets []model.MonitorTarget
 	for rows.Next() {
 		var t model.MonitorTarget
-		if err := rows.Scan(&t.ID, &t.Name, &t.URL, &t.Icon, &t.MAC, &t.Timeout, &t.CreatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.URL, &t.Icon, &t.MAC, &t.Timeout, &t.CreatedAt, &t.SSHUser, &t.SSHPass); err != nil {
 			slog.Warn("扫描监控目标失败", "error", err)
 			continue
 		}
@@ -273,6 +336,32 @@ func (h *HealthChecker) getTargets() []model.MonitorTarget {
 	return targets
 }
 
+
+// cleanOldHistory 清理 7 天前的历史记录
+func (h *HealthChecker) cleanOldHistory() error {
+	sevenDaysAgo := time.Now().AddDate(0, 0, -7).UnixMilli()
+	_, err := h.db.Exec("DELETE FROM check_history WHERE checked_at < ?", sevenDaysAgo)
+	return err
+}
+
+// GetUptime 返回指定目标最近 24 小时内的在线率（0-100）
+func (h *HealthChecker) GetUptime(targetID string) float64 {
+	dayAgo := time.Now().Add(-24 * time.Hour).UnixMilli()
+	var total, ok int
+	h.db.QueryRow("SELECT COUNT(*), COALESCE(SUM(CASE WHEN status='ok' THEN 1 ELSE 0 END),0) FROM check_history WHERE target_id=? AND checked_at > ?", targetID, dayAgo).Scan(&total, &ok)
+	if total == 0 { return 0 }
+	return float64(ok) / float64(total) * 100
+}
+
+// GetUptimeAll 返回所有目标的在线率
+func (h *HealthChecker) GetUptimeAll() map[string]float64 {
+	targets := h.getTargets()
+	result := make(map[string]float64, len(targets))
+	for _, t := range targets {
+		result[t.ID] = h.GetUptime(t.ID)
+	}
+	return result
+}
 // AddTarget creates a new monitor target and triggers an immediate check.
 // Returns the created target and any error.
 func (h *HealthChecker) AddTarget(input model.MonitorTargetInput) (*model.MonitorTarget, error) {
@@ -292,8 +381,8 @@ func (h *HealthChecker) AddTarget(input model.MonitorTargetInput) (*model.Monito
 	}
 
 	_, err := h.db.Exec(
-		"INSERT INTO monitor_targets (id, name, url, icon, mac, timeout, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		target.ID, target.Name, target.URL, target.Icon, target.MAC, target.Timeout, target.CreatedAt,
+		"INSERT INTO monitor_targets (id, name, url, icon, mac, timeout, created_at, ssh_user, ssh_pass) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		target.ID, target.Name, target.URL, target.Icon, target.MAC, target.Timeout, target.CreatedAt, target.SSHUser, target.SSHPass,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("添加监控目标失败: %w", err)
@@ -311,8 +400,8 @@ func (h *HealthChecker) AddTarget(input model.MonitorTargetInput) (*model.Monito
 // UpdateTarget updates an existing monitor target.
 func (h *HealthChecker) UpdateTarget(id string, input model.MonitorTargetInput) error {
 	result, err := h.db.Exec(
-		"UPDATE monitor_targets SET name=?, url=?, icon=?, mac=?, timeout=? WHERE id=?",
-		input.Name, input.URL, input.Icon, input.MAC, input.Timeout, id,
+		"UPDATE monitor_targets SET name=?, url=?, icon=?, mac=?, timeout=?, ssh_user=?, ssh_pass=?, api_key=?, check_type=? WHERE id=?",
+		input.Name, input.URL, input.Icon, input.MAC, input.Timeout, input.SSHUser, input.SSHPass, id,
 	)
 	if err != nil {
 		return fmt.Errorf("更新监控目标失败: %w", err)

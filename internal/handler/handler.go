@@ -70,6 +70,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminMW, authMW func(http.H
 	mux.Handle("POST /api/v1/upload", authMW(http.HandlerFunc(h.Upload())))
 	mux.Handle("GET /api/v1/parse", authMW(http.HandlerFunc(ParseURLHandler())))
 	mux.Handle("GET /api/v1/suggest", authMW(http.HandlerFunc(SuggestHandler())))
+		mux.Handle("GET /api/v1/search", authMW(http.HandlerFunc(SearchHandler(h.DB))))
 
 	// Admin — Docker
 	mux.Handle("GET /api/v1/admin/docker/containers", adminMW(http.HandlerFunc(h.DockerContainers())))

@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"sort"
 	"regexp"
 	"strings"
 	"time"
@@ -187,6 +188,7 @@ type MonitorAllResponse struct {
 	Containers []model.DockerContainer         `json:"containers"`
 	Stats      []model.DockerStat              `json:"stats"`
 	Metadata   map[string]model.DockerMetadata `json:"metadata"`
+	Uptime     map[string]float64               `json:"uptime,omitempty"`
 	Initializing bool                          `json:"initializing,omitempty"`
 }
 
@@ -198,11 +200,18 @@ func (h *Handler) MonitorAll() http.HandlerFunc {
 			Targets:  h.HealthChecker.GetTargets(),
 			Results:  h.HealthChecker.GetResults(),
 			Metadata: h.DockerMeta.GetAll(),
+			Uptime:   h.HealthChecker.GetUptimeAll(),
 		}
 
 		if svc := h.DockerSvc; svc != nil {
 			// 容器列表轻量快速，直接请求
 			if containers, err := svc.ListContainers(r.Context()); err == nil {
+				// 按 metadata.order 排序，支持前端拖拽后顺序固定
+				sort.SliceStable(containers, func(i, j int) bool {
+					oi := h.DockerMeta.GetOrder(containers[i].Name)
+					oj := h.DockerMeta.GetOrder(containers[j].Name)
+					return oi < oj
+				})
 				resp.Containers = containers
 			}
 			// Docker stats 从内存快照读取（<1ms），后台每 10s 刷新一次

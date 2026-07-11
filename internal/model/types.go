@@ -42,6 +42,9 @@ type MonitorTargetInput struct {
 	Icon    string `json:"icon,omitempty"`
 	MAC     string `json:"mac,omitempty"`
 	Timeout int    `json:"timeout,omitempty"`
+	SSHUser   string  `json:"ssh_user,omitempty"`
+	SSHPass   string  `json:"ssh_pass,omitempty"`
+CheckType string  `json:"check_type,omitempty"`
 }
 
 // ===== 数据库模型类型 =====
@@ -130,7 +133,11 @@ type MonitorTarget struct {
 	MAC       string `json:"mac,omitempty"`
 	Timeout   int    `json:"timeout"`
 	CreatedAt int64  `json:"createdAt"`
+	SSHUser   string  `json:"ssh_user,omitempty"`
+	SSHPass   string  `json:"ssh_pass,omitempty"`
+	CheckType string  `json:"check_type,omitempty"`
 }
+
 
 type CheckResult struct {
 	ID        string `json:"id"`

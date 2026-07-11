@@ -35,7 +35,8 @@ interface SearchBarProps {
 type SuggestionItem =
   | { kind: "history"; query: string }
   | { kind: "bookmark"; item: LinkItem }
-  | { kind: "web"; text: string };
+  | { kind: "web"; text: string }
+  | { kind: "global"; title: string; url?: string; type: string; icon?: string };
 
 const FUSE_OPTIONS: IFuseOptions<LinkItem> = {
   keys: [
@@ -54,6 +55,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
     const [showDropdown, setShowDropdown] = useState(false);
     const [selectedIdx, setSelectedIdx] = useState(-1);
     const [webSuggestions, setWebSuggestions] = useState<string[]>([]);
+    const [globalResults, setGlobalResults] = useState<SuggestionItem[]>([]);
     const prefersReducedMotion = useReducedMotion();
   const { history, addSearch, removeSearch, clearHistory } = useSearchHistory();
     const containerRef = useRef<HTMLDivElement>(null);
@@ -263,6 +265,13 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
         if (engine.url !== "local") {
           window.open(`${engine.url}${encodeURIComponent(item.text)}`, "_blank");
         }
+      } else if (item.kind === "global") {
+        if (item.url) {
+          window.open(item.url, "_blank");
+        } else {
+          setQuery(item.title);
+          if (engine.url === "local") onLocalSearch?.(item.title);
+        }
       } else {
         setQuery(item.query);
         if (engine.url === "local") onLocalSearch?.(item.query);
@@ -347,7 +356,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
                     : `在 ${engine.name} 中搜索...`
                 }
                 aria-label={engine.url === "local" ? "本地链接搜索" : "搜索引擎搜索"}
-                className={`h-14 pl-6 pr-14 rounded-2xl border-white/20 bg-white/10 dark:bg-black/20 backdrop-blur-xl placeholder:text-white/50 focus-visible:ring-2 focus-visible:ring-white/30 shadow-xl transition-all hover:bg-white/15 text-lg caret-white ${
+                className={`h-12 sm:h-14 pl-4 sm:pl-6 pr-12 sm:pr-14 rounded-xl sm:rounded-2xl border-white/20 bg-white/10 dark:bg-black/20 backdrop-blur-xl placeholder:text-white/50 focus-visible:ring-2 focus-visible:ring-white/30 shadow-xl transition-all hover:bg-white/15 text-base sm:text-lg caret-white ${
                   completionText ? "text-transparent" : "text-white"
                 }`}
               />
@@ -375,7 +384,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
             >
               <div className="py-1 max-h-72 overflow-y-auto">
                 {suggestions.map((s, idx) => (
-                  <React.Fragment key={`${s.kind}-${s.kind === "history" ? s.query : s.kind === "web" ? s.text : s.item.id}`}>
+                  <React.Fragment key={`${s.kind}-${s.kind === "history" ? s.query : s.kind === "web" ? s.text : s.kind === "global" ? s.title : s.item.id}`}>
                     {/* 分段头 */}
                     {idx === 0 && hasHistoryItems && (
                       <div className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-white/40 font-medium tracking-wider border-b border-white/5">
@@ -405,6 +414,12 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
                     )}
 
                     {/* 候选行 */}
+                    {s.kind === "global" && idx > 0 && suggestions[idx-1]?.kind !== "global" && (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-white/40 font-medium tracking-wider border-t border-white/5">
+                        <Wifi className="h-3 w-3" />
+                        全局搜索
+                      </div>
+                    )}
                     <div
                       className={`group flex items-center justify-between px-3 py-2 cursor-pointer transition-colors ${suggestionClass(idx)}`}
                       onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}
@@ -419,7 +434,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
                           <Clock className="h-3.5 w-3.5 shrink-0 text-white/30" />
                         )}
                         <span className="text-sm truncate">
-                          {s.kind === "history" ? s.query : s.kind === "web" ? s.text : s.item.title}
+                          {s.kind === "history" ? s.query : s.kind === "web" ? s.text : s.kind === "global" ? s.title : s.item.title}
                         </span>
                         {s.kind === "bookmark" && (
                           <span className="text-[11px] text-white/30 truncate hidden sm:inline max-w-[40%] ml-auto">

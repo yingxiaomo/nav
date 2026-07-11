@@ -16,6 +16,7 @@ import (
 	"github.com/YingXiaoMo/nav/internal/handler"
 	"github.com/YingXiaoMo/nav/internal/middleware"
 	"github.com/YingXiaoMo/nav/internal/model"
+	"github.com/YingXiaoMo/nav/internal/notify"
 	"github.com/YingXiaoMo/nav/internal/service"
 )
 
@@ -82,7 +83,17 @@ func main() {
 	dockerMetaStore := service.NewDockerMetadataStore(dataDir + "/docker-metadata.json")
 
 	// Initialize health checker
-	healthChecker := service.NewHealthChecker(database)
+	notifyCfg := notify.Config{CooldownMinutes: 30}
+	var nv string
+	if err := database.QueryRow("SELECT value FROM settings WHERE key = ?", "monitor_notify").Scan(&nv); err == nil && nv != "" {
+		json.Unmarshal([]byte(nv), &notifyCfg)
+	}
+	var hcNotifier service.Notifier
+	if notifyCfg.Enabled {
+		hcNotifier = notify.NewSender(notifyCfg)
+		slog.Info("监控通知已启用", "apprise", notifyCfg.AppriseURL != "")
+	}
+	healthChecker := service.NewHealthChecker(database, hcNotifier)
 	healthChecker.Start(context.Background())
 	defer healthChecker.Stop()
 	slog.Info("健康检查服务已启动")

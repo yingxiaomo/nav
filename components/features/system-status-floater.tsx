@@ -18,11 +18,12 @@ export function SystemStatusFloater() {
   const [containers, setContainers] = useState<ContainerInfo[]>([]);
   const [containerStats, setContainerStats] = useState<ContainerStats[]>([]);
   const [dockerMeta, setDockerMeta] = useState<Record<string, { name: string; icon?: string; label?: string; url?: string; order?: number }>>({});
+  const [uptime, setUptime] = useState<Record<string, number>>({});
   const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [editTarget, setEditTarget] = useState<MonitorEditTarget | null>(null);
   const [logContainer, setLogContainer] = useState<string | null>(null);
   const [logLines, setLogLines] = useState<string[]>([]);
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const dragSrc = useRef<string | null>(null);
 
   const { baseUrl, authHeaders, isActive } = useMonitorConfig();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -39,6 +40,7 @@ export function SystemStatusFloater() {
         setContainers(d.containers || []);
         setContainerStats(d.stats || []);
         setDockerMeta(d.metadata || {});
+        setUptime(d.uptime || {});
         // initializing 字段在 Docker stats 首次就绪前为 true，前端可据此显示骨架屏
       }
     } catch (err) { console.warn('[Monitor] fetch data failed:', err); }
@@ -244,6 +246,7 @@ export function SystemStatusFloater() {
                         <span className="text-[10px] tabular-nums text-muted-foreground/60" style={{ color: mc.cpu > 50 ? '#f59e0b' : undefined }}>
                           {mc.cpu}%
                         </span>
+                        <span className="text-[10px] tabular-nums text-muted-foreground/60">{Math.round(uptime[c.id] ?? 0)}%</span>
                         <span className="text-[10px] tabular-nums text-muted-foreground/60">{fmt(mc.ram * 1024 * 1024)}</span>
                         <span className="text-[11px] font-medium" style={{ color: c.status === 'ok' ? '#4ade80' : '#f87171' }}>
                           {c.status === 'ok' ? (c.latency !== null ? c.latency + 'ms' : '正常') : '离线'}
@@ -275,25 +278,39 @@ export function SystemStatusFloater() {
                 const ob = dockerMeta[b.name]?.order ?? 999;
                 return oa - ob;
               }).map((c, idx) => (
-                <div key={c.id}
+                <div key={c.id} data-container-name={c.name}
                   draggable={containers.length > 1}
                   className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-muted/30 dark:bg-white/[0.03] hover:bg-accent/50 transition-colors cursor-pointer"
-                  style={dragIdx !== null ? { opacity: dragIdx === idx ? 0.4 : undefined } : undefined}
-                  onDragStart={() => setDragIdx(idx)}
-                  onDragOver={e => { e.preventDefault(); setDragIdx(idx); }}
-                  onDragEnd={() => {
-                    if (dragIdx === null || dragIdx === idx) { setDragIdx(null); return; }
-                    const reordered = [...containers].sort((a, b) => {
-                      const oa = dockerMeta[a.name]?.order ?? 999;
-                      const ob = dockerMeta[b.name]?.order ?? 999;
-                      return oa - ob;
+                  onDragStart={() => { dragSrc.current = c.name; }}
+                  onDragOver={e => { e.preventDefault(); }}
+                  onDrop={e => {
+                    const srcName = dragSrc.current;
+                    dragSrc.current = null;
+                    if (!srcName) return;
+                    // 从 DOM 取目标容器名
+                    const dstEl = (e.currentTarget as HTMLElement).closest('[data-container-name]');
+                    const dstName = dstEl?.getAttribute('data-container-name');
+                    if (!dstName || srcName === dstName) return;
+
+                    // 当前排序列表
+                    const cur = [...containers].sort((a, b) =>
+                      (dockerMeta[a.name]?.order ?? 999) - (dockerMeta[b.name]?.order ?? 999)
+                    ).map(c => c.name);
+                    // 找到源和目标在列表中的位置并互换
+                    const si = cur.indexOf(srcName);
+                    const di = cur.indexOf(dstName);
+                    [cur[si], cur[di]] = [cur[di], cur[si]];
+
+                    // 立即更新本地状态
+                    const nm = { ...dockerMeta };
+                    cur.forEach((n, o) => {
+                      if (nm[n]) nm[n] = { ...nm[n], order: o }; else nm[n] = { name: n, order: o };
                     });
-                    const [moved] = reordered.splice(dragIdx, 1);
-                    reordered.splice(idx, 0, moved);
-                    handleDockerReorder(reordered.map(c => c.name));
-                    setDragIdx(null);
-                    setTimeout(fetchData, 300);
+                    setDockerMeta(nm);
+                    // 持久化
+                    handleDockerReorder(cur);
                   }}
+                  onDragEnd={() => { dragSrc.current = null; }}
                   onContextMenu={e => { e.preventDefault(); setContextMenu({ id: "docker:" + c.name, x: e.clientX, y: e.clientY }); }}
                   onClick={() => {
                     const url = getDockerUrl(c.name) || parseContainerUrl(c.ports);
@@ -346,7 +363,7 @@ export function SystemStatusFloater() {
       {contextMenu && (
         <div
           ref={menuRef}
-          className="fixed z-[70] min-w-[140px] rounded-xl backdrop-blur-xl border border-border/40 p-1 shadow-2xl"
+          className="fixed z-[70] min-w-[160px] sm:min-w-[140px] rounded-xl backdrop-blur-xl border border-border/40 p-1 shadow-2xl"
           style={{
             left: Math.max(8, Math.min(contextMenu.x, window.innerWidth - 160)),
             top: Math.max(8, Math.min(contextMenu.y, window.innerHeight - 140)),
@@ -354,7 +371,7 @@ export function SystemStatusFloater() {
           }}
         >
           <button
-            className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-foreground/80 hover:bg-accent rounded-lg transition-colors"
+            className="flex items-center gap-2 w-full px-3 py-2 sm:py-1.5 text-xs sm:text-xs text-sm text-foreground/80 hover:bg-accent rounded-lg transition-colors"
             onClick={async () => {
               const check = checks.find(c => c.id === contextMenu.id);
               const dockerC = containers.find(c => 'docker:' + c.name === contextMenu.id);
@@ -397,7 +414,7 @@ export function SystemStatusFloater() {
             <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-foreground/80 hover:bg-accent rounded-lg transition-colors"
               onClick={() => {
                 const c = checks.find(ch => ch.id === contextMenu.id);
-                if (c) { setEditTarget({ id: c.id, name: c.name, icon: getIcon(c.id), url: c.url, mac: getMac(c.id) }); }
+                if (c) { setEditTarget({ id: c.id, name: c.name, icon: getIcon(c.id), url: c.url, mac: getMac(c.id), ssh_user: (targets.find(t => t.id === c.id) as TargetInfo)?.ssh_user, ssh_pass: (targets.find(t => t.id === c.id) as TargetInfo)?.ssh_pass }); }
                 else {
                   const dc = containers.find(ch => 'docker:' + ch.name === contextMenu.id);
                   if (dc) setEditTarget({ id: contextMenu.id, name: getDockerLabel(dc.name), icon: getDockerIcon(dc.name) || undefined, url: getDockerUrl(dc.name) || parseContainerUrl(dc.ports) || undefined });

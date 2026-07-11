@@ -48,12 +48,12 @@ export default function AdminPanel() {
     })();
   }, []);
 
-  if (loading) return <div className="bg-card border border-border rounded-xl p-6 w-[420px] max-w-[94vw] mx-auto mt-20 shadow-xl"><Spinner /></div>;
+  if (loading) return <div className="bg-card border border-border rounded-xl p-3 sm:p-6 w-[420px] max-w-[94vw] mx-auto mt-20 shadow-xl"><Spinner /></div>;
   if (status?.setupRequired) return <SetupScreen />;
   if (!status?.loggedIn) return <LoginScreen />;
 
   return (
-    <div className="bg-card border border-border rounded-xl p-6 w-[960px] max-w-[100vw] sm:max-w-[94vw] mx-auto my-10 shadow-xl">
+    <div className="bg-card border border-border rounded-xl p-6 w-full sm:w-[960px] max-w-[100vw] sm:max-w-[94vw] mx-auto my-10 shadow-xl">
       <div className="flex justify-between items-center mb-3">
         <h1 className="flex items-center gap-1.5 m-0 text-[1.375rem] font-bold text-card-foreground tracking-tight">
           <Settings className="size-5" />

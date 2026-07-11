@@ -71,3 +71,4 @@ data/
 *.db-shm
 *.db-wal
 package-lock.json
+*~

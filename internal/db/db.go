@@ -68,7 +68,33 @@ func Migrate(database *sql.DB) error {
 		return err
 	}
 
-	return nil
+	// 迁移 3：监控检查历史记录表
+		if _, err := database.Exec(
+			`CREATE TABLE IF NOT EXISTS check_history (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				target_id TEXT NOT NULL,
+				status TEXT NOT NULL,
+				latency INTEGER,
+				checked_at INTEGER NOT NULL
+			)`,
+		); err != nil {
+			return fmt.Errorf("创建 check_history 表失败: %w", err)
+		}
+		if _, err := database.Exec(
+			`CREATE INDEX IF NOT EXISTS idx_check_history_target ON check_history(target_id, checked_at)`,
+		); err != nil {
+			return fmt.Errorf("创建索引失败: %w", err)
+		}
+
+		// 迁移 4：监控目标增加远程控制凭证
+		addColumnIfNotExists(database, "monitor_targets", "ssh_user",
+			`ALTER TABLE monitor_targets ADD COLUMN ssh_user TEXT`)
+		addColumnIfNotExists(database, "monitor_targets", "ssh_pass",
+			`ALTER TABLE monitor_targets ADD COLUMN ssh_pass TEXT`)
+		addColumnIfNotExists(database, "monitor_targets", "check_type",
+			`ALTER TABLE monitor_targets ADD COLUMN check_type TEXT NOT NULL DEFAULT ""`)
+
+		return nil
 }
 
 func addColumnIfNotExists(database *sql.DB, table, column, alterSQL string) error {

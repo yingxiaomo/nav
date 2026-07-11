@@ -49,6 +49,7 @@ type adminBackupExport struct {
 	Todos         []model.Todo         `json:"todos"`
 	Notes         []model.Note         `json:"notes"`
 	MonitorTargets []backupMonitorTarget `json:"monitorTargets"`
+	DockerMetadata  map[string]model.DockerMetadata `json:"dockerMetadata,omitempty"`
 }
 
 type adminBackupImport struct {
@@ -59,6 +60,7 @@ type adminBackupImport struct {
 	Todos         []model.Todo         `json:"todos"`
 	Notes         []model.Note         `json:"notes"`
 	MonitorTargets []backupMonitorTarget `json:"monitorTargets"`
+	DockerMetadata  map[string]model.DockerMetadata `json:"dockerMetadata,omitempty"`
 }
 
 // ===== Handlers =====
@@ -238,7 +240,15 @@ func (h *Handler) ImportBackup() http.HandlerFunc {
 			}
 		}
 
-		for _, mt := range body.MonitorTargets {
+		// 恢复 Docker 元数据
+		if body.DockerMetadata != nil {
+			for name, meta := range body.DockerMetadata {
+				meta.Name = name
+				h.DockerMeta.Set(name, meta)
+			}
+		}
+
+			for _, mt := range body.MonitorTargets {
 			if _, err := tx.ExecContext(r.Context(),
 				"INSERT INTO monitor_targets (id, name, url, icon, mac, timeout, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
 				mt.ID, mt.Name, mt.URL, mt.Icon, mt.MAC, mt.Timeout, mt.CreatedAt); err != nil {

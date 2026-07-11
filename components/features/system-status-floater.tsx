@@ -22,7 +22,7 @@ export function SystemStatusFloater() {
   const [editTarget, setEditTarget] = useState<MonitorEditTarget | null>(null);
   const [logContainer, setLogContainer] = useState<string | null>(null);
   const [logLines, setLogLines] = useState<string[]>([]);
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const dragSrc = useRef<string | null>(null);
 
   const { baseUrl, authHeaders, isActive } = useMonitorConfig();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -275,25 +275,39 @@ export function SystemStatusFloater() {
                 const ob = dockerMeta[b.name]?.order ?? 999;
                 return oa - ob;
               }).map((c, idx) => (
-                <div key={c.id}
+                <div key={c.id} data-container-name={c.name}
                   draggable={containers.length > 1}
                   className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-muted/30 dark:bg-white/[0.03] hover:bg-accent/50 transition-colors cursor-pointer"
-                  style={dragIdx !== null ? { opacity: dragIdx === idx ? 0.4 : undefined } : undefined}
-                  onDragStart={() => setDragIdx(idx)}
-                  onDragOver={e => { e.preventDefault(); setDragIdx(idx); }}
-                  onDragEnd={() => {
-                    if (dragIdx === null || dragIdx === idx) { setDragIdx(null); return; }
-                    const reordered = [...containers].sort((a, b) => {
-                      const oa = dockerMeta[a.name]?.order ?? 999;
-                      const ob = dockerMeta[b.name]?.order ?? 999;
-                      return oa - ob;
+                  onDragStart={() => { dragSrc.current = c.name; }}
+                  onDragOver={e => { e.preventDefault(); }}
+                  onDrop={e => {
+                    const srcName = dragSrc.current;
+                    dragSrc.current = null;
+                    if (!srcName) return;
+                    // 从 DOM 取目标容器名
+                    const dstEl = (e.currentTarget as HTMLElement).closest('[data-container-name]');
+                    const dstName = dstEl?.getAttribute('data-container-name');
+                    if (!dstName || srcName === dstName) return;
+
+                    // 当前排序列表
+                    const cur = [...containers].sort((a, b) =>
+                      (dockerMeta[a.name]?.order ?? 999) - (dockerMeta[b.name]?.order ?? 999)
+                    ).map(c => c.name);
+                    // 找到源和目标在列表中的位置并互换
+                    const si = cur.indexOf(srcName);
+                    const di = cur.indexOf(dstName);
+                    [cur[si], cur[di]] = [cur[di], cur[si]];
+
+                    // 立即更新本地状态
+                    const nm = { ...dockerMeta };
+                    cur.forEach((n, o) => {
+                      if (nm[n]) nm[n] = { ...nm[n], order: o }; else nm[n] = { name: n, order: o };
                     });
-                    const [moved] = reordered.splice(dragIdx, 1);
-                    reordered.splice(idx, 0, moved);
-                    handleDockerReorder(reordered.map(c => c.name));
-                    setDragIdx(null);
-                    setTimeout(fetchData, 300);
+                    setDockerMeta(nm);
+                    // 持久化
+                    handleDockerReorder(cur);
                   }}
+                  onDragEnd={() => { dragSrc.current = null; }}
                   onContextMenu={e => { e.preventDefault(); setContextMenu({ id: "docker:" + c.name, x: e.clientX, y: e.clientY }); }}
                   onClick={() => {
                     const url = getDockerUrl(c.name) || parseContainerUrl(c.ports);

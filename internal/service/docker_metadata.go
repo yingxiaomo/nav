@@ -85,6 +85,16 @@ func (s *DockerMetadataStore) Set(name string, meta model.DockerMetadata) error 
 }
 
 // GetAll returns all stored container metadata.
+// GetOrder returns the display order for a container name.
+func (s *DockerMetadataStore) GetOrder(name string) int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if meta, ok := s.data[name]; ok {
+		return meta.Order
+	}
+	return 999
+}
+
 func (s *DockerMetadataStore) GetAll() map[string]model.DockerMetadata {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

@@ -292,8 +292,9 @@ export function PinnedLinkCard({
 
       {/* 编辑弹窗 — 仿监控面板风格 */}
       {dialogOpen && createPortal(
-        <div className="fixed inset-0 z-[999] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => setDialogOpen(false)}>
-          <div className="bg-background/90 backdrop-blur-xl border border-border/40 rounded-2xl p-5 w-80 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[999] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}
+          onPointerDown={e => { if (!(e.target as Element).closest('.dialog-content')) setDialogOpen(false); }}>
+          <div className="bg-background/90 backdrop-blur-xl border border-border/40 rounded-2xl p-5 w-80 shadow-2xl dialog-content">
             <div className="text-sm font-medium text-foreground mb-3">编辑固定链接</div>
             <input value={editTitle} onChange={e => setEditTitle(e.target.value)}
               placeholder="标题"

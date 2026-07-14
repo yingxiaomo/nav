@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ChevronDown, Cpu, HardDrive, Plus, XCircle, Box, MemoryStick, Container, ExternalLink, FileText, X as XIcon } from "lucide-react";
+import { ChevronDown, Cpu, HardDrive, Plus, XCircle, Box, MemoryStick, Container, ExternalLink, FileText, Trash2, X as XIcon } from "lucide-react";
 import { useMonitorConfig } from "@/lib/hooks/use-monitor-config";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -17,11 +17,12 @@ export function SystemStatusFloater() {
   const [targets, setTargets] = useState<TargetInfo[]>([]);
   const [containers, setContainers] = useState<ContainerInfo[]>([]);
   const [containerStats, setContainerStats] = useState<ContainerStats[]>([]);
-  const [dockerMeta, setDockerMeta] = useState<Record<string, { name: string; icon?: string; label?: string }>>({});
+  const [dockerMeta, setDockerMeta] = useState<Record<string, { name: string; icon?: string; label?: string; url?: string; order?: number }>>({});
   const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [editTarget, setEditTarget] = useState<MonitorEditTarget | null>(null);
   const [logContainer, setLogContainer] = useState<string | null>(null);
   const [logLines, setLogLines] = useState<string[]>([]);
+  const dragSrc = useRef<string | null>(null);
 
   const { baseUrl, authHeaders, isActive } = useMonitorConfig();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -69,6 +70,8 @@ export function SystemStatusFloater() {
     dockerMeta[containerName]?.icon;
   const getDockerLabel = (containerName: string): string =>
     dockerMeta[containerName]?.label || containerName;
+  const getDockerUrl = (containerName: string): string | undefined =>
+    dockerMeta[containerName]?.url;
 
   const handleWake = async (id: string) => {
     const mac = getMac(id);
@@ -78,6 +81,26 @@ export function SystemStatusFloater() {
       await fetch(`${baseUrl}/api/v1/admin/monitor/wol/${id}`, { method: 'POST', headers: h });
     } catch (err) { console.warn('[Monitor] WOL failed:', err); }
     setContextMenu(null);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const h = authHeaders;
+      await fetch(`${baseUrl}/api/v1/admin/monitor/checks/${id}`, { method: 'DELETE', headers: h });
+      setContextMenu(null);
+      setTimeout(fetchData, 500);
+    } catch (err) { console.warn('[Monitor] delete failed:', err); }
+  };
+
+  const handleDockerReorder = async (names: string[]) => {
+    if (!baseUrl) return;
+    try {
+      await fetch(`${baseUrl}/api/v1/admin/docker/reorder`, {
+        method: 'PUT',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: names }),
+      });
+    } catch (err) { console.warn('[Monitor] reorder failed:', err); }
   };
 
   const handleDockerAction = async (name: string, action: 'start' | 'stop' | 'restart') => {
@@ -247,12 +270,47 @@ export function SystemStatusFloater() {
               </span>
             </div>
             <div className="space-y-1 max-h-[200px] overflow-y-auto">
-              {containers.map(c => (
-                <div key={c.id}
+              {[...containers].sort((a, b) => {
+                const oa = dockerMeta[a.name]?.order ?? 999;
+                const ob = dockerMeta[b.name]?.order ?? 999;
+                return oa - ob;
+              }).map((c, idx) => (
+                <div key={c.id} data-container-name={c.name}
+                  draggable={containers.length > 1}
                   className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-muted/30 dark:bg-white/[0.03] hover:bg-accent/50 transition-colors cursor-pointer"
+                  onDragStart={() => { dragSrc.current = c.name; }}
+                  onDragOver={e => { e.preventDefault(); }}
+                  onDrop={e => {
+                    const srcName = dragSrc.current;
+                    dragSrc.current = null;
+                    if (!srcName) return;
+                    // 从 DOM 取目标容器名
+                    const dstEl = (e.currentTarget as HTMLElement).closest('[data-container-name]');
+                    const dstName = dstEl?.getAttribute('data-container-name');
+                    if (!dstName || srcName === dstName) return;
+
+                    // 当前排序列表
+                    const cur = [...containers].sort((a, b) =>
+                      (dockerMeta[a.name]?.order ?? 999) - (dockerMeta[b.name]?.order ?? 999)
+                    ).map(c => c.name);
+                    // 找到源和目标在列表中的位置并互换
+                    const si = cur.indexOf(srcName);
+                    const di = cur.indexOf(dstName);
+                    [cur[si], cur[di]] = [cur[di], cur[si]];
+
+                    // 立即更新本地状态
+                    const nm = { ...dockerMeta };
+                    cur.forEach((n, o) => {
+                      if (nm[n]) nm[n] = { ...nm[n], order: o }; else nm[n] = { name: n, order: o };
+                    });
+                    setDockerMeta(nm);
+                    // 持久化
+                    handleDockerReorder(cur);
+                  }}
+                  onDragEnd={() => { dragSrc.current = null; }}
                   onContextMenu={e => { e.preventDefault(); setContextMenu({ id: "docker:" + c.name, x: e.clientX, y: e.clientY }); }}
                   onClick={() => {
-                    const url = parseContainerUrl(c.ports);
+                    const url = getDockerUrl(c.name) || parseContainerUrl(c.ports);
                     if (url) window.open(url, "_blank");
                   }}
                 >
@@ -356,13 +414,21 @@ export function SystemStatusFloater() {
                 if (c) { setEditTarget({ id: c.id, name: c.name, icon: getIcon(c.id), url: c.url, mac: getMac(c.id) }); }
                 else {
                   const dc = containers.find(ch => 'docker:' + ch.name === contextMenu.id);
-                  if (dc) setEditTarget({ id: contextMenu.id, name: getDockerLabel(dc.name), icon: getDockerIcon(dc.name) || undefined, url: parseContainerUrl(dc.ports) || undefined });
+                  if (dc) setEditTarget({ id: contextMenu.id, name: getDockerLabel(dc.name), icon: getDockerIcon(dc.name) || undefined, url: getDockerUrl(dc.name) || parseContainerUrl(dc.ports) || undefined });
                 }
                 setContextMenu(null);
               }}
               aria-label="编辑"
             >
               <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg> 编辑
+            </button>
+          )}
+          {checks.some(c => c.id === contextMenu.id) && (
+            <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+              onClick={() => handleDelete(contextMenu.id)}
+              aria-label="删除"
+            >
+              <Trash2 className="w-3 h-3" /> 删除
             </button>
           )}
           {getMac(contextMenu.id) && (
@@ -433,6 +499,7 @@ export function SystemStatusFloater() {
 
 /** 迷你 Docker 日志查看器 */
 function LogViewer({ containerName, baseUrl, onClose }: { containerName: string; baseUrl: string; onClose: () => void }) {
+  const logDialogRef = useRef<HTMLDivElement>(null);
   const [lines, setLines] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const evRef = useRef<EventSource | null>(null);
@@ -457,8 +524,9 @@ function LogViewer({ containerName, baseUrl, onClose }: { containerName: string;
   }, [lines]);
 
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={onClose}>
-      <div className="bg-black/90 backdrop-blur-xl border border-white/20 rounded-2xl w-[90vw] max-w-3xl h-[70vh] shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[999] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}
+      onPointerDown={e => { if (logDialogRef.current && !logDialogRef.current.contains(e.target as Node)) onClose(); }}>
+      <div ref={logDialogRef} className="bg-black/90 backdrop-blur-xl border border-white/20 rounded-2xl w-[90vw] max-w-3xl h-[70vh] shadow-2xl flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
           <span className="text-sm font-medium text-white/90">容器日志 — {containerName}</span>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 transition-colors">

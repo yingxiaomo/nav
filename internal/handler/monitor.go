@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"sort"
 	"regexp"
 	"strings"
 	"time"
@@ -89,6 +90,12 @@ func (h *Handler) UpdateCheck() http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "更新失败")
 			return
 		}
+
+		// 编辑后立即触发一次健康检查，刷新内存结果
+		if target := h.HealthChecker.CheckNow(id); target != nil {
+			slog.Debug("更新后触发检查", "id", id, "url", target.URL)
+		}
+
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 	}
 }
@@ -197,6 +204,12 @@ func (h *Handler) MonitorAll() http.HandlerFunc {
 		if svc := h.DockerSvc; svc != nil {
 			// 容器列表轻量快速，直接请求
 			if containers, err := svc.ListContainers(r.Context()); err == nil {
+				// 按 metadata.order 排序，支持前端拖拽后顺序固定
+				sort.SliceStable(containers, func(i, j int) bool {
+					oi := h.DockerMeta.GetOrder(containers[i].Name)
+					oj := h.DockerMeta.GetOrder(containers[j].Name)
+					return oi < oj
+				})
 				resp.Containers = containers
 			}
 			// Docker stats 从内存快照读取（<1ms），后台每 10s 刷新一次

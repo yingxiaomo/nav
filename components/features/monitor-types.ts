@@ -46,7 +46,8 @@ export const serverName = typeof window !== 'undefined'
 
 /** 从 Docker 端口字符串提取第一个宿主机 IP:端口的 URL */
 export function parseContainerUrl(ports: string): string | null {
-  const m = ports.match(/(?:0\.0\.0\.0|::):(\d+)->\d+/);
+  // 格式：8080:80（Go 后端 formatPorts）
+  const m = ports.match(/(\d+):\d+/);
   if (m) return `http://${window.location.hostname}:${m[1]}`;
   return null;
 }

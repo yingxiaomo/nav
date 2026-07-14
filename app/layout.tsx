@@ -23,15 +23,17 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "Clean Nav - 极简风格导航页 | 开发者起始页",
+    default: "Clean Nav - 极简 Homelab 导航与仪表盘 | 个人主页",
     template: "%s | Clean Nav",
   },
-  description: "Clean Nav 是一个基于 Next.js + Tailwind CSS 构建的极简、免费开源浏览器主页。支持 GitHub 账号直接登录同步数据，无需服务器数据库。具备拖拽排序、自定义壁纸、书签导入等功能。",
+  description: "Clean Nav 是一个专为 Homelab 打造的极速个人导航页与轻量级服务器管理面板。Go + React 重构，15MB Docker 镜像。支持书签管理、内网服务监控、Docker 容器控制、多端数据同步、自定义壁纸。开源免费，隐私安全。",
 
   keywords: [
     "Nav", "导航页", "起始页", "浏览器主页", "极简导航", "好看的导航",
-    "开源项目", "Next.js", "React", "Tailwind CSS", "GitHub API",
-    "Serverless", "静态网站", "Vercel", "书签管理", "Dashboard", "Startpage"
+    "开源项目", "Next.js", "React", "Tailwind CSS", "Go",
+    "Homelab", "Dashboard", "Startpage", "服务器监控", "Docker管理",
+    "书签管理", "个人主页", "自部署", "Serverless", "Vercel",
+    "self-hosted", "navigation dashboard", "homelab dashboard"
   ],
 
   authors: [{ name: "XiaoMo", url: "https://nav.ovoxo.cc" }],
@@ -58,8 +60,8 @@ export const metadata: Metadata = {
     type: "website",
     locale: "zh_CN",
     url: "https://nav.ovoxo.cc",
-    title: "Clean Nav - 极简风格导航页",
-    description: "免费、开源、无服务器。利用 GitHub API 同步数据的极简浏览器主页。",
+    title: "Clean Nav - 极简 Homelab 导航与仪表盘",
+    description: "轻量级自部署导航页 | 内网监控 | Docker 管理 | 多端同步。Go + React 重构，15MB 镜像，毫秒级响应。",
     siteName: "Clean Nav",
     images: [
       {
@@ -74,8 +76,8 @@ export const metadata: Metadata = {
 
   twitter: {
     card: "summary_large_image",
-    title: "Clean Nav - 极简风格导航页",
-    description: "支持拖拽排序与 GitHub 数据同步的极简起始页。",
+    title: "Clean Nav - 极简 Homelab 导航与仪表盘",
+    description: "轻量级自部署导航页 | 内网监控 | Docker 管理 | 多端同步。",
     images: ["https://nav.ovoxo.cc/og-image.png"],
     creator: "@XiaoMo",
   },

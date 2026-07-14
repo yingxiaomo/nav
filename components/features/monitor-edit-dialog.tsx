@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Container, Server, Globe, Monitor, Wifi, HardDrive, Database, Cloud, Terminal, Shield, Activity, Settings, Box, MemoryStick, Cpu, Zap, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import type { MonitorEditTarget } from "./monitor-types";
 
 const QUICK_ICONS = ['Container', 'Server', 'Globe', 'Monitor', 'Wifi', 'HardDrive', 'Database', 'Cloud', 'Terminal', 'Shield', 'Activity', 'Settings', 'Box', 'MemoryStick', 'Cpu', 'Zap'];
@@ -25,6 +26,7 @@ export function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSav
   const [detecting, setDetecting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100); }, []);
 
@@ -33,31 +35,36 @@ export function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSav
     setSaving(true);
     const isDocker = target.id.startsWith('docker:');
     try {
+      let ok = false;
       if (!target.id) {
         // 添加模式
         if (!url.trim()) { setSaving(false); return; }
-        await fetch(`${baseUrl}/api/v1/admin/monitor/checks`, {
+        const res = await fetch(`${baseUrl}/api/v1/admin/monitor/checks`, {
           method: 'POST',
           headers: { ...authHeaders, 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: name.trim(), url: url.trim(), icon: icon || undefined }),
         });
+        ok = res.ok;
       } else if (isDocker) {
-        // 编辑模式（Docker 容器）— 只存备注名和图标
+        // 编辑模式（Docker 容器）— 存备注名、图标、自定义地址
         const containerName = target.id.replace('docker:', '');
-        await fetch(`${baseUrl}/api/v1/admin/docker/metadata/${encodeURIComponent(containerName)}`, {
+        const res = await fetch(`${baseUrl}/api/v1/admin/docker/metadata/${encodeURIComponent(containerName)}`, {
           method: 'PUT',
           headers: { ...authHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ icon: icon || undefined, label: name.trim() !== containerName ? name.trim() : undefined }),
+          body: JSON.stringify({ icon: icon || undefined, url: url.trim() || undefined, label: name.trim() !== containerName ? name.trim() : undefined }),
         });
+        ok = res.ok;
       } else {
         // 编辑模式（内网巡检）
-        await fetch(`${baseUrl}/api/v1/admin/monitor/checks/${target.id}`, {
+        const res = await fetch(`${baseUrl}/api/v1/admin/monitor/checks/${target.id}`, {
           method: 'PUT',
           headers: { ...authHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim(), icon: icon || undefined, mac: mac.trim() || undefined }),
+          body: JSON.stringify({ name: name.trim(), url: url.trim() || undefined, icon: icon || undefined, mac: mac.trim() || undefined }),
         });
+        ok = res.ok;
       }
-    } catch (err) { console.warn('[Monitor] save target failed:', err); }
+      if (!ok) { toast.error('保存失败，请确认登录状态'); setSaving(false); return; }
+    } catch (err) { console.warn('[Monitor] save target failed:', err); toast.error('网络错误，保存失败'); setSaving(false); return; }
     setSaving(false);
     onSaved();
   };
@@ -86,7 +93,7 @@ export function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSav
           headers: { ...authHeaders, 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: detectUrl }),
         });
-        if (res.ok) { const d = await res.json(); if (d.icon) { setIcon(d.icon); return; } }
+        if (res.ok) { const d = await res.json(); if (d.icon) { setIcon(d.icon); setDetecting(false); return; } }
       }
       if (target.id.startsWith('docker:')) {
         const res = await fetch(`${baseUrl}/api/v1/admin/docker/fetch-icon`, {
@@ -94,23 +101,30 @@ export function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSav
           headers: { ...authHeaders, 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: target.id.replace('docker:', '') }),
         });
-        if (res.ok) { const d = await res.json(); if (d.icon) setIcon(d.icon); }
+        if (res.ok) { const d = await res.json(); if (d.icon) { setIcon(d.icon); } }
       }
     } catch (err) { console.warn('[Monitor] icon detection failed:', err); }
     setDetecting(false);
   };
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={onClose}>
-      <div className="bg-background/90 backdrop-blur-xl border border-border/40 rounded-2xl p-5 w-80 shadow-2xl" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[90] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}
+      onPointerDown={e => { if (dialogRef.current && !dialogRef.current.contains(e.target as Node)) onClose(); }}>
+      <div ref={dialogRef} className="bg-background/90 backdrop-blur-xl border border-border/40 rounded-2xl p-5 w-80 shadow-2xl">
         <div className="text-sm font-medium text-foreground mb-3">{!target.id ? '添加监控目标' : target.id.startsWith('docker:') ? '编辑 Docker 容器' : '编辑巡检目标'}</div>
         <input ref={inputRef} value={name} onChange={e => setName(e.target.value)}
           placeholder="名称" className="w-full px-3 py-2 rounded-xl text-sm bg-muted/50 border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors mb-2"
           onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') onClose(); }}
         />
-        {!target.id && (
+        {!target.id.startsWith("docker:") ? (
         <input value={url} onChange={e => setUrl(e.target.value)}
           placeholder="http://192.168.1.xxx:8080"
+          className="w-full px-3 py-2 rounded-xl text-sm bg-muted/50 border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors mb-2"
+          onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') onClose(); }}
+        />
+        ) : (
+        <input value={url} onChange={e => setUrl(e.target.value)}
+          placeholder="http://192.168.1.xxx:8080（可选，自定义跳转地址）"
           className="w-full px-3 py-2 rounded-xl text-sm bg-muted/50 border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors mb-2"
           onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') onClose(); }}
         />

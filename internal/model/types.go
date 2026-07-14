@@ -165,6 +165,8 @@ type DockerMetadata struct {
 	Name  string `json:"name"`
 	Icon  string `json:"icon,omitempty"`
 	Label string `json:"label,omitempty"`
+	URL   string `json:"url,omitempty"`
+	Order int    `json:"order,omitempty"`
 }
 
 // ===== 系统信息类型 =====

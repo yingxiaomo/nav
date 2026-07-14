@@ -7,19 +7,19 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
-// LLMConfig AI 配置
-type LLMConfig struct {
-	APIKey  string `json:"api_key"`
-	BaseURL string `json:"base_url"` // OpenAI-compatible API
-	Model   string `json:"model"`
+var chatHistory struct {
+	sync.Mutex
+	data map[string][]chatMessage
 }
 
-var defaultLLMConfig = LLMConfig{
-	BaseURL: "https://api.openai.com/v1",
-	Model:   "gpt-4o-mini",
+var chatHistoryInit sync.Once
+
+func initHistory() {
+	chatHistoryInit.Do(func() { chatHistory.data = make(map[string][]chatMessage) })
 }
 
 type chatMessage struct {
@@ -28,9 +28,9 @@ type chatMessage struct {
 }
 
 type chatRequest struct {
-	Model       string        `json:"model"`
-	Messages    []chatMessage `json:"messages"`
-	MaxTokens   int           `json:"max_tokens"`
+	Model     string        `json:"model"`
+	Messages  []chatMessage `json:"messages"`
+	MaxTokens int           `json:"max_tokens"`
 }
 
 type chatResponse struct {
@@ -39,63 +39,106 @@ type chatResponse struct {
 	} `json:"choices"`
 }
 
-// CallLLM 调用大模型，将自然语言转为具体指令
+
+// CallLLM 单次 AI 调用（无上下文，供 handleOrganize 使用）
 func CallLLM(cfg LLMConfig, prompt string) (string, error) {
-	if cfg.APIKey == "" || cfg.BaseURL == "" {
-		return "", fmt.Errorf("AI 未配置")
+	if cfg.APIKey == "" { return "", fmt.Errorf("AI 未配置") }
+	if cfg.Model == "" { cfg.Model = defaultLLMConfig.Model }
+	baseURL := strings.TrimRight(cfg.BaseURL, "/")
+	msgs := []chatMessage{
+		{Role: "system", Content: "你是一个智能助手，理解并返回 JSON 格式数据。"},
+		{Role: "user", Content: prompt},
+	}
+	body := chatRequest{Model: cfg.Model, Messages: msgs, MaxTokens: 1000}
+	payload, _ := json.Marshal(body)
+	req, err := http.NewRequest("POST", baseURL+"/chat/completions", bytes.NewReader(payload))
+	if err != nil { return "", err }
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil { return "", fmt.Errorf("请求失败: %w", err) }
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 { return "", fmt.Errorf("返回 %d", resp.StatusCode) }
+	var result chatResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+	if len(result.Choices) == 0 { return "", fmt.Errorf("AI 返回为空") }
+	return strings.TrimSpace(result.Choices[0].Message.Content), nil
+}
+
+func callLLM(cfg LLMConfig, uid, text string) string {
+	if cfg.APIKey == "" {
+		return "AI 未配置"
 	}
 	if cfg.Model == "" {
 		cfg.Model = defaultLLMConfig.Model
 	}
-
 	baseURL := strings.TrimRight(cfg.BaseURL, "/")
 
-	systemPrompt := `你是一个智能家居助手，可以控制内网设备。可用命令：
-- /status [name] - 查看服务状态
-- /wake [name] - 唤醒设备
-- /docker ps - 容器列表
-- /docker start [name] / stop [name] / restart [name]
-- /device exec [name] [command] - 在设备上执行 SSH 命令
+	initHistory()
+	chatHistory.Lock()
+	history := chatHistory.data[uid]
+	chatHistory.Unlock()
 
-请把用户的自然语言转换成对应的斜杠命令，只回复命令本身，不要解释。`
+	sysPrompt := "你是一个智能家居助手，可以用中文聊天。如需执行命令，在回复中另起一行以 / 开头写命令。可用命令：/status /wake /docker /device /organize"
 
-	body := chatRequest{
-		Model: cfg.Model,
-		Messages: []chatMessage{
-			{Role: "system", Content: systemPrompt},
-			{Role: "user", Content: prompt},
-		},
-		MaxTokens: 200,
+	msgs := []chatMessage{{Role: "system", Content: sysPrompt}}
+	msgs = append(msgs, history...)
+	msgs = append(msgs, chatMessage{Role: "user", Content: text})
+
+	if len(msgs) > 14 {
+		msgs = append([]chatMessage{msgs[0]}, msgs[len(msgs)-12:]...)
 	}
 
+	body := chatRequest{Model: cfg.Model, Messages: msgs, MaxTokens: 600}
 	payload, _ := json.Marshal(body)
 	req, err := http.NewRequest("POST", baseURL+"/chat/completions", bytes.NewReader(payload))
 	if err != nil {
-		return "", err
+		return "请求失败: " + err.Error()
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
 
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := &http.Client{Timeout: 20 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("AI 请求失败: %w", err)
+		return "AI 请求失败: " + err.Error()
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 500))
-		return "", fmt.Errorf("AI 返回 %d: %s", resp.StatusCode, string(body))
+		io.ReadAll(io.LimitReader(resp.Body, 200))
+		return fmt.Sprintf("AI 返回 %d", resp.StatusCode)
 	}
 
 	var result chatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("AI 响应解析失败: %w", err)
-	}
-
+	json.NewDecoder(resp.Body).Decode(&result)
 	if len(result.Choices) == 0 {
-		return "", fmt.Errorf("AI 返回为空")
+		return "AI 返回为空"
 	}
 
-	return strings.TrimSpace(result.Choices[0].Message.Content), nil
+	reply := strings.TrimSpace(result.Choices[0].Message.Content)
+
+	chatHistory.Lock()
+	chatHistory.data[uid] = append(chatHistory.data[uid],
+		chatMessage{Role: "user", Content: text},
+		chatMessage{Role: "assistant", Content: reply})
+	if len(chatHistory.data[uid]) > 40 {
+		chatHistory.data[uid] = chatHistory.data[uid][len(chatHistory.data[uid])-40:]
+	}
+	chatHistory.Unlock()
+
+	return reply
+}
+
+// LLMConfig AI 配置
+type LLMConfig struct {
+	APIKey  string `json:"api_key"`
+	BaseURL string `json:"base_url"`
+	Model   string `json:"model"`
+}
+
+var defaultLLMConfig = LLMConfig{
+	BaseURL: "https://api.openai.com/v1",
+	Model:   "gpt-4o-mini",
 }

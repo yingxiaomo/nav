@@ -23,26 +23,25 @@ type CmdHandler struct {
 }
 
 func (h *CmdHandler) HandleTG(fromID, cmd string, args []string) string {
-	if !strings.HasPrefix(cmd, "/") && h.LLM.APIKey != "" {
-		return h.handleAI(fromID, cmd, args)
-	}
 	switch cmd {
 	case "/start", "/help":
-		return "<b>Nav Bot</b>\n\n/status - 监控状态\n/wake - WOL 唤醒\n/docker ps|start|stop|restart - Docker\n/device ssh [name] [cmd] - SSH\n/organize - AI 整理\n/uptime - 运行时间\n/help - 帮助"
+		return "Nav Bot\n/ai [消息] - AI 对话\n/status - 监控状态\n/wake - WOL 唤醒\n/docker - Docker 管理\n/device - 远程设备\n/organize - AI 整理书签\n/uptime - 运行时间\n/help - 帮助"
 	case "/status": return h.handleStatus(args)
 	case "/wake": return h.handleWake(args)
 	case "/docker": return h.handleDocker(args)
 	case "/organize": return h.handleOrganize()
 	case "/device": return h.handleDevice(args)
+	case "/ai": return h.handleAI(fromID, args)
 	case "/uptime": return fmt.Sprintf("运行 %d 秒", service.GetSystemInfo().Uptime)
 	default: return "未知命令，发送 /help 查看"
 	}
 }
 
-func (h *CmdHandler) handleAI(fromID, cmd string, args []string) string {
-	fullText := cmd
-	if len(args) > 0 { fullText += " " + strings.Join(args, " ") }
-	resp := callLLM(h.LLM, fromID, fullText)
+func (h *CmdHandler) handleAI(fromID string, args []string) string {
+	if h.LLM.APIKey == "" { return "AI 未配置，请在设置中填写 API Key" }
+	text := strings.Join(args, " ")
+	if text == "" { return "用法: /ai 你想说的话" }
+	resp := callLLM(h.LLM, fromID, text)
 	return resp
 }
 

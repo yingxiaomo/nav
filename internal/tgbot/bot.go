@@ -77,7 +77,25 @@ func (b *Bot) Broadcast(text string) {
 func (b *Bot) Start(handler CommandHandler) {
 	b.cmd = handler
 	slog.Info("TG 机器人已启动")
+	b.registerCommands()
 	go b.pollLoop()
+}
+
+
+func (b *Bot) registerCommands() {
+	cmds := []map[string]string{
+		{"command": "ai", "description": "AI 对话"},
+		{"command": "status", "description": "查看监控状态"},
+		{"command": "wake", "description": "WOL 唤醒"},
+		{"command": "docker", "description": "Docker 管理"},
+		{"command": "device", "description": "远程设备"},
+		{"command": "organize", "description": "AI 整理书签"},
+		{"command": "uptime", "description": "运行时间"},
+		{"command": "help", "description": "帮助"},
+	}
+	payload, _ := json.Marshal(map[string]any{"commands": cmds})
+	resp, err := b.client.Post(b.apiURL("setMyCommands"), "application/json", bytes.NewReader(payload))
+	if err == nil { resp.Body.Close() }
 }
 
 func (b *Bot) Stop() {

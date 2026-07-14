@@ -17,6 +17,7 @@ export default function SettingsTab() {
   // TG Bot 配置
   const [botToken, setBotToken] = useState('');
   const [botChatId, setBotChatId] = useState('');
+  const [botProxy, setBotProxy] = useState('');
   const [botBusy, setBotBusy] = useState(false);
   const [botMsg, setBotMsg] = useState('');
   const [botLoaded, setBotLoaded] = useState(false);
@@ -57,7 +58,7 @@ export default function SettingsTab() {
 
   const saveBot = async () => {
     setBotBusy(true); setBotMsg('');
-    const { ok } = await req('PUT', `${API}/settings`, { bot_config: JSON.stringify({ token: botToken, chat_id: botChatId }) });
+    const { ok } = await req('PUT', `${API}/settings`, { bot_config: JSON.stringify({ token: botToken, chat_id: botChatId, proxy_url: botProxy }) });
     setBotBusy(false);
     setBotMsg(ok ? '✅ 已保存' : '❌ 保存失败');
   };
@@ -111,6 +112,7 @@ export default function SettingsTab() {
         <div className="space-y-2 max-w-sm">
           <input value={botToken} onChange={e => setBotToken(e.target.value)} placeholder="Bot Token（例如 123456:ABC-DEF）" className={inputCls} />
           <input value={botChatId} onChange={e => setBotChatId(e.target.value)} placeholder="Chat ID（可选，用于主动推送）" className={inputCls} />
+          <input value={botProxy} onChange={e => setBotProxy(e.target.value)} placeholder="代理地址（可选，如 http://192.168.0.1:7890）" className={inputCls} />
           <Button variant="outline" size="sm" onClick={saveBot} disabled={botBusy}>{botBusy ? <Loader2 className="size-3.5 animate-spin" /> : null} 保存 Bot 配置</Button>
           {botMsg && <span className="text-xs text-muted-foreground ml-2">{botMsg}</span>}
         </div>

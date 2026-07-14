@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -14,8 +15,9 @@ import (
 
 // BotConfig TG 机器人配置
 type BotConfig struct {
-	Token  string `json:"token"`
-	ChatID string `json:"chat_id,omitempty"`
+	Token    string `json:"token"`
+	ChatID   string `json:"chat_id,omitempty"`
+	ProxyURL string `json:"proxy_url,omitempty"` // 代理地址，如 http://192.168.0.1:7890
 }
 
 // Bot TG 机器人实例
@@ -35,9 +37,15 @@ type CommandHandler interface {
 
 // NewBot 创建机器人
 func NewBot(cfg BotConfig) *Bot {
+	transport := &http.Transport{}
+	if cfg.ProxyURL != "" {
+		if proxyURL, err := url.Parse(cfg.ProxyURL); err == nil {
+			transport.Proxy = http.ProxyURL(proxyURL)
+		}
+	}
 	return &Bot{
 		cfg:    cfg,
-		client: &http.Client{Timeout: 10 * time.Second},
+		client: &http.Client{Timeout: 10 * time.Second, Transport: transport},
 		stopCh: make(chan struct{}),
 	}
 }

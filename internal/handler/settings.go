@@ -7,6 +7,7 @@ import (
 
 	"github.com/YingXiaoMo/nav/internal/db/queries"
 	"github.com/YingXiaoMo/nav/internal/model"
+	"github.com/YingXiaoMo/nav/internal/tgbot"
 )
 
 var protectedSettings = map[string]bool{
@@ -101,6 +102,27 @@ func (h *Handler) UpdateSettings() http.HandlerFunc {
 			return
 		}
 
+		// 如果更新了 Bot 配置，热重载
+		if botCfg, hasBot := body["bot_config"]; hasBot && h.TGBot != nil {
+			h.TGBot.Stop()
+			var bc tgbot.BotConfig
+			if json.Unmarshal([]byte(botCfg), &bc) == nil && bc.Token != "" {
+				newBot := tgbot.NewBot(bc)
+				cmdHandler := &tgbot.CmdHandler{
+					Devices: h.DeviceMgr,
+					DB:      h.DB,
+				}
+				// 读取 AI 配置
+				var aiCfg tgbot.LLMConfig
+				if aiRaw, ok := body["ai_config"]; ok && aiRaw != "" {
+					json.Unmarshal([]byte(aiRaw), &aiCfg)
+					cmdHandler.LLM = aiCfg
+				}
+				newBot.Start(cmdHandler)
+				h.TGBot = newBot
+				slog.Info("TG Bot 已热重载")
+			}
+		}
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 	}
 }

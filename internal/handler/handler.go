@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/YingXiaoMo/nav/internal/remote"
 	"github.com/YingXiaoMo/nav/internal/service"
+	"github.com/YingXiaoMo/nav/internal/tgbot"
 )
 
 // Handler holds all dependencies for HTTP handlers.
@@ -14,6 +16,8 @@ type Handler struct {
 	DockerSvc     *service.DockerService
 	DockerMeta    *service.DockerMetadataStore
 	DockerSnap    *service.DockerSnapshotter
+	TGBot         *tgbot.Bot
+	DeviceMgr     *remote.Manager
 	UploadDir     string
 	DataDir       string
 }

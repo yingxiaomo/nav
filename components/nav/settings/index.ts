@@ -1,5 +1,4 @@
 export * from './add-link-tab';
-export * from './category-editor';
 export * from './category-item';
 export * from './folder-navigator';
 export * from './general-tab';

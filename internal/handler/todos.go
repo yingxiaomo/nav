@@ -1,8 +1,9 @@
 package handler
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 
 	"github.com/YingXiaoMo/nav/internal/db/queries"
@@ -10,59 +11,41 @@ import (
 )
 
 func (h *Handler) ListTodos() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		todos, err := queries.GetAllTodos(r.Context(), h.DB)
-		if err != nil {
-			slog.Error("获取待办列表失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		model.RespondJSON(w, http.StatusOK, todos)
-	}
+	return h.handleList("待办", func(ctx context.Context, db *sql.DB) (any, error) {
+		return queries.GetAllTodos(ctx, db)
+	})
 }
 
 func (h *Handler) CreateTodo() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return h.handleCreate("待办", func(r *http.Request, ctx context.Context, db *sql.DB) (any, string, bool) {
 		var input model.TodoInput
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
-			return
+			return nil, "请求体格式错误", false
 		}
 		if input.Text == "" {
-			model.RespondError(w, http.StatusBadRequest, "内容不能为空")
-			return
+			return nil, "内容不能为空", false
 		}
-
-		todo, err := queries.CreateTodo(r.Context(), h.DB, input.Text)
+		todo, err := queries.CreateTodo(ctx, db, input.Text)
 		if err != nil {
-			slog.Error("创建待办失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+			return nil, "服务器内部错误", false
 		}
-		model.RespondJSON(w, http.StatusCreated, todo)
-	}
+		return todo, "", true
+	})
 }
 
 func (h *Handler) UpdateTodo() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		db := h.DB
-		id := r.PathValue("id")
-
+	return h.handleUpdate("待办", func(r *http.Request, ctx context.Context, db *sql.DB, id string) (any, string, bool) {
 		var input model.TodoInput
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
-			return
+			return nil, "请求体格式错误", false
 		}
 
-		existing, err := queries.GetTodo(r.Context(), db, id)
+		existing, err := queries.GetTodo(ctx, db, id)
 		if err != nil {
-			slog.Error("获取待办失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+			return nil, "服务器内部错误", false
 		}
 		if existing == nil {
-			model.RespondError(w, http.StatusNotFound, "待办不存在")
-			return
+			return nil, "not_found", false
 		}
 
 		text := existing.Text
@@ -70,44 +53,20 @@ func (h *Handler) UpdateTodo() http.HandlerFunc {
 			text = input.Text
 		}
 
-		_, err = queries.UpdateTodo(r.Context(), db, id, text, input.Completed)
-		if err != nil {
-			slog.Error("更新待办失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+		if _, err := queries.UpdateTodo(ctx, db, id, text, input.Completed); err != nil {
+			return nil, "服务器内部错误", false
 		}
 
-		updated, err := queries.GetTodo(r.Context(), db, id)
+		updated, err := queries.GetTodo(ctx, db, id)
 		if err != nil {
-			slog.Error("获取更新后待办失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+			return nil, "服务器内部错误", false
 		}
-		model.RespondJSON(w, http.StatusOK, updated)
-	}
+		return updated, "", true
+	})
 }
 
 func (h *Handler) DeleteTodo() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		db := h.DB
-		id := r.PathValue("id")
-
-		existing, err := queries.GetTodo(r.Context(), db, id)
-		if err != nil {
-			slog.Error("获取待办失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		if existing == nil {
-			model.RespondError(w, http.StatusNotFound, "待办不存在")
-			return
-		}
-
-		if err := queries.DeleteTodo(r.Context(), db, id); err != nil {
-			slog.Error("删除待办失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
-	}
+	return h.handleDelete("待办",
+		func(ctx context.Context, db *sql.DB, id string) (any, error) { return queries.GetTodo(ctx, db, id) },
+		queries.DeleteTodo)
 }

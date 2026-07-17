@@ -507,27 +507,6 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
 
         {localData.settings.wallpaperType === 'local' && (
           <div className="space-y-4 animate-in fade-in pt-1">
-            <div className="space-y-2">
-               <div className="flex items-center justify-between">
-                 <Label className="text-xs text-muted-foreground">随机打包数量</Label>
-                 <span className="text-xs font-mono bg-background px-2 py-0.5 rounded border">
-                 </span>
-               </div>
-               <div className="flex gap-2 items-center">
-                 <Input 
-                    type="number"
-                    min={1}
-                    max={50}
-                    onChange={e => {
-                      const val = parseInt(e.target.value);
-                      if (!isNaN(val) && val > 0) {
-                      }
-                    }}
-                    className="h-8 text-sm"
-                 />
-               </div>
-            </div>
-
             <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-background/50">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-md bg-muted text-muted-foreground"><ImageIcon className="h-4 w-4" /></div>

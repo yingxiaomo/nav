@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { DataSchema, Category, LinkItem } from "@/lib/types";
+import { deepClone } from "@/lib/utils/tree";
 import {
   DndContext,
   closestCenter,
@@ -141,7 +142,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
   const handleBatchDelete = () => {
     setLocalData((prev) => {
-      const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
+      const newData = deepClone(prev);
       const deleteRecursive = (items: (Category | LinkItem)[]) => {
         for (const item of items) {
           const children = getChildren(item);
@@ -164,7 +165,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   const handleBatchMove = (targetId: string) => {
 
     setLocalData((prev) => {
-      const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
+      const newData = deepClone(prev);
 
       // Remove selected items from all locations
       const removed: LinkItem[] = [];
@@ -291,7 +292,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       };
 
       setLocalData((prev) => {
-          const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
+          const newData = deepClone(prev);
           
           const updateRecursive = (items: (Category|LinkItem)[]) => {
               for (const item of items) {
@@ -325,7 +326,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
       if (!movingLink) return;
       
       setLocalData((prev) => {
-          const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
+          const newData = deepClone(prev);
           let movedItem: LinkItem | null = null;
 
           const removeRecursive = (items: (Category|LinkItem)[]) => {
@@ -448,7 +449,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
     setLocalData((prev) => {
         
-        const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
+        const newData = deepClone(prev);
         const findParentContainerAndList = (items: (Category|LinkItem)[], id: string): [Category|LinkItem, LinkItem[]] | null => {
             for (const item of items) {
                 const children = getChildren(item);
@@ -514,7 +515,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
         if (activeContainer === overContainer && activeContainer) {
             setLocalData((prev) => {
-                const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
+                const newData = deepClone(prev);
                 
                 const findAndSort = (items: (Category|LinkItem)[]) => {
                     for (const item of items) {
@@ -546,7 +547,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
   const handleDeleteLink = useCallback((_parentId: string, linkId: string) => {
     setLocalData((prev) => {
-        const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
+        const newData = deepClone(prev);
         const deleteRecursive = (items: (Category|LinkItem)[]) => {
             for (const item of items) {
                 let children = getChildren(item);
@@ -569,7 +570,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
   const handleCategoryIconChange = useCallback((catId: string, icon: string) => {
     setLocalData(prev => {
-        const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
+        const newData = deepClone(prev);
         const catIndex = newData.categories.findIndex(c => c.id === catId);
         if (catIndex !== -1) {
             newData.categories[catIndex].icon = icon;
@@ -581,7 +582,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
   const handleRenameCategory = useCallback((id: string, title: string) => {
     setLocalData(prev => {
-        const newData = JSON.parse(JSON.stringify(prev)) as DataSchema;
+        const newData = deepClone(prev);
         const index = newData.categories.findIndex(c => c.id === id);
         if (index !== -1) {
             newData.categories[index].title = title;

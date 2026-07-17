@@ -72,3 +72,15 @@ data/
 *.db-wal
 package-lock.json
 *~
+
+# public/ build outputs（next build 产物，不提交）
+/public/404.html
+/public/index.html
+/public/admin.html
+/public/admin/
+/public/probe.html
+/public/probe/
+/public/_next/
+/public/_not-found.html
+/public/_not-found/
+/public/favicon.ico

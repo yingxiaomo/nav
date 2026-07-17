@@ -1,5 +1,14 @@
 // ══════ 管理后台共享常量 & 工具函数 ══════
 
+import type React from 'react';
+import {
+  LayoutDashboard, Folder, Link, CheckSquare, FileText,
+  Monitor, Container, Save, Settings, ClipboardList, Loader2,
+  ImageIcon,
+} from 'lucide-react';
+import type { Category, LinkItem, Todo, Note } from '@/lib/types';
+import { Card, CardContent } from '@/components/ui/card';
+
 export type TabId = 'overview' | 'cats' | 'bms' | 'todos' | 'notes' | 'monitor' | 'docker' | 'backup' | 'settings' | 'logs' | 'gallery';
 
 export interface StatusInfo {
@@ -7,10 +16,11 @@ export interface StatusInfo {
   loggedIn: boolean;
 }
 
-export interface Category { id: string; title: string; icon?: string; links?: LinkItem[]; }
-export interface LinkItem { id: string; title: string; url: string; }
-export interface TodoItem { id: string; text: string; completed: boolean; }
-export interface NoteItem { id: string; title: string; content?: string; updatedAt: number; }
+// 类型别名：管理后台使用的类型名与 lib/types 保持一致，消除重复定义
+export type TodoItem = Todo;
+export type NoteItem = Note;
+export type { Category, LinkItem };
+
 export interface SystemInfo { cpu: { usage: number; cores: number }; memory: { total: number; used: number; usedPercent: number }; disk: { total: number; used: number; usedPercent: number }; uptime: number; }
 export interface CheckResult { id: string; name: string; url: string; status: 'ok' | 'error' | 'timeout'; latency: number | null; lastCheck: number | null; }
 export interface MonitorData { targets: { id: string; name: string; url: string }[]; results: CheckResult[]; }
@@ -53,13 +63,6 @@ export function es(text: string): string {
 
 // ── Tab config ──
 
-import type React from 'react';
-import {
-  LayoutDashboard, Folder, Link, CheckSquare, FileText,
-  Monitor, Container, Save, Settings, ClipboardList, Loader2,
-  ImageIcon,
-} from 'lucide-react';
-
 export const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'overview', label: '概览', icon: <LayoutDashboard className="icon-sm" /> },
   { id: 'cats', label: '分类', icon: <Folder className="icon-sm" /> },
@@ -75,8 +78,6 @@ export const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
 ];
 
 // ── Shared sub-components ──
-
-import { Card, CardContent } from '@/components/ui/card';
 
 export function Spinner() {
   return <div className="flex justify-center py-8"><Loader2 className="size-5 animate-spin text-muted-foreground" /></div>;
@@ -117,6 +118,6 @@ export function ft(s: number): string {
   return (d ? d + '天' : '') + h + '小时' + m + '分';
 }
 
-export function fmt(...args: Parameters<typeof Intl.NumberFormat.prototype.format>) {
+export function f(...args: Parameters<typeof Intl.NumberFormat.prototype.format>) {
   return new Intl.NumberFormat('zh-CN').format(args[0] as number);
 }

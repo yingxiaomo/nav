@@ -11,9 +11,7 @@ import (
 )
 
 var protectedSettings = map[string]bool{
-	"api_token":           true,
 	"admin_password_hash": true,
-	"admin_salt":          true,
 	"session_secret":      true,
 }
 

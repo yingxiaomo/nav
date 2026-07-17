@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/YingXiaoMo/nav/internal/db"
+	"github.com/YingXiaoMo/nav/internal/db/queries"
 	"github.com/YingXiaoMo/nav/internal/handler"
 	"github.com/YingXiaoMo/nav/internal/middleware"
-	"github.com/YingXiaoMo/nav/internal/model"
 	"github.com/YingXiaoMo/nav/internal/notify"
 	"github.com/YingXiaoMo/nav/internal/remote"
 	"github.com/YingXiaoMo/nav/internal/service"
@@ -86,8 +86,7 @@ func main() {
 
 	// Initialize health checker
 	notifyCfg := notify.Config{CooldownMinutes: 30}
-	var nv string
-	if err := database.QueryRow("SELECT value FROM settings WHERE key = ?", "monitor_notify").Scan(&nv); err == nil && nv != "" {
+	if nv, err := queries.GetSetting(context.Background(), database, "monitor_notify"); err == nil && nv != "" {
 		json.Unmarshal([]byte(nv), &notifyCfg)
 	}
 	var hcNotifier service.Notifier
@@ -97,27 +96,25 @@ func main() {
 	}
 	healthChecker := service.NewHealthChecker(database, hcNotifier)
 	healthChecker.Start(context.Background())
-	
+
 	slog.Info("健康检查服务已启动")
 
-		// Initialize Docker stats snapshotter（后台每 10s 轮询）
-		var dockerSnap *service.DockerSnapshotter
-		if dockerSvc != nil {
-			dockerSnap = service.NewDockerSnapshotter(dockerSvc)
-			dockerSnap.Start(context.Background())
-			slog.Info("Docker stats 快照服务已启动")
-		}
+	// Initialize Docker stats snapshotter（后台每 10s 轮询）
+	var dockerSnap *service.DockerSnapshotter
+	if dockerSvc != nil {
+		dockerSnap = service.NewDockerSnapshotter(dockerSvc)
+		dockerSnap.Start(context.Background())
+		slog.Info("Docker stats 快照服务已启动")
+	}
 
 	// 启动 Telegram Bot（如果配置了 Token）
 	var tgBot *tgbot.Bot
 	// 初始化设备管理器（供 Bot SSH 控制使用）
 	deviceMgr := remote.NewManager(remote.NewSSHExec())
-	var devCfg string
-	if err := database.QueryRow("SELECT value FROM settings WHERE key = ?", "device_config").Scan(&devCfg); err == nil {
+	if devCfg, err := queries.GetSetting(context.Background(), database, "device_config"); err == nil {
 		deviceMgr.Load(devCfg)
 	}
-	var bt string
-	if err := database.QueryRow("SELECT value FROM settings WHERE key = ?", "bot_config").Scan(&bt); err == nil && bt != "" {
+	if bt, err := queries.GetSetting(context.Background(), database, "bot_config"); err == nil && bt != "" {
 		var bc tgbot.BotConfig
 		if json.Unmarshal([]byte(bt), &bc) == nil && bc.Token != "" {
 			tgBot = tgbot.NewBot(bc)
@@ -128,9 +125,8 @@ func main() {
 				DB:      database,
 			}
 			// 读取 AI 配置
-			var aiCfg tgbot.LLMConfig
-			var aiCfgStr string
-			if err := database.QueryRow("SELECT value FROM settings WHERE key = ?", "ai_config").Scan(&aiCfgStr); err == nil && aiCfgStr != "" {
+			if aiCfgStr, err := queries.GetSetting(context.Background(), database, "ai_config"); err == nil && aiCfgStr != "" {
+				var aiCfg tgbot.LLMConfig
 				json.Unmarshal([]byte(aiCfgStr), &aiCfg)
 				cmdHandler.LLM = aiCfg
 			}
@@ -139,30 +135,20 @@ func main() {
 		}
 	}
 
-	corsOrigin := os.Getenv("CORS_ORIGIN")
-	if corsOrigin == "" {
-		corsOrigin = "*"
-	}
-
 	mux := http.NewServeMux()
-
-	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{"status": "ok", "time": model.Now()})
-	})
 
 	app := &handler.Handler{
 		DB:            database,
 		HealthChecker: healthChecker,
 		DockerSvc:     dockerSvc,
 		DockerMeta:    dockerMetaStore,
-			DockerSnap:    dockerSnap,
+		DockerSnap:    dockerSnap,
 		UploadDir:     uploadDir,
 		DataDir:       dataDir,
 	}
 
 	adminMW := middleware.Admin(database)
-	authMW := middleware.Auth(database)
-	app.RegisterRoutes(mux, adminMW, authMW)
+	app.RegisterRoutes(mux, adminMW)
 
 	mux.Handle("GET /uploads/", http.StripPrefix("/uploads/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/") {
@@ -182,11 +168,9 @@ func main() {
 		mux.Handle("GET /", http.FileServer(http.Dir(staticDir)))
 	}
 
-	wrappedHandler := middleware.CORS(corsOrigin)(mux)
-
 	srv := &http.Server{
-		Addr:         ":" + strconv.Itoa(port),
-		Handler:      wrappedHandler,
+		Addr: ":" + strconv.Itoa(port),
+		Handler: mux,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,

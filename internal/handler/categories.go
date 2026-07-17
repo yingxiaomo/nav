@@ -1,8 +1,9 @@
 package handler
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 
 	"github.com/YingXiaoMo/nav/internal/db/queries"
@@ -10,97 +11,58 @@ import (
 )
 
 func (h *Handler) ListCategories() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		db := h.DB
-		cats, err := queries.GetAllCategories(r.Context(), db)
-		if err != nil {
-			slog.Error("获取分类列表失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		for i := range cats {
-			links, err := queries.GetBookmarksByCategory(r.Context(), db, cats[i].ID)
-			if err != nil {
-				slog.Error("获取分类书签失败", "error", err, "category_id", cats[i].ID)
-				model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-				return
-			}
-			cats[i].Links = links
-		}
-		model.RespondJSON(w, http.StatusOK, cats)
-	}
+	return h.handleList("分类", func(ctx context.Context, db *sql.DB) (any, error) {
+		return queries.GetAllCategories(ctx, db)
+	})
 }
 
 func (h *Handler) GetCategory() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		db := h.DB
-		id := r.PathValue("id")
-
-		cat, err := queries.GetCategory(r.Context(), db, id)
-		if err != nil {
-			slog.Error("获取分类失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		if cat == nil {
-			model.RespondError(w, http.StatusNotFound, "分类不存在")
-			return
-		}
-
-		links, err := queries.GetBookmarksByCategory(r.Context(), db, id)
-		if err != nil {
-			slog.Error("获取分类书签失败", "error", err, "category_id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		cat.Links = links
-
-		model.RespondJSON(w, http.StatusOK, cat)
-	}
+	return h.handleGet("分类",
+		func(ctx context.Context, db *sql.DB, id string) (any, error) {
+			cat, err := queries.GetCategory(ctx, db, id)
+			if err != nil || cat == nil {
+				return cat, err
+			}
+			// 附带书签列表
+			links, err := queries.GetBookmarksByCategory(ctx, db, id)
+			if err != nil {
+				return cat, nil // 书签获取失败不影响分类本身
+			}
+			cat.Links = links
+			return cat, nil
+		})
 }
 
 func (h *Handler) CreateCategory() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return h.handleCreate("分类", func(r *http.Request, ctx context.Context, db *sql.DB) (any, string, bool) {
 		var input model.CategoryInput
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
-			return
+			return nil, "请求体格式错误", false
 		}
 		if input.Title == "" {
-			model.RespondError(w, http.StatusBadRequest, "分类名称不能为空")
-			return
+			return nil, "分类名称不能为空", false
 		}
-
-		cat, err := queries.CreateCategory(r.Context(), h.DB, input)
+		cat, err := queries.CreateCategory(ctx, db, input)
 		if err != nil {
-			slog.Error("创建分类失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+			return nil, "服务器内部错误", false
 		}
-		model.RespondJSON(w, http.StatusCreated, cat)
-	}
+		return cat, "", true
+	})
 }
 
 func (h *Handler) UpdateCategory() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		db := h.DB
-		id := r.PathValue("id")
-
+	return h.handleUpdate("分类", func(r *http.Request, ctx context.Context, db *sql.DB, id string) (any, string, bool) {
 		var input model.CategoryInput
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
-			return
+			return nil, "请求体格式错误", false
 		}
 
-		existing, err := queries.GetCategory(r.Context(), db, id)
+		existing, err := queries.GetCategory(ctx, db, id)
 		if err != nil {
-			slog.Error("获取分类失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+			return nil, "服务器内部错误", false
 		}
 		if existing == nil {
-			model.RespondError(w, http.StatusNotFound, "分类不存在")
-			return
+			return nil, "not_found", false
 		}
 
 		if input.Title != "" {
@@ -110,48 +72,22 @@ func (h *Handler) UpdateCategory() http.HandlerFunc {
 			existing.Icon = input.Icon
 		}
 
-		_, err = queries.UpdateCategory(r.Context(), db, id, model.CategoryInput{
-			Title: existing.Title,
-			Icon:  existing.Icon,
-			Order: existing.Order,
-		})
-		if err != nil {
-			slog.Error("更新分类失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+		if _, err := queries.UpdateCategory(ctx, db, id, model.CategoryInput{
+			Title: existing.Title, Icon: existing.Icon, Order: existing.Order,
+		}); err != nil {
+			return nil, "服务器内部错误", false
 		}
 
-		updated, err := queries.GetCategory(r.Context(), db, id)
+		updated, err := queries.GetCategory(ctx, db, id)
 		if err != nil {
-			slog.Error("获取更新后分类失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+			return nil, "服务器内部错误", false
 		}
-		model.RespondJSON(w, http.StatusOK, updated)
-	}
+		return updated, "", true
+	})
 }
 
 func (h *Handler) DeleteCategory() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		db := h.DB
-		id := r.PathValue("id")
-
-		existing, err := queries.GetCategory(r.Context(), db, id)
-		if err != nil {
-			slog.Error("获取分类失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		if existing == nil {
-			model.RespondError(w, http.StatusNotFound, "分类不存在")
-			return
-		}
-
-		if err := queries.DeleteCategory(r.Context(), db, id); err != nil {
-			slog.Error("删除分类失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
-	}
+	return h.handleDelete("分类",
+		func(ctx context.Context, db *sql.DB, id string) (any, error) { return queries.GetCategory(ctx, db, id) },
+		queries.DeleteCategory)
 }

@@ -1,8 +1,9 @@
 package handler
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 
 	"github.com/YingXiaoMo/nav/internal/db/queries"
@@ -10,72 +11,43 @@ import (
 )
 
 func (h *Handler) ListNotes() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		notes, err := queries.GetAllNotes(r.Context(), h.DB)
-		if err != nil {
-			slog.Error("获取笔记列表失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		model.RespondJSON(w, http.StatusOK, notes)
-	}
+	return h.handleList("笔记", func(ctx context.Context, db *sql.DB) (any, error) {
+		return queries.GetAllNotes(ctx, db)
+	})
 }
 
 func (h *Handler) GetNote() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("id")
-		note, err := queries.GetNote(r.Context(), h.DB, id)
-		if err != nil {
-			slog.Error("获取笔记失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		if note == nil {
-			model.RespondError(w, http.StatusNotFound, "笔记不存在")
-			return
-		}
-		model.RespondJSON(w, http.StatusOK, note)
-	}
+	return h.handleGet("笔记",
+		func(ctx context.Context, db *sql.DB, id string) (any, error) { return queries.GetNote(ctx, db, id) })
 }
 
 func (h *Handler) CreateNote() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return h.handleCreate("笔记", func(r *http.Request, ctx context.Context, db *sql.DB) (any, string, bool) {
 		var input model.NoteInput
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
-			return
+			return nil, "请求体格式错误", false
 		}
-
-		note, err := queries.CreateNote(r.Context(), h.DB, input.Title, input.Content)
+		note, err := queries.CreateNote(ctx, db, input.Title, input.Content)
 		if err != nil {
-			slog.Error("创建笔记失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+			return nil, "服务器内部错误", false
 		}
-		model.RespondJSON(w, http.StatusCreated, note)
-	}
+		return note, "", true
+	})
 }
 
 func (h *Handler) UpdateNote() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		db := h.DB
-		id := r.PathValue("id")
-
+	return h.handleUpdate("笔记", func(r *http.Request, ctx context.Context, db *sql.DB, id string) (any, string, bool) {
 		var input model.NoteInput
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
-			return
+			return nil, "请求体格式错误", false
 		}
 
-		existing, err := queries.GetNote(r.Context(), db, id)
+		existing, err := queries.GetNote(ctx, db, id)
 		if err != nil {
-			slog.Error("获取笔记失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+			return nil, "服务器内部错误", false
 		}
 		if existing == nil {
-			model.RespondError(w, http.StatusNotFound, "笔记不存在")
-			return
+			return nil, "not_found", false
 		}
 
 		title := existing.Title
@@ -87,44 +59,20 @@ func (h *Handler) UpdateNote() http.HandlerFunc {
 			content = input.Content
 		}
 
-		_, err = queries.UpdateNote(r.Context(), db, id, title, content)
-		if err != nil {
-			slog.Error("更新笔记失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+		if _, err := queries.UpdateNote(ctx, db, id, title, content); err != nil {
+			return nil, "服务器内部错误", false
 		}
 
-		updated, err := queries.GetNote(r.Context(), db, id)
+		updated, err := queries.GetNote(ctx, db, id)
 		if err != nil {
-			slog.Error("获取更新后笔记失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+			return nil, "服务器内部错误", false
 		}
-		model.RespondJSON(w, http.StatusOK, updated)
-	}
+		return updated, "", true
+	})
 }
 
 func (h *Handler) DeleteNote() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		db := h.DB
-		id := r.PathValue("id")
-
-		existing, err := queries.GetNote(r.Context(), db, id)
-		if err != nil {
-			slog.Error("获取笔记失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		if existing == nil {
-			model.RespondError(w, http.StatusNotFound, "笔记不存在")
-			return
-		}
-
-		if err := queries.DeleteNote(r.Context(), db, id); err != nil {
-			slog.Error("删除笔记失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
-	}
+	return h.handleDelete("笔记",
+		func(ctx context.Context, db *sql.DB, id string) (any, error) { return queries.GetNote(ctx, db, id) },
+		queries.DeleteNote)
 }

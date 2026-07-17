@@ -1,10 +1,10 @@
-import React, { useState, ChangeEvent, useRef, useEffect } from "react";
-import { DataSchema, Category, LinkItem } from "@/lib/types";
+import React, { useState, useRef, useEffect } from "react";
+import { DataSchema, Category } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Wand2, Plus, FolderPlus, Upload, Loader2 } from "lucide-react";
+import { Wand2, Plus, FolderPlus } from "lucide-react";
 import { toast } from "sonner";
 import { IconRender, PRESET_ICONS } from "./shared";
 import { generateFaviconUrl, generateId } from "@/lib/utils/common";
@@ -12,12 +12,11 @@ import { extractTitleFromUrl } from "@/lib/utils/favicon";
 import {
   isValidUrl,
   isValidFolderName,
-  isValidImageFile,
-  isValidFileSize,
   sanitizeText
 } from "@/lib/utils/validation";
-import { convertToWebP } from "@/lib/utils/image-utils";
-import { STORAGE_CONFIG_KEY, StorageConfig, createAdapter } from "@/lib/adapters/storage";
+import { STORAGE_CONFIG_KEY, StorageConfig } from "@/lib/adapters/storage";
+import { BookmarkImport } from "./bookmark-import";
+import { IconUploader } from "@/components/ui/icon-uploader";
 
 interface AddLinkTabProps {
   localData: DataSchema;
@@ -32,10 +31,7 @@ export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTa
   const [newIcon, setNewIcon] = useState("Link");
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  const [isUploadingIcon, setIsUploadingIcon] = useState(false);
-  const [iconUploadProgress, setIconUploadProgress] = useState(0);
   const existingCategories = Array.from(new Set(localData.categories.map(c => c.title)));
- const fileInputRef = React.useRef<HTMLInputElement>(null);
   const identifyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleEditedManually = useRef(false);
   
@@ -129,77 +125,6 @@ export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTa
     toast.success("文件夹创建成功", { description: `已创建文件夹: ${sanitizedFolderName}` });
   };
 
-  // 图标上传处理函数
-  const handleIconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!isValidImageFile(file)) {
-      return toast.error("请选择图片文件", { description: "支持的图片格式：JPG、PNG、GIF、SVG等" });
-    }
-    if (!isValidFileSize(file, 2)) {
-      return toast.error("文件大小超过限制", { description: "图片大小不能超过2MB" });
-    }
-
-    setIsUploadingIcon(true);
-    setIconUploadProgress(0);
-    let progressInterval: ReturnType<typeof setInterval> | null = null;
-
-    try {
-      // 1. 极限压缩：转为 WebP + 128px 限制 + 65% 质量
-      setIconUploadProgress(10);
-      const webpFile = await convertToWebP(file, 65, 128);
-      setIconUploadProgress(50);
-
-      // 2. 尝试上传到存储后端（如果当前适配器支持）
-      let iconUrl: string | null = null;
-
-      if (storageConfig && storageConfig.type !== 'gist') {
-        try {
-          let adapter: { uploadFile?: (file: File, name: string) => Promise<string> } | null = createAdapter(storageConfig);
-
-          if (adapter?.uploadFile) {
-            const url = await adapter.uploadFile(webpFile, `icon-${Date.now()}.webp`);
-            iconUrl = url;
-          }
-        } catch {
-          // 上传失败 → 降级到 data URI
-        }
-      }
-
-      // 3. 设置最终图标（URL 优先，否则 data URI）
-      if (iconUrl) {
-        setNewIcon(iconUrl);
-        setIconUploadProgress(100);
-        toast.success("图标已上传到云端并设置为当前链接的图标");
-        setIsUploadingIcon(false);
-      } else {
-        // 降级：转 data URI
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const base64Data = event.target?.result as string;
-          setNewIcon(base64Data);
-          setIconUploadProgress(100);
-          toast.success("图标已压缩并设置为当前链接的图标");
-        };
-        let progress = 50;
-        progressInterval = setInterval(() => {
-          progress += 5;
-          if (progress < 90) setIconUploadProgress(progress);
-        }, 100);
-        reader.onloadend = () => {
-          if (progressInterval) clearInterval(progressInterval);
-          setIsUploadingIcon(false);
-        };
-        reader.readAsDataURL(webpFile);
-      }
-    } catch (error) {
-      console.error("Icon upload error:", error);
-      toast.error("图标上传失败", { description: "请重试或选择其他图标" });
-      if (progressInterval) clearInterval(progressInterval);
-      setIsUploadingIcon(false);
-    }
-  };
 
   const handleAddLink = () => {
     // 净化和验证输入
@@ -250,167 +175,11 @@ export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTa
     toast.success("链接添加成功", { description: `已将 "${sanitizedTitle}" 添加到 "${sanitizedCategory}" 分类` });
   };
 
-  const handleBookmarkImport = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const content = e.target?.result as string;
-        if (!content) {
-            toast.error("无法读取文件内容", { description: "请确保文件格式正确且可以正常读取" });
-            return;
-        }
-        try {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(content, "text/html");
-            const newCategories: Category[] = [];
-            let totalLinks = 0;
-            let totalFolders = 0;
-
-            const parseBookmarks = (dl: Element): LinkItem[] => {
-                const items: LinkItem[] = [];
-                const children = Array.from(dl.children);
-                
-                for (let i = 0; i < children.length; i++) {
-                    const node = children[i];
-                    
-                    if (node.tagName === 'DT') {
-                        const h3 = node.querySelector('h3');
-                        const a = node.querySelector('a');
-                        
-                        if (h3) {
-                            const folderTitle = h3.innerText;
-                            let childItems: LinkItem[] = [];
-                            let itemsDl = node.querySelector('dl');
-
-                            if (!itemsDl) {
-                                let next = node.nextElementSibling;
-                                while (next && next.tagName !== 'DT' && next.tagName !== 'DL') {
-                                    next = next.nextElementSibling;
-                                }
-                                if (next && next.tagName === 'DL') {
-                                    itemsDl = next as HTMLDListElement;
-                                }
-                            }
-                            
-                            if (itemsDl) {
-                                childItems = parseBookmarks(itemsDl);
-                            }
-
-                            items.push({
-                                id: generateId(),
-                                title: folderTitle,
-                                url: "",
-                                icon: "FolderOpen",
-                                type: 'folder',
-                                children: childItems
-                            });
-                            totalFolders++;
-                        } else if (a) {
-                            items.push({
-                                id: generateId(),
-                                title: a.innerText,
-                                url: a.href,
-                                icon: generateFaviconUrl(new URL(a.href).hostname),
-                                type: 'link'
-                            });
-                            totalLinks++;
-                        }
-                    }
-                }
-                return items;
-            };
-
-            const bodyDl = doc.querySelector('body > dl') || doc.querySelector('dl');
-            
-            if (bodyDl) {
-                const rootItems = parseBookmarks(bodyDl);
-                
-                const looseLinks: LinkItem[] = [];
-                
-                for (const item of rootItems) {
-                    if (item.type === 'folder' && item.children) {
-                        newCategories.push({
-                            id: generateId(),
-                            title: item.title,
-                            icon: "FolderOpen",
-                            links: item.children
-                        });
-                    } else {
-                        looseLinks.push(item);
-                    }
-                }
-
-                if (looseLinks.length > 0) {
-                    newCategories.push({
-                        id: generateId(),
-                        title: "导入的书签",
-                        icon: "FolderDown",
-                        links: looseLinks
-                    });
-                }
-            }
-
-            if (newCategories.length > 0) {
-                // 收集现有所有书签 URL，用于去重
-                const existingUrls = new Set<string>();
-                const collectUrls = (items: LinkItem[]) => {
-                    for (const item of items) {
-                        if (item.url) existingUrls.add(item.url);
-                        if (item.children) collectUrls(item.children);
-                    }
-                };
-                for (const cat of localData.categories) {
-                    collectUrls(cat.links);
-                }
-
-                // 递归过滤重复链接，跳过 URL 已存在的条目
-                const filterDups = (items: LinkItem[]): [LinkItem[], number] => {
-                    let skipped = 0;
-                    const filtered = items.flatMap(item => {
-                        if (item.url && existingUrls.has(item.url)) {
-                            skipped++;
-                            return [];
-                        }
-                        if (item.children) {
-                            const [filteredKids, kidSkipped] = filterDups(item.children);
-                            skipped += kidSkipped;
-                            if (filteredKids.length === 0) return [];
-                            return [{ ...item, children: filteredKids }];
-                        }
-                        return [item];
-                    });
-                    return [filtered, skipped];
-                };
-
-                let totalSkipped = 0;
-                const filteredCategories = newCategories.map(cat => {
-                    const [filteredLinks, skipped] = filterDups(cat.links);
-                    totalSkipped += skipped;
-                    return { ...cat, links: filteredLinks };
-                }).filter(cat => cat.links.length > 0);
-
-                if (filteredCategories.length > 0) {
-                    setLocalData(prevData => ({
-                        ...prevData,
-                        categories: [...prevData.categories, ...filteredCategories],
-                    }));
-                    const actualLinks = totalLinks - totalSkipped;
-                    toast.success(`成功导入 ${filteredCategories.length} 个文件夹，共 ${actualLinks} 个链接${totalSkipped > 0 ? (`（${totalSkipped} 个重复已跳过）`) : ''}！`);
-                } else {
-                    toast.info("所有书签都已存在，无新内容可导入");
-                }
-            } else {
-                toast.warning("没有找到可以导入的书签或文件夹。请确认文件格式是否正确。");
-            }
-        } catch (error) {
-            console.error(error);
-            toast.error("解析书签文件失败", { description: "请确保是浏览器导出的 HTML 格式书签文件" });
-        }
-    };
-    reader.readAsText(file);
-    event.target.value = "";
+  const handleImportResult = (categories: Category[]) => {
+    setLocalData(prev => ({
+      ...prev,
+      categories: [...prev.categories, ...categories],
+    }));
   };
 
   return (
@@ -458,42 +227,7 @@ export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTa
                                     <div className="border-b border-border/50 p-2">
                                       <h4 className="text-xs font-medium mb-2">自定义图标</h4>
                                       <div className="flex flex-col gap-2">
-                                        {/* 文件上传输入 */}
-                                        <input
-                                          type="file"
-                                          ref={fileInputRef}
-                                          className="hidden"
-                                          accept="image/*"
-                                          onChange={handleIconUpload}
-                                        />
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          className="w-full gap-2 text-xs"
-                                          onClick={() => fileInputRef.current?.click()}
-                                          disabled={isUploadingIcon}
-                                        >
-                                          {isUploadingIcon ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
-                                          {isUploadingIcon ? "上传中..." : "上传自定义图标"}
-                                        </Button>
-                                        
-                                        {/* 上传进度条 */}
-                                        {isUploadingIcon && (
-                                          <div className="w-full space-y-1">
-                                            <div className="flex justify-between items-center text-[10px] text-muted-foreground">
-                                              <span>上传进度</span>
-                                              <span>{iconUploadProgress}%</span>
-                                            </div>
-                                            <div className="h-1 bg-muted rounded-full overflow-hidden">
-                                              <div
-                                                className="h-full bg-primary rounded-full transition-all duration-200 ease-out"
-                                                style={{ width: `${iconUploadProgress}%` }}
-                                              />
-                                            </div>
-                                          </div>
-                                        )}
-                                        
-                                        {/* 说明文字 */}
+                                        <IconUploader storageConfig={storageConfig} onIconReady={setNewIcon} />
                                         <p className="text-[10px] text-muted-foreground">
                                           支持 JPG、PNG、WEBP 格式，大小不超过 2MB
                                         </p>
@@ -562,24 +296,7 @@ export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTa
         </div>
       </div>
 
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 px-1">
-            <div className="h-1 w-1 rounded-full bg-primary/50" />
-            <h3 className="text-sm font-medium text-muted-foreground">导入书签</h3>
-        </div>
-        <div className="p-6 border rounded-xl bg-muted/30 border-dashed hover:border-primary/30 transition-colors">
-            <Label htmlFor="bookmark-import" className="flex flex-col items-center justify-center gap-3 cursor-pointer py-4 group">
-                <div className="p-3 rounded-full bg-background shadow-sm group-hover:scale-110 transition-transform">
-                    <Upload className="h-6 w-6 text-primary" />
-                </div>
-                <div className="text-center space-y-1">
-                    <span className="text-sm font-medium">点击导入浏览器书签</span>
-                    <p className="text-xs text-muted-foreground">支持 Chrome, Edge, Firefox 导出的 HTML 文件</p>
-                </div>
-            </Label>
-            <Input id="bookmark-import" type="file" accept=".html" onChange={handleBookmarkImport} className="hidden" />
-        </div>
-      </div>
+      <BookmarkImport existingCategories={localData.categories} onImport={handleImportResult} />
 
     </div>
   );

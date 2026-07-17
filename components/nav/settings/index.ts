@@ -1,4 +1,5 @@
 export * from './add-link-tab';
+export * from './bookmark-import';
 export * from './category-item';
 export * from './folder-navigator';
 export * from './general-tab';

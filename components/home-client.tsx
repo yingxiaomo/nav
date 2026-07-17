@@ -19,6 +19,9 @@ import Image from "next/image";
 
 import { useWallpaper, useNavData, useKeyboardShortcuts } from "@/lib";
 import { useUIStore } from "@/lib/stores";
+import { CommandPalette } from "@/components/features/command-palette";
+import { AIPanel } from "@/components/features/ai-panel";
+import { SSHTerminalPanel } from "@/components/features/ssh-terminal";
 
 interface HomeClientProps {
   initialWallpapers: string[]; 
@@ -71,7 +74,8 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const folderNavRef = useRef<FolderModalHandle>(null);
-  const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels, isCheatSheetOpen, setCheatSheetOpen, setBackendAvailable } = useUIStore();
+  const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels, isCheatSheetOpen, setCheatSheetOpen, setBackendAvailable, setCommandPaletteOpen, isCommandPaletteOpen, togglePanel } = useUIStore();
+  const { sidebarCollapsed } = useUIStore();
 
   // 检测后端是否可用（静态部署时禁用后端功能），定期重试
   useEffect(() => {
@@ -104,9 +108,23 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
     },
     {
       key: '/',
-      handler: () => searchInputRef.current?.focus(),
-      label: '搜索书签',
+      handler: () => setCommandPaletteOpen(true),
+      label: '打开命令面板',
       category: 'global',
+    },
+    {
+      key: 'meta+i',
+      handler: () => togglePanel('ai'),
+      label: 'AI 对话',
+      category: 'global',
+      allowInInputs: true,
+    },
+    {
+      key: 'meta+t',
+      handler: () => togglePanel('ssh'),
+      label: 'SSH 终端',
+      category: 'global',
+      allowInInputs: true,
     },
     {
       key: 'meta+n',
@@ -125,27 +143,20 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
     {
       key: 'escape',
       handler: () => {
-        // 层级 1：搜索框聚焦 → 失焦并清空搜索
+        // 层级 1：⌘K 面板打开 → 关闭
+        if (isCommandPaletteOpen) { setCommandPaletteOpen(false); return; }
+        // 层级 2：搜索框聚焦 → 失焦并清空搜索
         if (document.activeElement === searchInputRef.current) {
           searchInputRef.current?.blur();
           setSearchQuery("");
           return;
         }
-        // 层级 2：文件夹模态框打开 → 返回上级或关闭
-        if (folderNavRef.current?.back()) {
-          return;
-        }
-        // 层级 3：快捷键帮助面板打开 → 关闭
-        if (isCheatSheetOpen) {
-          closeAllPanels();
-          return;
-        }
-        // 层级 4：有面板打开 → 关闭所有浮动 UI
-        if (activePanel !== null || isSettingsOpen) {
-          closeAllPanels();
-          return;
-        }
-        // 层级 5：设置对话框由 Radix Dialog 内部处理（事件不拦截）
+        // 层级 3：文件夹模态框打开 → 返回上级或关闭
+        if (folderNavRef.current?.back()) { return; }
+        // 层级 4：快捷键帮助面板打开 → 关闭
+        if (isCheatSheetOpen) { closeAllPanels(); return; }
+        // 层级 5：有面板打开 → 关闭所有浮动 UI
+        if (activePanel !== null || isSettingsOpen) { closeAllPanels(); return; }
       },
       label: '关闭面板 / 返回上级',
       category: 'global',
@@ -319,6 +330,21 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
           </ErrorBoundary>
         </Suspense>
         <AuthSetupDialog baseUrl={typeof window !== 'undefined' ? window.location.origin : ''} />
+        {isCommandPaletteOpen && (
+          <CommandPalette
+            data={data}
+            allBookmarks={allBookmarks}
+            onOpenLink={(url) => window.open(url, '_blank', 'noopener,noreferrer')}
+            onToggleAI={() => togglePanel('ai')}
+            onToggleSSH={() => togglePanel('ssh')}
+          />
+        )}
+        <ErrorBoundary name="ai-panel" fallback={null}>
+          <AIPanel />
+        </ErrorBoundary>
+        <ErrorBoundary name="ssh-terminal" fallback={null}>
+          <SSHTerminalPanel />
+        </ErrorBoundary>
       </main>
     </ThemeProvider>
   );

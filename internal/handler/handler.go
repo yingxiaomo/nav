@@ -64,6 +64,13 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminMW, authMW func(http.H
 	mux.Handle("PUT /api/v1/settings", authMW(http.HandlerFunc(h.UpdateSettings())))
 	mux.Handle("PUT /api/v1/settings/{key}", authMW(http.HandlerFunc(h.UpdateSetting())))
 
+	// AI
+	mux.Handle("POST /api/v1/ai/chat", authMW(http.HandlerFunc(h.AIChat())))
+	mux.Handle("POST /api/v1/ai/conversation", authMW(http.HandlerFunc(h.AIConversation())))
+
+	// SSH
+	mux.Handle("GET /api/v1/ws/ssh", authMW(http.HandlerFunc(h.SSHWebSocket())))
+
 	// Data / Upload / Parse / Suggest
 	mux.Handle("GET /api/v1/data", authMW(http.HandlerFunc(h.GetData())))
 	mux.Handle("PUT /api/v1/data", authMW(http.HandlerFunc(h.PutData())))

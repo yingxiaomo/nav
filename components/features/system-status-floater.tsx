@@ -78,7 +78,8 @@ export function SystemStatusFloater() {
   const memC = memPct > 80 ? "#ef4444" : memPct > 50 ? "#06b6d4" : "#22c55e";
   const diskC = diskPct > 85 ? "#ef4444" : diskPct > 60 ? "#06b6d4" : "#22c55e";
 
-  const runningCount = checks.filter((c) => c.status === "ok").length + containers.filter((c) => c.state === "running").length;
+  const runningCount = checks.filter((c) => c.status === "ok").length;
+  const totalCount = checks.length + containers.length;
   const glassPanel = "bg-background/70 dark:bg-background/60 backdrop-blur-xl border border-border/40";
 
   return (
@@ -90,8 +91,11 @@ export function SystemStatusFloater() {
           <MemoryStick className="w-4 h-4 text-amber-500" /><span className="w-8">{memPct}%</span>
         </div>
         <ChevronDown className={cn("w-3 h-3 text-muted-foreground transition-transform", expanded && "rotate-180")} />
-        <div className="flex items-center gap-3 text-sm font-medium tabular-nums">
-          <span className="w-8 text-right">{runningCount}</span><Box className="w-4 h-4 text-green-500" />
+        <div className="flex items-center gap-2 text-sm font-medium tabular-nums">
+          <span className="text-right">{runningCount}</span>
+          <span className="text-muted-foreground/50">/</span>
+          <span className="text-right text-muted-foreground/70">{totalCount}</span>
+          <Box className="w-4 h-4 text-green-500" />
         </div>
       </div>
 

@@ -742,7 +742,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
 
       {searchResults !== null ? (
         /* ── 搜索结果视图 ── */
-        <div className="flex-1 border rounded-xl bg-muted/10 overflow-y-auto min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40">
+        <div className="flex-1 border rounded-xl bg-muted/10 overflow-y-auto min-h-0 custom-scrollbar">
           <div className="p-2 pb-10 space-y-0.5">
             {searchResults.length === 0 ? (
               <div className="py-10 text-center text-sm text-muted-foreground/50">
@@ -800,7 +800,7 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex-1 border rounded-xl bg-muted/10 overflow-y-auto min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40">
+        <div className="flex-1 border rounded-xl bg-muted/10 overflow-y-auto min-h-0 custom-scrollbar">
             <div className="space-y-1 p-2 pb-10">
                 {!currentFolder ? (
 

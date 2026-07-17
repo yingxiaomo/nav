@@ -152,7 +152,7 @@ export function GeneralTab({ localData, setLocalData, onRefreshWallpaper, onSave
   };
 
   return (
-    <div className="space-y-6 py-4 overflow-y-auto h-full [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40">
+    <div className="space-y-6 py-4 overflow-y-auto h-full custom-scrollbar">
       
       <div className="space-y-2">
         <Label>网站标题</Label>

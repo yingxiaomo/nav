@@ -194,6 +194,20 @@
 @keyframes spin{to{transform:rotate(360deg)}}
 }
 
+/* 自定义滚动条 — 统一样式，代替各文件重复的 [&::-webkit-scrollbar] */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.2);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.4);
+}
 
 /* ── 尊重用户减少动画偏好 ── */
 @media (prefers-reduced-motion: reduce) {

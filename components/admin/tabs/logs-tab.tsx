@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { req, API, LogData, es } from '../admin-tabs';
+import { req, API, LogData } from '../admin-tabs';
+import { sanitizeText } from '@/lib/utils/validation';
 import { RefreshCw } from 'lucide-react';
 
 export default function LogsTab() {
@@ -42,7 +43,7 @@ export default function LogsTab() {
                   m?.[1] === 'ERROR' ? 'text-destructive' : m?.[1] === 'WARN' ? 'text-warning' : m?.[1] === 'INFO' ? 'text-primary' : 'text-muted-foreground'
                 }`}
               >
-                {es(x)}
+                {sanitizeText(x)}
               </div>
             );
           })

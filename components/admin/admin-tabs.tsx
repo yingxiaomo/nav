@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { Category, LinkItem, Todo, Note } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
+import { sanitizeText } from '@/lib/utils/validation';
 
 export type TabId = 'overview' | 'cats' | 'bms' | 'todos' | 'notes' | 'monitor' | 'docker' | 'backup' | 'settings' | 'logs' | 'gallery';
 
@@ -53,12 +54,6 @@ export async function req<T = Record<string, unknown>>(method: string, path: str
   } catch {
     return { ok: false, status: 0, data: { error: '无法连接后端' } as T };
   }
-}
-
-export function es(text: string): string {
-  const el = document.createElement('div');
-  el.textContent = text;
-  return el.innerHTML;
 }
 
 // ── Tab config ──

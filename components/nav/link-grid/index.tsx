@@ -383,7 +383,7 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
                 animate={{ opacity: 1, x: 0 }} 
                 exit={{ opacity: 0, x: -10 }} 
                 transition={{ duration: 0.2 }} 
-                className="p-6 overflow-y-auto flex-1 bg-transparent [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40"
+                className="p-6 overflow-y-auto flex-1 bg-transparent custom-scrollbar"
               >
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleLinkDragEnd}>
                   <SortableContext items={modalCurrentItems.map(i => i.id)} strategy={rectSortingStrategy}>

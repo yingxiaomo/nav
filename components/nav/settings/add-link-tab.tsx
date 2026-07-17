@@ -435,7 +435,7 @@ export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTa
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 gap-6 py-4 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40">
+    <div className="flex-1 flex flex-col min-h-0 gap-6 py-4 overflow-y-auto custom-scrollbar">
       <div className="space-y-4">
         <div className="flex items-center gap-2 px-1">
             <div className="h-1 w-1 rounded-full bg-primary/50" />

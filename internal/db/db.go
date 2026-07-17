@@ -30,6 +30,24 @@ func Open(dbPath string) (*sql.DB, error) {
 }
 
 func Migrate(database *sql.DB) error {
+	migrations := []struct {
+		name string
+		fn   func(*sql.DB) error
+	}{
+		{"v1-基础表", migrateV1},
+		{"v2-文件夹列", migrateV2},
+		{"v3-check_history", migrateV3},
+		{"v4-SSH凭证", migrateV4},
+	}
+	for i, m := range migrations {
+		if err := m.fn(database); err != nil {
+			return fmt.Errorf("迁移 %d (%s) 失败: %w", i+1, m.name, err)
+		}
+	}
+	return nil
+}
+
+func migrateV1(database *sql.DB) error {
 	stmts := []string{
 		`CREATE TABLE IF NOT EXISTS categories (
 			id TEXT PRIMARY KEY, title TEXT NOT NULL, icon TEXT,
@@ -57,44 +75,47 @@ func Migrate(database *sql.DB) error {
 			return fmt.Errorf("迁移失败: %w\nSQL: %s", err, stmt)
 		}
 	}
+	return nil
+}
 
-	// 迁移 2：为嵌套文件夹添加 parent_id 和 is_folder 列
+func migrateV2(database *sql.DB) error {
 	if err := addColumnIfNotExists(database, "bookmarks", "parent_id",
 		`ALTER TABLE bookmarks ADD COLUMN parent_id TEXT REFERENCES bookmarks(id) ON DELETE CASCADE`); err != nil {
 		return err
 	}
-	if err := addColumnIfNotExists(database, "bookmarks", "is_folder",
-		`ALTER TABLE bookmarks ADD COLUMN is_folder INTEGER NOT NULL DEFAULT 0`); err != nil {
+	return addColumnIfNotExists(database, "bookmarks", "is_folder",
+		`ALTER TABLE bookmarks ADD COLUMN is_folder INTEGER NOT NULL DEFAULT 0`)
+}
+
+func migrateV3(database *sql.DB) error {
+	if _, err := database.Exec(
+		`CREATE TABLE IF NOT EXISTS check_history (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			target_id TEXT NOT NULL,
+			status TEXT NOT NULL,
+			latency INTEGER,
+			checked_at INTEGER NOT NULL
+		)`,
+	); err != nil {
+		return fmt.Errorf("创建 check_history 表失败: %w", err)
+	}
+	_, err := database.Exec(
+		`CREATE INDEX IF NOT EXISTS idx_check_history_target ON check_history(target_id, checked_at)`,
+	)
+	return err
+}
+
+func migrateV4(database *sql.DB) error {
+	if err := addColumnIfNotExists(database, "monitor_targets", "ssh_user",
+		`ALTER TABLE monitor_targets ADD COLUMN ssh_user TEXT`); err != nil {
 		return err
 	}
-
-	// 迁移 3：监控检查历史记录表
-		if _, err := database.Exec(
-			`CREATE TABLE IF NOT EXISTS check_history (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				target_id TEXT NOT NULL,
-				status TEXT NOT NULL,
-				latency INTEGER,
-				checked_at INTEGER NOT NULL
-			)`,
-		); err != nil {
-			return fmt.Errorf("创建 check_history 表失败: %w", err)
-		}
-		if _, err := database.Exec(
-			`CREATE INDEX IF NOT EXISTS idx_check_history_target ON check_history(target_id, checked_at)`,
-		); err != nil {
-			return fmt.Errorf("创建索引失败: %w", err)
-		}
-
-		// 迁移 4：监控目标增加远程控制凭证
-		addColumnIfNotExists(database, "monitor_targets", "ssh_user",
-			`ALTER TABLE monitor_targets ADD COLUMN ssh_user TEXT`)
-		addColumnIfNotExists(database, "monitor_targets", "ssh_pass",
-			`ALTER TABLE monitor_targets ADD COLUMN ssh_pass TEXT`)
-		addColumnIfNotExists(database, "monitor_targets", "check_type",
-			`ALTER TABLE monitor_targets ADD COLUMN check_type TEXT NOT NULL DEFAULT ""`)
-
-		return nil
+	if err := addColumnIfNotExists(database, "monitor_targets", "ssh_pass",
+		`ALTER TABLE monitor_targets ADD COLUMN ssh_pass TEXT`); err != nil {
+		return err
+	}
+	return addColumnIfNotExists(database, "monitor_targets", "check_type",
+		`ALTER TABLE monitor_targets ADD COLUMN check_type TEXT NOT NULL DEFAULT ""`)
 }
 
 func addColumnIfNotExists(database *sql.DB, table, column, alterSQL string) error {

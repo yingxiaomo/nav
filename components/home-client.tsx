@@ -17,7 +17,7 @@ import { SystemStatusFloater } from "@/components/features/system-status-floater
 import { AuthSetupDialog } from "@/components/features/auth-setup-dialog";
 import Image from "next/image";
 
-import { useWallpaper, useNavData, useKeyboardShortcuts } from "@/lib";
+import { useWallpaper, useNavData, useKeyboardShortcuts, useBackendCheck } from "@/lib";
 import { useUIStore } from "@/lib/stores";
 
 interface HomeClientProps {
@@ -71,21 +71,10 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const folderNavRef = useRef<FolderModalHandle>(null);
-  const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels, isCheatSheetOpen, setCheatSheetOpen, setBackendAvailable } = useUIStore();
+  const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels, isCheatSheetOpen, setCheatSheetOpen } = useUIStore();
 
   // 检测后端是否可用（静态部署时禁用后端功能），定期重试
-  useEffect(() => {
-    let cancelled = false;
-    const check = () => fetch('/api/v1/health').then(r => {
-      if (!cancelled) setBackendAvailable(r.ok);
-    }).catch(() => {
-      if (!cancelled) setBackendAvailable(false);
-    });
-
-    check();
-    const timer = setInterval(check, 15000);
-    return () => { cancelled = true; clearInterval(timer); };
-  }, [setBackendAvailable]);
+  useBackendCheck();
 
   // 拍平所有书签（用于 Fuse.js 模糊搜索）
   const allBookmarks = useMemo(

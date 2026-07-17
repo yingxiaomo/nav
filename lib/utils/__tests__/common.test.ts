@@ -179,9 +179,9 @@ describe("isImageFile", () => {
 // ---------------------------------------------------------------------------
 describe("formatFileSize", () => {
   it("应格式化字节数", () => {
-    expect(formatFileSize(0)).toBe("0 Bytes");
-    expect(formatFileSize(1024)).toBe("1 KB");
-    expect(formatFileSize(1048576)).toBe("1 MB");
+    expect(formatFileSize(0)).toBe("0 B");
+    expect(formatFileSize(1024)).toBe("1.0 KB");
+    expect(formatFileSize(1048576)).toBe("1.0 MB");
   });
 });
 

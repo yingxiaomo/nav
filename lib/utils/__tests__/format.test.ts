@@ -38,20 +38,20 @@ describe("formatTime", () => {
 
 describe("formatFileSize", () => {
   it("应格式化 0 字节", () => {
-    expect(formatFileSize(0)).toBe("0 Bytes");
+    expect(formatFileSize(0)).toBe("0 B");
   });
   it("应格式化 KB", () => {
-    expect(formatFileSize(1024)).toBe("1 KB");
+    expect(formatFileSize(1024)).toBe("1.0 KB");
     expect(formatFileSize(1536)).toBe("1.5 KB");
   });
   it("应格式化 MB", () => {
-    expect(formatFileSize(1048576)).toBe("1 MB");
-    expect(formatFileSize(2097152)).toBe("2 MB");
+    expect(formatFileSize(1048576)).toBe("1.0 MB");
+    expect(formatFileSize(2097152)).toBe("2.0 MB");
   });
   it("应格式化 GB", () => {
-    expect(formatFileSize(1073741824)).toBe("1 GB");
+    expect(formatFileSize(1073741824)).toBe("1.0 GB");
   });
   it("应截断到超大值", () => {
-    expect(formatFileSize(1099511627776)).toBe("1 TB");
+    expect(formatFileSize(1099511627776)).toBe("1.0 TB");
   });
 });

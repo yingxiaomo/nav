@@ -179,8 +179,8 @@ func dockerGetRaw(ctx context.Context, cli *http.Client, path string) (io.ReadCl
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		resp.Body.Close()
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		resp.Body.Close()
 		return nil, fmt.Errorf("Docker API 返回 %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 	return resp.Body, nil

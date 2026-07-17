@@ -1,4 +1,10 @@
 import { DataSchema } from "../types/types";
+import { ApiServerAdapter } from './api-server-adapter';
+import { GithubRepoAdapter } from './github-repo-adapter';
+import { S3Adapter } from './s3-adapter';
+import { WebDavAdapter } from './webdav-adapter';
+import { DropboxAdapter } from './dropbox-adapter';
+import { GoogleDriveAdapter } from './google-drive-adapter';
 
 export const STORAGE_CONFIG_KEY = "clean-nav-storage-config";
 
@@ -65,4 +71,24 @@ export interface GoogleDriveSettings {
 export interface ApiServerSettings {
   baseUrl: string;
   token?: string;
+}
+
+/** 根据配置创建对应的存储适配器实例 */
+export function createAdapter(config: StorageConfig): StorageAdapter | null {
+  switch (config.type) {
+    case 'api-server':
+      return config.apiServer?.baseUrl ? new ApiServerAdapter(config.apiServer) : null;
+    case 'github':
+      return config.github?.token ? new GithubRepoAdapter(config.github) : null;
+    case 's3':
+      return config.s3?.accessKeyId ? new S3Adapter(config.s3) : null;
+    case 'webdav':
+      return config.webdav?.url ? new WebDavAdapter(config.webdav) : null;
+    case 'dropbox':
+      return config.dropbox?.token ? new DropboxAdapter(config.dropbox) : null;
+    case 'googledrive':
+      return config.googledrive?.token ? new GoogleDriveAdapter(config.googledrive) : null;
+    default:
+      return null;
+  }
 }

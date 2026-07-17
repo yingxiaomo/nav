@@ -17,8 +17,7 @@ import {
   sanitizeText
 } from "@/lib/utils/validation";
 import { convertToWebP } from "@/lib/utils/image-utils";
-import { STORAGE_CONFIG_KEY, StorageConfig } from "@/lib/adapters/storage";
-import { GithubRepoAdapter, S3Adapter, WebDavAdapter, DropboxAdapter, GoogleDriveAdapter, ApiServerAdapter } from "@/lib/adapters";
+import { STORAGE_CONFIG_KEY, StorageConfig, createAdapter } from "@/lib/adapters/storage";
 
 interface AddLinkTabProps {
   localData: DataSchema;
@@ -157,27 +156,7 @@ export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTa
 
       if (storageConfig && storageConfig.type !== 'gist') {
         try {
-          let adapter: { uploadFile?: (file: File, name: string) => Promise<string> } | null = null;
-          switch (storageConfig.type) {
-            case 'github':
-              if (storageConfig.github?.token) adapter = new GithubRepoAdapter(storageConfig.github);
-              break;
-            case 's3':
-              if (storageConfig.s3?.accessKeyId) adapter = new S3Adapter(storageConfig.s3);
-              break;
-            case 'webdav':
-              if (storageConfig.webdav?.url) adapter = new WebDavAdapter(storageConfig.webdav);
-              break;
-            case 'dropbox':
-              if (storageConfig.dropbox?.token) adapter = new DropboxAdapter(storageConfig.dropbox);
-              break;
-            case 'googledrive':
-              if (storageConfig.googledrive?.token) adapter = new GoogleDriveAdapter(storageConfig.googledrive);
-              break;
-            case 'api-server':
-              if (storageConfig.apiServer?.baseUrl) adapter = new ApiServerAdapter(storageConfig.apiServer);
-              break;
-          }
+          let adapter: { uploadFile?: (file: File, name: string) => Promise<string> } | null = createAdapter(storageConfig);
 
           if (adapter?.uploadFile) {
             const url = await adapter.uploadFile(webpFile, `icon-${Date.now()}.webp`);

@@ -22,8 +22,8 @@ export function MonitorEditDialog({ target, baseUrl, authHeaders, onClose, onSav
   const [icon, setIcon] = useState(target.icon || '');
   const [url, setUrl] = useState(target.url || '');
   const [mac, setMac] = useState(target.mac || '');
-  const [sshUser, setSshUser] = useState(target.ssh_user || '');
-  const [sshPass, setSshPass] = useState(target.ssh_pass || '');
+  const [sshUser, setSshUser] = useState(target.sshUser || '');
+  const [sshPass, setSshPass] = useState(target.sshPass || '');
 const [saving, setSaving] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -61,7 +61,7 @@ const [saving, setSaving] = useState(false);
         const res = await fetch(`${baseUrl}/api/v1/admin/monitor/checks/${target.id}`, {
           method: 'PUT',
           headers: { ...authHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim(), url: url.trim() || undefined, icon: icon || undefined, mac: mac.trim() || undefined, ssh_user: sshUser.trim() || undefined, ssh_pass: sshPass.trim() || undefined }),
+          body: JSON.stringify({ name: name.trim(), url: url.trim() || undefined, icon: icon || undefined, mac: mac.trim() || undefined, sshUser: sshUser.trim() || undefined, sshPass: sshPass.trim() || undefined }),
         });
         ok = res.ok;
       }

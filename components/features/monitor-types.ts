@@ -12,7 +12,7 @@ export interface CheckResult {
   latency: number | null;
 }
 export interface TargetInfo {
-  id: string; name: string; url: string; icon?: string; mac?: string; ssh_user?: string; ssh_pass?: string;
+  id: string; name: string; url: string; icon?: string; mac?: string; sshUser?: string; sshPass?: string;
 }
 export interface ContainerInfo {
   id: string; name: string; image: string;
@@ -25,7 +25,7 @@ export interface ContainerStats {
 
 export interface MonitorEditTarget {
   id: string; name: string; icon?: string; url?: string; mac?: string;
-  ssh_user?: string; ssh_pass?: string;
+  sshUser?: string; sshPass?: string;
 }
 
 /** 格式化秒数为中文时长字符串 */

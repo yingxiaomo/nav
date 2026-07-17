@@ -5,3 +5,4 @@ export * from './use-keyboard-shortcuts';
 export * from './use-search-history';
 export * from './use-storage-config';
 export * from './use-reduced-motion';
+export * from './use-monitor-data';

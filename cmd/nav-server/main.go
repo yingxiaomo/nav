@@ -156,8 +156,8 @@ func run(ctx context.Context, cfg Config) error {
 		UploadDir:     cfg.UploadDir,
 		DataDir:       cfg.DataDir,
 	}
-	adminMW := middleware.Admin(database)
-	app.RegisterRoutes(mux, adminMW)
+	sessionMW := middleware.SessionAuth(database)
+	app.RegisterRoutes(mux, sessionMW)
 
 	// Uploads
 	mux.Handle("GET /uploads/", http.StripPrefix("/uploads/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -27,12 +27,12 @@ func isPublicPath(path string) bool {
 	return false
 }
 
-// Admin returns middleware that protects admin and API routes with session cookie auth.
+// SessionAuth returns middleware that protects admin and API routes with session cookie auth.
 //
 // Session cookie format: base64("userID:expiresAtUnixMs") + "." + hmac_hex
 // The HMAC is computed over "userID:expiresAtUnixMs" using the session_secret
 // from the database settings table.
-func Admin(database *sql.DB) func(http.Handler) http.Handler {
+func SessionAuth(database *sql.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			path := r.URL.Path
@@ -56,15 +56,6 @@ func Admin(database *sql.DB) func(http.Handler) http.Handler {
 					next.ServeHTTP(w, r)
 					return
 				}
-			}
-
-			// Docker actions (used by monitoring panel) are public
-			if r.Method == http.MethodPost &&
-				(strings.HasSuffix(path, "/start") ||
-					strings.HasSuffix(path, "/stop") ||
-					strings.HasSuffix(path, "/restart")) {
-				next.ServeHTTP(w, r)
-				return
 			}
 
 			// Check session cookie

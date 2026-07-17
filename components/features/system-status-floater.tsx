@@ -80,25 +80,34 @@ export function SystemStatusFloater() {
 
   const runningCount = checks.filter((c) => c.status === "ok").length;
   const totalCount = checks.length + containers.length;
+  const offlineCount = totalCount - runningCount;
   const glassPanel = "bg-background/70 dark:bg-background/60 backdrop-blur-xl border border-border/40";
 
   return (
     <div className="fixed top-4 right-4 z-[60]" style={{ width: "min(360px, calc(100vw - 32px))" }}>
-      {/* Collapsed pill */}
+
+      {/* Collapsed pill — 4 equal blocks centered around chevron */}
       <div className={cn("flex items-center justify-between px-3 h-10 cursor-pointer select-none rounded-2xl transition-all duration-300 hover:border-border/80", glassPanel)} onClick={() => setExpanded(!expanded)}>
-        <div className="flex items-center gap-3 text-sm font-medium tabular-nums">
-          <Cpu className="w-4 h-4 text-blue-500" /><span className="w-8">{cpuPct}%</span>
-          <MemoryStick className="w-4 h-4 text-amber-500" /><span className="w-8">{memPct}%</span>
+        <div className="flex items-center gap-4 text-sm font-medium tabular-nums flex-1 justify-center">
+          <div className="flex items-center gap-1.5 min-w-[70px] justify-center">
+            <Cpu className="w-4 h-4 text-blue-400 shrink-0" /> <span>{cpuPct}%</span>
+          </div>
+          <div className="flex items-center gap-1.5 min-w-[70px] justify-center">
+            <MemoryStick className="w-4 h-4 text-amber-400 shrink-0" /> <span>{memPct}%</span>
+          </div>
         </div>
-        <ChevronDown className={cn("w-3 h-3 text-muted-foreground transition-transform", expanded && "rotate-180")} />
-        <div className="flex items-center gap-2 text-sm font-medium tabular-nums">
-          <span className="text-right">{runningCount}</span>
-          <span className="text-muted-foreground/50">/</span>
-          <span className="text-right text-muted-foreground/70">{totalCount}</span>
-          <Box className="w-4 h-4 text-green-500" />
+        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted/30 hover:bg-muted/50 transition-colors shrink-0">
+          <ChevronDown className={cn("w-5 h-5 text-muted-foreground/70 transition-transform", expanded && "rotate-180")} />
+        </div>
+        <div className="flex items-center gap-4 text-sm font-medium tabular-nums flex-1 justify-center">
+          <div className="flex items-center gap-1.5 min-w-[70px] justify-center">
+            <Box className="w-4 h-4 text-green-400 shrink-0" /> <span>{runningCount}</span>
+          </div>
+          <div className="flex items-center gap-1.5 min-w-[70px] justify-center">
+            <XCircle className="w-4 h-4 text-red-400 shrink-0" /> <span>{offlineCount}</span>
+          </div>
         </div>
       </div>
-
       {/* Expanded panel */}
       <div className={cn("mt-2 overflow-hidden transition-all duration-300", expanded ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0 pointer-events-none")}>
         <div className={cn("rounded-2xl p-3 space-y-3", glassPanel)}>

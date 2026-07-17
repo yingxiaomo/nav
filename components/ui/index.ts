@@ -17,3 +17,4 @@ export * from './card';
 export * from './table';
 export * from './icon-editor';
 export * from './icon-uploader';
+export * from './context-menu-wrapper';

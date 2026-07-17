@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -566,4 +567,130 @@ func extractIconHref(htmlStr string) string {
 		start = tagStart + tagEnd + 1
 	}
 	return ""
+}
+
+// ===== Favicon extraction (moved from handler/monitor.go) =====
+
+var faviconPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)<link[^>]+rel=["'](?:apple-touch-icon|apple-touch-icon-precomposed)["'][^>]+href=["']([^"']*)["']`),
+	regexp.MustCompile(`(?i)<link[^>]+rel=["']icon["'][^>]+href=["']([^"']*)["']`),
+	regexp.MustCompile(`(?i)<link[^>]+rel=["']shortcut\s+icon["'][^>]+href=["']([^"']*)["']`),
+	regexp.MustCompile(`(?i)<link[^>]+href=["']([^"']*)["'][^>]+rel=["']icon["']`),
+	regexp.MustCompile(`(?i)<link[^>]+href=["']([^"']*)["'][^>]+rel=["']shortcut\s+icon["']`),
+}
+
+// FetchFavicon fetches the favicon URL for a given website.
+// Returns the icon URL (or empty string) and any error encountered.
+func FetchFavicon(targetURL string) (string, error) {
+	normalizedURL := targetURL
+	if !strings.HasPrefix(normalizedURL, "http://") && !strings.HasPrefix(normalizedURL, "https://") {
+		normalizedURL = "http://" + normalizedURL
+	}
+
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return fmt.Errorf("重定向次数过多")
+			}
+			return nil
+		},
+	}
+
+	origin := extractOrigin(targetURL)
+	var fallbackIcon string
+	if origin != "" {
+		fallbackIcon = origin + "/favicon.ico"
+	}
+
+	html := fetchHTML(client, targetURL)
+	if html == "" {
+		return fallbackIcon, nil
+	}
+
+	iconURL := ExtractFaviconFromHTML(html, origin)
+	if iconURL != "" {
+		return iconURL, nil
+	}
+
+	return fallbackIcon, nil
+}
+
+// ExtractFaviconFromHTML extracts the favicon URL from HTML content using regex patterns.
+func ExtractFaviconFromHTML(html string, baseURL string) string {
+	for _, pattern := range faviconPatterns {
+		matches := pattern.FindStringSubmatch(html)
+		if len(matches) > 1 && matches[1] != "" {
+			resolved := ResolveURL(matches[1], baseURL)
+			if resolved != "" {
+				return resolved
+			}
+		}
+	}
+	return ""
+}
+
+// fetchHTML fetches HTML from a URL with a 512KB limit and decodes using detected charset.
+func fetchHTML(client *http.Client, url string) string {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (NavServer Monitor; +https://github.com/yingxiaomo/nav)")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+
+	limited := io.LimitReader(resp.Body, 512*1024)
+	data, err := io.ReadAll(limited)
+	if err != nil {
+		return ""
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	charset := detectCharset(contentType, data)
+	return decodeToString(data, charset)
+}
+
+// extractOrigin extracts the origin (scheme + host) from a URL.
+func extractOrigin(rawURL string) string {
+	if !strings.HasPrefix(rawURL, "http://") && !strings.HasPrefix(rawURL, "https://") {
+		rawURL = "http://" + rawURL
+	}
+
+	afterProto := rawURL
+	if strings.HasPrefix(rawURL, "https://") {
+		afterProto = rawURL[8:]
+	} else if strings.HasPrefix(rawURL, "http://") {
+		afterProto = rawURL[7:]
+	}
+
+	slashIdx := strings.Index(afterProto, "/")
+	if slashIdx == -1 {
+		slashIdx = len(afterProto)
+	}
+
+	host := afterProto[:slashIdx]
+	proto := "https"
+	if strings.HasPrefix(rawURL, "http://") {
+		proto = "http"
+	}
+
+	return proto + "://" + host
+}
+
+// decodeToString decodes byte data according to the given charset.
+// Currently always returns string(data); the charset parameter is kept for
+// future proper encoding conversion.
+func decodeToString(data []byte, charset string) string {
+	switch strings.ToLower(charset) {
+	case "utf-8", "utf8", "":
+		return string(data)
+	default:
+		return string(data)
+	}
 }

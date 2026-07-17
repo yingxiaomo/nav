@@ -316,7 +316,7 @@ func (h *HealthChecker) GetTargets() []model.MonitorTarget {
 // getTargets retrieves all monitor targets from the database.
 func (h *HealthChecker) getTargets() []model.MonitorTarget {
 	rows, err := h.db.Query(
-		"SELECT id, name, url, COALESCE(icon,''), COALESCE(mac,''), timeout, created_at, COALESCE(ssh_user,''), COALESCE(ssh_pass,'') FROM monitor_targets ORDER BY created_at",
+		"SELECT id, name, url, COALESCE(icon,''), COALESCE(mac,''), timeout, created_at, COALESCE(ssh_user,''), COALESCE(ssh_pass,''), COALESCE(check_type,'') FROM monitor_targets ORDER BY created_at",
 	)
 	if err != nil {
 		slog.Warn("查询监控目标失败", "error", err)
@@ -327,7 +327,7 @@ func (h *HealthChecker) getTargets() []model.MonitorTarget {
 	var targets []model.MonitorTarget
 	for rows.Next() {
 		var t model.MonitorTarget
-		if err := rows.Scan(&t.ID, &t.Name, &t.URL, &t.Icon, &t.MAC, &t.Timeout, &t.CreatedAt, &t.SSHUser, &t.SSHPass); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.URL, &t.Icon, &t.MAC, &t.Timeout, &t.CreatedAt, &t.SSHUser, &t.SSHPass, &t.CheckType); err != nil {
 			slog.Warn("扫描监控目标失败", "error", err)
 			continue
 		}
@@ -400,8 +400,8 @@ func (h *HealthChecker) AddTarget(input model.MonitorTargetInput) (*model.Monito
 // UpdateTarget updates an existing monitor target.
 func (h *HealthChecker) UpdateTarget(id string, input model.MonitorTargetInput) error {
 	result, err := h.db.Exec(
-		"UPDATE monitor_targets SET name=?, url=?, icon=?, mac=?, timeout=?, ssh_user=?, ssh_pass=?, api_key=?, check_type=? WHERE id=?",
-		input.Name, input.URL, input.Icon, input.MAC, input.Timeout, input.SSHUser, input.SSHPass, id,
+		"UPDATE monitor_targets SET name=?, url=?, icon=?, mac=?, timeout=?, ssh_user=?, ssh_pass=?, check_type=? WHERE id=?",
+		input.Name, input.URL, input.Icon, input.MAC, input.Timeout, input.SSHUser, input.SSHPass, input.CheckType, id,
 	)
 	if err != nil {
 		return fmt.Errorf("更新监控目标失败: %w", err)

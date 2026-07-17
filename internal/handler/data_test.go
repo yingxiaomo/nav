@@ -149,13 +149,13 @@ func TestPutData_FullRoundTrip(t *testing.T) {
 func TestPutData_PreservesAuthSettings(t *testing.T) {
 	h := setupHandler(t)
 
-	_, err := h.DB.Exec(`INSERT INTO settings (key, value) VALUES (?, ?)`, "api_token", "sk-secret")
+	_, err := h.DB.Exec(`INSERT INTO settings (key, value) VALUES (?, ?)`, "admin_password_hash", "$2a$10$test")
 	if err != nil {
-		t.Fatalf("failed to set api_token: %v", err)
+		t.Fatalf("failed to set admin_password_hash: %v", err)
 	}
 
 	input := dataImport{
-		Settings: json.RawMessage(`{"api_token":"should-not-override","title":"New Title"}`),
+		Settings: json.RawMessage(`{"title":"New Title"}`),
 	}
 	body, _ := json.Marshal(input)
 	req := httptest.NewRequest("PUT", "/api/v1/data", bytes.NewReader(body))
@@ -167,10 +167,10 @@ func TestPutData_PreservesAuthSettings(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	var token string
-	h.DB.QueryRow("SELECT value FROM settings WHERE key='api_token'").Scan(&token)
-	if token != "sk-secret" {
-		t.Errorf("expected preserved api_token 'sk-secret', got %q", token)
+	var hash string
+	h.DB.QueryRow("SELECT value FROM settings WHERE key='admin_password_hash'").Scan(&hash)
+	if hash != "$2a$10$test" {
+		t.Errorf("expected preserved admin_password_hash, got %q", hash)
 	}
 }
 

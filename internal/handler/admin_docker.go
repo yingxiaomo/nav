@@ -134,58 +134,69 @@ func (h *Handler) DockerLogs() http.HandlerFunc {
 	}
 }
 
-// DockerStartContainer handles POST /api/v1/admin/docker/{name}/start.
-func (h *Handler) DockerStartContainer() http.HandlerFunc {
+// DockerContainerAction handles POST /api/v1/admin/docker/{name}/{action}.
+// It dispatches to start/stop/restart based on the action path parameter.
+func (h *Handler) DockerContainerAction() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		svc := h.DockerSvc
-		if svc == nil {
-			model.RespondError(w, http.StatusServiceUnavailable, "Docker 不可用，需要挂载 Docker socket")
-			return
-		}
 		name := r.PathValue("name")
-		if err := svc.StartContainer(r.Context(), name); err != nil {
-			slog.Warn("启动容器失败", "container", name, "error", err)
-			model.RespondError(w, http.StatusInternalServerError, err.Error())
-			return
+		action := r.PathValue("action")
+
+		switch action {
+		case "start":
+			h.dockerStartContainer(name, w, r)
+		case "stop":
+			h.dockerStopContainer(name, w, r)
+		case "restart":
+			h.dockerRestartContainer(name, w, r)
+		default:
+			model.RespondError(w, http.StatusBadRequest, "不支持的操作，仅支持 start/stop/restart")
 		}
-		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 	}
 }
 
-// DockerStopContainer handles POST /api/v1/admin/docker/{name}/stop.
-func (h *Handler) DockerStopContainer() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		svc := h.DockerSvc
-		if svc == nil {
-			model.RespondError(w, http.StatusServiceUnavailable, "Docker 不可用，需要挂载 Docker socket")
-			return
-		}
-		name := r.PathValue("name")
-		if err := svc.StopContainer(r.Context(), name); err != nil {
-			slog.Warn("停止容器失败", "container", name, "error", err)
-			model.RespondError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
+// dockerStartContainer starts a Docker container by name.
+func (h *Handler) dockerStartContainer(name string, w http.ResponseWriter, r *http.Request) {
+	svc := h.DockerSvc
+	if svc == nil {
+		model.RespondError(w, http.StatusServiceUnavailable, "Docker 不可用，需要挂载 Docker socket")
+		return
 	}
+	if err := svc.StartContainer(r.Context(), name); err != nil {
+		slog.Warn("启动容器失败", "container", name, "error", err)
+		model.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 }
 
-// DockerRestartContainer handles POST /api/v1/admin/docker/{name}/restart.
-func (h *Handler) DockerRestartContainer() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		svc := h.DockerSvc
-		if svc == nil {
-			model.RespondError(w, http.StatusServiceUnavailable, "Docker 不可用，需要挂载 Docker socket")
-			return
-		}
-		name := r.PathValue("name")
-		if err := svc.RestartContainer(r.Context(), name); err != nil {
-			slog.Warn("重启容器失败", "container", name, "error", err)
-			model.RespondError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
+// dockerStopContainer stops a Docker container by name.
+func (h *Handler) dockerStopContainer(name string, w http.ResponseWriter, r *http.Request) {
+	svc := h.DockerSvc
+	if svc == nil {
+		model.RespondError(w, http.StatusServiceUnavailable, "Docker 不可用，需要挂载 Docker socket")
+		return
 	}
+	if err := svc.StopContainer(r.Context(), name); err != nil {
+		slog.Warn("停止容器失败", "container", name, "error", err)
+		model.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
+}
+
+// dockerRestartContainer restarts a Docker container by name.
+func (h *Handler) dockerRestartContainer(name string, w http.ResponseWriter, r *http.Request) {
+	svc := h.DockerSvc
+	if svc == nil {
+		model.RespondError(w, http.StatusServiceUnavailable, "Docker 不可用，需要挂载 Docker socket")
+		return
+	}
+	if err := svc.RestartContainer(r.Context(), name); err != nil {
+		slog.Warn("重启容器失败", "container", name, "error", err)
+		model.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 }
 
 // FetchDockerIcon handles POST /api/v1/admin/docker/fetch-icon.

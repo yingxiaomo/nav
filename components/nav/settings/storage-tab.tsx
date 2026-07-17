@@ -1,8 +1,8 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, DropboxSettings, GoogleDriveSettings, ApiServerSettings } from "@/lib/adapters/storage";
-import { GithubRepoAdapter, S3Adapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, ApiServerAdapter } from "@/lib/adapters";
+import { StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, DropboxSettings, GoogleDriveSettings, ApiServerSettings, createAdapter } from "@/lib/adapters/storage";
+import { GistAdapter } from "@/lib/adapters";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -89,63 +89,32 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
   const handleTestConnection = async () => {
     setIsTesting(true);
     try {
-      if (config.type === 'github') {
-        const settings = config.github || DEFAULT_GITHUB;
-        const adapter = new GithubRepoAdapter(settings);
-        if (adapter.testConnection) await adapter.testConnection();
-        toast.success("GitHub 连接成功！", {
-          description: "已成功连接到 GitHub 仓库",
-          duration: 3000
-        });
-      } else if (config.type === 's3') {
-        const settings = config.s3 || DEFAULT_S3;
-        const adapter = new S3Adapter(settings);
-        if (adapter.testConnection) await adapter.testConnection();
-        toast.success("S3/R2 连接成功！", {
-          description: "已成功连接到 S3/R2 存储",
-          duration: 3000
-        });
-      } else if (config.type === 'webdav') {
-        const settings = config.webdav || DEFAULT_WEBDAV;
-        const adapter = new WebDavAdapter(settings);
-        if (adapter.testConnection) await adapter.testConnection();
-        toast.success("WebDAV 连接成功！", {
-          description: "已成功连接到 WebDAV 服务器",
-          duration: 3000
-        });
-      } else if (config.type === 'gist') {
+      let adapter: { testConnection?: () => Promise<void> } | null = null;
+      let typeLabel = '';
+
+      if (config.type === 'gist') {
         const settings = config.gist || DEFAULT_GIST;
-        const adapter = new GistAdapter(settings);
-        if (adapter.testConnection) await adapter.testConnection();
-        toast.success("Gist 连接成功！", {
-          description: "已成功连接到 GitHub Gist",
-          duration: 3000
-        });
-      } else if (config.type === 'dropbox') {
-        const settings = config.dropbox || DEFAULT_DROPBOX;
-        const adapter = new DropboxAdapter(settings);
-        if (adapter.testConnection) await adapter.testConnection();
-        toast.success("Dropbox 连接成功！", {
-          description: "已成功连接到 Dropbox",
-          duration: 3000
-        });
-      } else if (config.type === 'googledrive') {
-        const settings = config.googledrive || DEFAULT_GOOGLE_DRIVE;
-        const adapter = new GoogleDriveAdapter(settings);
-        if (adapter.testConnection) await adapter.testConnection();
-        toast.success("Google Drive 连接成功！", {
-          description: "已成功连接到 Google Drive",
-          duration: 3000
-        });
-      } else if (config.type === 'api-server') {
-        const settings = config.apiServer || DEFAULT_APISERVER;
-        const adapter = new ApiServerAdapter(settings);
-        if (adapter.testConnection) await adapter.testConnection();
-        toast.success("后端连接成功！", {
-          description: `已成功连接到 ${settings.baseUrl}`,
-          duration: 3000
-        });
+        adapter = new GistAdapter(settings);
+        typeLabel = 'GitHub Gist';
+      } else {
+        adapter = createAdapter(config);
+        const labelMap: Record<string, string> = {
+          github: 'GitHub 仓库', s3: 'S3/R2 存储', webdav: 'WebDAV 服务器',
+          dropbox: 'Dropbox', googledrive: 'Google Drive', 'api-server': '后端'
+        };
+        typeLabel = labelMap[config.type] || config.type;
       }
+
+      if (!adapter) {
+        toast.error(`${typeLabel} 配置不完整`, { description: "请填写必要的配置信息" });
+        return;
+      }
+
+      if (adapter.testConnection) await adapter.testConnection();
+      toast.success(`${typeLabel} 连接成功！`, {
+        description: `已成功连接到 ${typeLabel}`,
+        duration: 3000
+      });
     } catch (error: unknown) {
       console.error("Test connection failed:", error);
       const errorMessage = typeof error === 'object' && error !== null && 'message' in error ? (error.message as string) : "请检查配置信息";

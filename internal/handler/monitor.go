@@ -2,28 +2,14 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"sort"
-	"regexp"
 	"strings"
-	"time"
 
 	"github.com/YingXiaoMo/nav/internal/model"
 	"github.com/YingXiaoMo/nav/internal/service"
 )
-
-// ===== Favicon extraction patterns =====
-
-var faviconPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)<link[^>]+rel=["'](?:apple-touch-icon|apple-touch-icon-precomposed)["'][^>]+href=["']([^"']*)["']`),
-	regexp.MustCompile(`(?i)<link[^>]+rel=["']icon["'][^>]+href=["']([^"']*)["']`),
-	regexp.MustCompile(`(?i)<link[^>]+rel=["']shortcut\s+icon["'][^>]+href=["']([^"']*)["']`),
-	regexp.MustCompile(`(?i)<link[^>]+href=["']([^"']*)["'][^>]+rel=["']icon["']`),
-	regexp.MustCompile(`(?i)<link[^>]+href=["']([^"']*)["'][^>]+rel=["']shortcut\s+icon["']`),
-}
 
 // ===== Handlers =====
 
@@ -127,7 +113,7 @@ func FetchMonitorIcon() http.HandlerFunc {
 			model.RespondError(w, http.StatusBadRequest, "请输入有效 URL")
 			return
 		}
-		iconURL := fetchFavicon(req.URL)
+		iconURL, _ := service.FetchFavicon(req.URL)
 		model.RespondJSON(w, http.StatusOK, map[string]any{"icon": iconURL})
 	}
 }
@@ -228,125 +214,3 @@ func (h *Handler) MonitorAll() http.HandlerFunc {
 	}
 }
 
-// ===== Favicon fetch helper =====
-
-func fetchFavicon(targetURL string) *string {
-	normalizedURL := targetURL
-	if !strings.HasPrefix(normalizedURL, "http://") && !strings.HasPrefix(normalizedURL, "https://") {
-		normalizedURL = "http://" + normalizedURL
-	}
-
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 10 {
-				return fmt.Errorf("重定向次数过多")
-			}
-			return nil
-		},
-	}
-
-	origin := extractOrigin(targetURL)
-	var fallbackIcon *string
-	if origin != "" {
-		f := origin + "/favicon.ico"
-		fallbackIcon = &f
-	}
-
-	html := fetchHTML(client, targetURL)
-	if html == "" {
-		return fallbackIcon
-	}
-
-	iconURL := extractFaviconFromHTML(html, origin)
-	if iconURL != "" {
-		return &iconURL
-	}
-
-	return fallbackIcon
-}
-
-func fetchHTML(client *http.Client, url string) string {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return ""
-	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (NavServer Monitor; +https://github.com/yingxiaomo/nav)")
-	req.Header.Set("Accept", "text/html,application/xhtml+xml")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return ""
-	}
-	defer resp.Body.Close()
-
-	limited := io.LimitReader(resp.Body, 512*1024)
-	data, err := io.ReadAll(limited)
-	if err != nil {
-		return ""
-	}
-
-	contentType := resp.Header.Get("Content-Type")
-	charset := detectCharset(contentType)
-	return decodeToString(data, charset)
-}
-
-func extractOrigin(rawURL string) string {
-	if !strings.HasPrefix(rawURL, "http://") && !strings.HasPrefix(rawURL, "https://") {
-		rawURL = "http://" + rawURL
-	}
-
-	afterProto := rawURL
-	if strings.HasPrefix(rawURL, "https://") {
-		afterProto = rawURL[8:]
-	} else if strings.HasPrefix(rawURL, "http://") {
-		afterProto = rawURL[7:]
-	}
-
-	slashIdx := strings.Index(afterProto, "/")
-	if slashIdx == -1 {
-		slashIdx = len(afterProto)
-	}
-
-	host := afterProto[:slashIdx]
-	proto := "https"
-	if strings.HasPrefix(rawURL, "http://") {
-		proto = "http"
-	}
-
-	return proto + "://" + host
-}
-
-func detectCharset(contentType string) string {
-	idx := strings.Index(strings.ToLower(contentType), "charset=")
-	if idx == -1 {
-		return "utf-8"
-	}
-	charset := contentType[idx+8:]
-	if semi := strings.Index(charset, ";"); semi != -1 {
-		charset = charset[:semi]
-	}
-	return strings.TrimSpace(charset)
-}
-
-func decodeToString(data []byte, charset string) string {
-	switch strings.ToLower(charset) {
-	case "utf-8", "utf8", "":
-		return string(data)
-	default:
-		return string(data)
-	}
-}
-
-func extractFaviconFromHTML(html string, baseURL string) string {
-	for _, pattern := range faviconPatterns {
-		matches := pattern.FindStringSubmatch(html)
-		if len(matches) > 1 && matches[1] != "" {
-			resolved := service.ResolveURL(matches[1], baseURL)
-			if resolved != "" {
-				return resolved
-			}
-		}
-	}
-	return ""
-}

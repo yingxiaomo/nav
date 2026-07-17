@@ -162,7 +162,7 @@ func (h *Handler) ImportBackup() http.HandlerFunc {
 			return
 		}
 
-		authKeys := []string{"api_token", "admin_password_hash", "admin_salt", "session_secret", "admin_session_secret"}
+		authKeys := []string{"admin_password_hash", "session_secret"}
 		preserved := make(map[string]string)
 		for _, key := range authKeys {
 			if val, err := queries.GetSetting(r.Context(), db, key); err == nil && val != "" {

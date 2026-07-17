@@ -3,12 +3,10 @@ package handler
 import (
 	"crypto/rand"
 	"database/sql"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -62,22 +60,7 @@ func checkSession(r *http.Request, db *sql.DB) bool {
 		return false
 	}
 	sessionSecret, _ := queries.GetSetting(r.Context(), db, "session_secret")
-	if sessionSecret != "" && session.Verify(cookie.Value, sessionSecret) {
-		return true
-	}
-	apiToken, _ := queries.GetSetting(r.Context(), db, "api_token")
-	if apiToken != "" && session.Verify(cookie.Value, apiToken) {
-		return true
-	}
-	return false
-}
-
-func generateAPIToken() (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return "sk-" + base64.RawURLEncoding.EncodeToString(b), nil
+	return sessionSecret != "" && session.Verify(cookie.Value, sessionSecret)
 }
 
 // ===== Rate limiting for login =====
@@ -149,13 +132,6 @@ func (h *Handler) Login() http.HandlerFunc {
 		}
 
 		ip := r.RemoteAddr
-		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-			if idx := strings.Index(fwd, ","); idx != -1 {
-				ip = strings.TrimSpace(fwd[:idx])
-			} else {
-				ip = strings.TrimSpace(fwd)
-			}
-		}
 
 		pwHash, err := queries.GetSetting(r.Context(), db, "admin_password_hash")
 		if err != nil {
@@ -218,7 +194,7 @@ func (h *Handler) Logout() http.HandlerFunc {
 	}
 }
 
-// Setup handles POST /api/v1/auth/setup — initial password and API token creation
+// Setup handles POST /api/v1/auth/setup — initial password creation
 func (h *Handler) Setup() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		db := h.DB
@@ -258,18 +234,6 @@ func (h *Handler) Setup() http.HandlerFunc {
 			return
 		}
 
-		token, err := generateAPIToken()
-		if err != nil {
-			slog.Error("生成 API token 失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		if err := queries.SetSetting(r.Context(), db, "api_token", token); err != nil {
-			slog.Error("保存 API token 失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-
 		slog.Info("管理员初始化完成")
 		model.RespondJSON(w, http.StatusCreated, map[string]any{"success": true})
 	}
@@ -279,49 +243,10 @@ func (h *Handler) Setup() http.HandlerFunc {
 func (h *Handler) AuthStatus() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		pwHash, _ := queries.GetSetting(r.Context(), h.DB, "admin_password_hash")
-		apiToken, _ := queries.GetSetting(r.Context(), h.DB, "api_token")
 
 		model.RespondJSON(w, http.StatusOK, map[string]any{
-			"setupRequired":   pwHash == "",
-			"tokenConfigured": apiToken != "",
-			"loggedIn":        checkSession(r, h.DB),
-		})
-	}
-}
-
-// GetAPIToken handles GET /api/v1/auth/api-token
-func (h *Handler) GetAPIToken() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		token, err := queries.GetSetting(r.Context(), h.DB, "api_token")
-		if err != nil {
-			slog.Error("读取 API token 失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		model.RespondJSON(w, http.StatusOK, map[string]any{"token": token})
-	}
-}
-
-// RegenerateAPIToken handles POST /api/v1/auth/api-token
-func (h *Handler) RegenerateAPIToken() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		token, err := generateAPIToken()
-		if err != nil {
-			slog.Error("生成 API token 失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		if err := queries.SetSetting(r.Context(), h.DB, "api_token", token); err != nil {
-			slog.Error("保存 API token 失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-
-		slog.Info("API token 已重新生成")
-		model.RespondJSON(w, http.StatusOK, map[string]any{
-			"success": true,
-			"token":   token,
-			"message": "API 令牌已重新生成，前端需要使用新令牌连接",
+			"setupRequired": pwHash == "",
+			"loggedIn":      checkSession(r, h.DB),
 		})
 	}
 }
@@ -330,17 +255,9 @@ func (h *Handler) RegenerateAPIToken() http.HandlerFunc {
 func (h *Handler) ChangePassword() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		db := h.DB
-		ip := r.RemoteAddr
-		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-			if idx := strings.Index(fwd, ","); idx != -1 {
-				ip = strings.TrimSpace(fwd[:idx])
-			} else {
-				ip = strings.TrimSpace(fwd)
-			}
-		}
 
-		if !checkRateLimit(ip) {
-			slog.Warn("修改密码限流", "ip", ip)
+		if !checkRateLimit(r.RemoteAddr) {
+			slog.Warn("修改密码限流", "ip", r.RemoteAddr)
 			model.RespondError(w, http.StatusTooManyRequests, "操作过于频繁，请 15 分钟后再试")
 			return
 		}
@@ -369,13 +286,13 @@ func (h *Handler) ChangePassword() http.HandlerFunc {
 			return
 		}
 		if err := bcrypt.CompareHashAndPassword([]byte(pwHash), []byte(body.CurrentPassword)); err != nil {
-			recordLoginAttempt(ip, false)
-			slog.Warn("修改密码 - 当前密码错误", "ip", ip)
+			recordLoginAttempt(r.RemoteAddr, false)
+			slog.Warn("修改密码 - 当前密码错误", "ip", r.RemoteAddr)
 			model.RespondError(w, http.StatusForbidden, "当前密码错误")
 			return
 		}
 
-		recordLoginAttempt(ip, true)
+		recordLoginAttempt(r.RemoteAddr, true)
 
 		newHash, err := bcrypt.GenerateFromPassword([]byte(body.NewPassword), bcrypt.DefaultCost)
 		if err != nil {

@@ -342,23 +342,11 @@ func extractFaviconFromHTML(html string, baseURL string) string {
 	for _, pattern := range faviconPatterns {
 		matches := pattern.FindStringSubmatch(html)
 		if len(matches) > 1 && matches[1] != "" {
-			resolved := resolveURL(matches[1], baseURL)
+			resolved := service.ResolveURL(matches[1], baseURL)
 			if resolved != "" {
 				return resolved
 			}
 		}
 	}
 	return ""
-}
-
-func resolveURL(href, base string) string {
-	if strings.HasPrefix(href, "http://") || strings.HasPrefix(href, "https://") || strings.HasPrefix(href, "data:") {
-		return href
-	}
-
-	base = strings.TrimRight(base, "/")
-	if strings.HasPrefix(href, "/") {
-		return base + href
-	}
-	return base + "/" + href
 }

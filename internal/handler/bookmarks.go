@@ -1,8 +1,9 @@
 package handler
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -15,127 +16,81 @@ type reorderRequest struct {
 }
 
 func (h *Handler) ListBookmarks() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		categoryID := r.URL.Query().Get("categoryId")
-		bms, err := queries.GetAllBookmarks(r.Context(), h.DB, categoryID)
-		if err != nil {
-			slog.Error("获取书签列表失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		model.RespondJSON(w, http.StatusOK, bms)
-	}
+	return h.handleList("书签", func(ctx context.Context, db *sql.DB) (any, error) {
+		return queries.GetAllBookmarks(ctx, db, "")
+	})
 }
 
 func (h *Handler) GetBookmark() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("id")
-		bm, err := queries.GetBookmark(r.Context(), h.DB, id)
-		if err != nil {
-			slog.Error("获取书签失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		if bm == nil {
-			model.RespondError(w, http.StatusNotFound, "书签不存在")
-			return
-		}
-		model.RespondJSON(w, http.StatusOK, bm)
-	}
+	return h.handleGet("书签",
+		func(ctx context.Context, db *sql.DB, id string) (any, error) { return queries.GetBookmark(ctx, db, id) })
 }
 
 func (h *Handler) CreateBookmark() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		db := h.DB
-
+	return h.handleCreate("书签", func(r *http.Request, ctx context.Context, db *sql.DB) (any, string, bool) {
 		var input model.BookmarkInput
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
-			return
+			return nil, "请求体格式错误", false
 		}
 		if input.CategoryID == "" {
-			model.RespondError(w, http.StatusBadRequest, "缺少分类 ID")
-			return
+			return nil, "缺少分类 ID", false
 		}
 		if input.Title == "" {
-			model.RespondError(w, http.StatusBadRequest, "标题不能为空")
-			return
+			return nil, "标题不能为空", false
 		}
 		if input.URL == "" && !input.IsFolder {
-			// 允许文件夹没有 URL
-			model.RespondError(w, http.StatusBadRequest, "链接不能为空")
-			return
+			return nil, "链接不能为空", false
 		}
 		if input.URL != "" && !strings.HasPrefix(input.URL, "http://") && !strings.HasPrefix(input.URL, "https://") {
-			model.RespondError(w, http.StatusBadRequest, "链接格式无效，仅允许 http/https 链接")
-			return
+			return nil, "链接格式无效，仅允许 http/https 链接", false
 		}
-
-		exists, err := queries.CategoryExists(r.Context(), db, input.CategoryID)
+		exists, err := queries.CategoryExists(ctx, db, input.CategoryID)
 		if err != nil {
-			slog.Error("验证分类失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+			return nil, "服务器内部错误", false
 		}
 		if !exists {
-			model.RespondError(w, http.StatusNotFound, "所属分类不存在")
-			return
+			return nil, "所属分类不存在", false
 		}
-
-		bm, err := queries.CreateBookmark(r.Context(), db, input)
+		bm, err := queries.CreateBookmark(ctx, db, input)
 		if err != nil {
-			slog.Error("创建书签失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+			return nil, "服务器内部错误", false
 		}
-		model.RespondJSON(w, http.StatusCreated, bm)
-	}
+		return bm, "", true
+	})
 }
 
 func (h *Handler) UpdateBookmark() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		db := h.DB
-		id := r.PathValue("id")
-
+	return h.handleUpdate("书签", func(r *http.Request, ctx context.Context, db *sql.DB, id string) (any, string, bool) {
 		var input model.BookmarkInput
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
-			return
+			return nil, "请求体格式错误", false
 		}
 
-		existing, err := queries.GetBookmark(r.Context(), db, id)
+		existing, err := queries.GetBookmark(ctx, db, id)
 		if err != nil {
-			slog.Error("获取书签失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+			return nil, "服务器内部错误", false
 		}
 		if existing == nil {
-			model.RespondError(w, http.StatusNotFound, "书签不存在")
-			return
+			return nil, "not_found", false
 		}
 
-		if input.CategoryID != "" {
-			if input.CategoryID != existing.CategoryID {
-				exists, err := queries.CategoryExists(r.Context(), db, input.CategoryID)
-				if err != nil {
-					slog.Error("验证目标分类失败", "error", err)
-					model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-					return
-				}
-				if !exists {
-					model.RespondError(w, http.StatusBadRequest, "目标分类不存在")
-					return
-				}
-				existing.CategoryID = input.CategoryID
+		// 验证并更新分类
+		if input.CategoryID != "" && input.CategoryID != existing.CategoryID {
+			exists, err := queries.CategoryExists(ctx, db, input.CategoryID)
+			if err != nil {
+				return nil, "服务器内部错误", false
 			}
+			if !exists {
+				return nil, "目标分类不存在", false
+			}
+			existing.CategoryID = input.CategoryID
 		}
 		if input.Title != "" {
 			existing.Title = input.Title
 		}
 		if input.URL != "" {
 			if !strings.HasPrefix(input.URL, "http://") && !strings.HasPrefix(input.URL, "https://") {
-				model.RespondError(w, http.StatusBadRequest, "链接格式无效，仅允许 http/https 链接")
-				return
+				return nil, "链接格式无效，仅允许 http/https 链接", false
 			}
 			existing.URL = input.URL
 		}
@@ -146,55 +101,28 @@ func (h *Handler) UpdateBookmark() http.HandlerFunc {
 			existing.Description = input.Description
 		}
 
-		_, err = queries.UpdateBookmark(r.Context(), db, id, model.BookmarkInput{
-			CategoryID:  existing.CategoryID,
-			Title:       existing.Title,
-			URL:         existing.URL,
-			Icon:        existing.Icon,
-			Description: existing.Description,
-			Order:       existing.Order,
-		})
-		if err != nil {
-			slog.Error("更新书签失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+		if _, err := queries.UpdateBookmark(ctx, db, id, model.BookmarkInput{
+			CategoryID: existing.CategoryID, Title: existing.Title, URL: existing.URL,
+			Icon: existing.Icon, Description: existing.Description, Order: existing.Order,
+		}); err != nil {
+			return nil, "服务器内部错误", false
 		}
 
-		updated, err := queries.GetBookmark(r.Context(), db, id)
+		updated, err := queries.GetBookmark(ctx, db, id)
 		if err != nil {
-			slog.Error("获取更新后书签失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
+			return nil, "服务器内部错误", false
 		}
-		model.RespondJSON(w, http.StatusOK, updated)
-	}
+		return updated, "", true
+	})
 }
 
 func (h *Handler) DeleteBookmark() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		db := h.DB
-		id := r.PathValue("id")
-
-		existing, err := queries.GetBookmark(r.Context(), db, id)
-		if err != nil {
-			slog.Error("获取书签失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		if existing == nil {
-			model.RespondError(w, http.StatusNotFound, "书签不存在")
-			return
-		}
-
-		if err := queries.DeleteBookmark(r.Context(), db, id); err != nil {
-			slog.Error("删除书签失败", "error", err, "id", id)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
-	}
+	return h.handleDelete("书签",
+		func(ctx context.Context, db *sql.DB, id string) (any, error) { return queries.GetBookmark(ctx, db, id) },
+		queries.DeleteBookmark)
 }
 
+// ReorderBookmarks 处理 PATCH /api/v1/bookmarks/reorder — 特殊非 CRUD 端点，保持原样
 func (h *Handler) ReorderBookmarks() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req reorderRequest
@@ -211,7 +139,6 @@ func (h *Handler) ReorderBookmarks() http.HandlerFunc {
 			return
 		}
 		if err := queries.ReorderBookmarks(r.Context(), h.DB, req.Items); err != nil {
-			slog.Error("排序书签失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}

@@ -102,7 +102,7 @@ func IsPrivateHost(hostname string) bool {
 }
 
 // resolveURL converts a possibly-relative URL to absolute using the base URL.
-func resolveURL(href, base string) string {
+func ResolveURL(href, base string) string {
 	if strings.HasPrefix(href, "http://") || strings.HasPrefix(href, "https://") {
 		return href
 	}
@@ -280,7 +280,7 @@ func ParseURL(rawURL string) (*ParseResult, error) {
 
 	// Fallback icon
 	if result.Icon == "" {
-		result.Icon = resolveURL("/favicon.ico", baseURLStr)
+		result.Icon = ResolveURL("/favicon.ico", baseURLStr)
 	}
 
 	return result, nil
@@ -352,15 +352,15 @@ func extractFromNode(n *html.Node, result *ParseResult, baseURL string) {
 			}
 			// <meta property="og:image" content="...">
 			if property == "og:image" && result.Image == "" {
-				result.Image = resolveURL(content, baseURL)
+				result.Image = ResolveURL(content, baseURL)
 			}
 			// <meta name="twitter:image" content="...">
 			if name == "twitter:image" && result.Image == "" {
-				result.Image = resolveURL(content, baseURL)
+				result.Image = ResolveURL(content, baseURL)
 			}
 			// <meta property="twitter:image" content="...">
 			if property == "twitter:image" && result.Image == "" {
-				result.Image = resolveURL(content, baseURL)
+				result.Image = ResolveURL(content, baseURL)
 			}
 		case "link":
 			var rel, href string
@@ -376,7 +376,7 @@ func extractFromNode(n *html.Node, result *ParseResult, baseURL string) {
 				break
 			}
 			if (rel == "icon" || rel == "shortcut icon" || rel == "apple-touch-icon") && result.Icon == "" {
-				result.Icon = resolveURL(href, baseURL)
+				result.Icon = ResolveURL(href, baseURL)
 			}
 		}
 	}
@@ -413,18 +413,18 @@ func parseHTMLSimple(htmlStr string, baseURL string) *ParseResult {
 
 	// OG image
 	if ogImage := extractMetaValue(htmlStr, "og:image"); ogImage != "" {
-		result.Image = resolveURL(ogImage, baseURL)
+		result.Image = ResolveURL(ogImage, baseURL)
 	}
 	if result.Image == "" {
 		if twitterImage := extractMetaValue(htmlStr, "twitter:image"); twitterImage != "" {
-			result.Image = resolveURL(twitterImage, baseURL)
+			result.Image = ResolveURL(twitterImage, baseURL)
 		}
 	}
 
 	// Icon
 	icon := extractIconHref(htmlStr)
 	if icon != "" {
-		result.Icon = resolveURL(icon, baseURL)
+		result.Icon = ResolveURL(icon, baseURL)
 	}
 
 	return result

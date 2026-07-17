@@ -3,9 +3,9 @@
 
 type ChildrenAccessor<T> = (item: T) => T[] | undefined;
 
-const defaultGetChildren = (item: Record<string, unknown>): unknown[] | undefined => {
-	const children = item.children;
-	return Array.isArray(children) ? children : undefined;
+const defaultGetChildren = <T,>(item: T): T[] | undefined => {
+	const children = (item as Record<string, unknown>).children;
+	return Array.isArray(children) ? (children as T[]) : undefined;
 };
 
 /** 在树中查找首个匹配 predicate 的节点 */

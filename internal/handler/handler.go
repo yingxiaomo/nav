@@ -88,9 +88,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminMW func(http.Handler) 
 	mux.Handle("GET /api/v1/admin/docker/metadata", adminMW(http.HandlerFunc(h.GetDockerMetadata())))
 	mux.Handle("PUT /api/v1/admin/docker/metadata/{name}", adminMW(http.HandlerFunc(h.SetDockerMetadata())))
 	mux.Handle("PUT /api/v1/admin/docker/reorder", adminMW(http.HandlerFunc(h.ReorderContainers())))
-	mux.Handle("POST /api/v1/admin/docker/{name}/start", adminMW(http.HandlerFunc(h.DockerStartContainer())))
-	mux.Handle("POST /api/v1/admin/docker/{name}/stop", adminMW(http.HandlerFunc(h.DockerStopContainer())))
-	mux.Handle("POST /api/v1/admin/docker/{name}/restart", adminMW(http.HandlerFunc(h.DockerRestartContainer())))
+		mux.Handle("POST /api/v1/admin/docker/{name}/{action}", adminMW(http.HandlerFunc(h.DockerContainerAction())))
 
 	// Admin — Monitor
 	mux.Handle("GET /api/v1/admin/monitor/system", adminMW(http.HandlerFunc(SystemInfo())))

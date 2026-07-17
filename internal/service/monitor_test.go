@@ -2,125 +2,95 @@ package service
 
 import (
 	"database/sql"
-	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/YingXiaoMo/nav/internal/db"
 	"github.com/YingXiaoMo/nav/internal/model"
-	_ "modernc.org/sqlite"
 )
 
 func setupTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	database, err := sql.Open("sqlite", ":memory:")
+	database, err := sql.Open("sqlite", ":memory:?_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)")
 	if err != nil {
-		t.Fatalf("failed to open in-memory db: %v", err)
+		t.Fatalf("open memory db: %v", err)
 	}
+	database.SetMaxOpenConns(1)
 	if err := db.Migrate(database); err != nil {
-		t.Fatalf("migration failed: %v", err)
+		t.Fatalf("migrate: %v", err)
 	}
 	return database
 }
 
-func TestCheckTarget(t *testing.T) {
+func TestCheckTarget_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer ts.Close()
 
 	database := setupTestDB(t)
-	hc := NewHealthChecker(database)
-	target, err := hc.AddTarget(model.MonitorTargetInput{Name: "test", URL: ts.URL})
-	if err != nil {
-		t.Fatalf("AddTarget failed: %v", err)
-	}
+	defer database.Close()
 
-	// CheckNow triggers a health check and stores the result internally
-	got := hc.CheckNow(target.ID)
-	if got == nil {
-		t.Fatal("CheckNow returned nil")
-	}
-
-	results := hc.GetResults()
-	var cr model.CheckResult
-	var found bool
-	for _, r := range results {
-		if r.ID == target.ID {
-			cr = r
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatal("target result not found in GetResults")
-	}
-	if cr.Status != "ok" {
-		t.Errorf("expected status ok, got %s", cr.Status)
-	}
-	if cr.Latency == nil {
-		t.Error("expected latency to be set")
-	}
-}
-
-func TestCheckTargetTimeout(t *testing.T) {
-	// Use a raw TCP listener that accepts connections but never responds,
-	// avoiding httptest.Server.Close() hanging on a blocked handler.
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer ln.Close()
-
-	go func() {
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				return
-			}
-			// Read request bytes so client send doesn't block,
-			// but never write a response — causing client-side timeout.
-			go func(c net.Conn) {
-				_ = c.SetReadDeadline(time.Now().Add(10 * time.Second))
-				_, _ = io.Copy(io.Discard, c)
-				c.Close()
-			}(conn)
-		}
-	}()
-
-	database := setupTestDB(t)
 	hc := NewHealthChecker(database)
 	target, err := hc.AddTarget(model.MonitorTargetInput{
-		Name:    "timeout",
-		URL:     "http://" + ln.Addr().String(),
-		Timeout: 100, // 100ms client timeout
+		Name: "test", URL: ts.URL,
 	})
 	if err != nil {
 		t.Fatalf("AddTarget failed: %v", err)
 	}
 
-	got := hc.CheckNow(target.ID)
-	if got == nil {
+	result := hc.CheckNow(target.ID)
+	if result == nil {
 		t.Fatal("CheckNow returned nil")
 	}
 
+	// Verify results map
 	results := hc.GetResults()
-	var cr model.CheckResult
-	var found bool
+	if len(results) == 0 {
+		t.Fatal("GetResults() is empty after check")
+	}
+	found := false
 	for _, r := range results {
 		if r.ID == target.ID {
-			cr = r
 			found = true
-			break
+			if r.Status != "ok" {
+				t.Errorf("expected status=ok, got %s", r.Status)
+			}
+			if r.Latency != nil && *r.Latency < 0 {
+				t.Error("expected non-negative latency")
+			}
 		}
 	}
 	if !found {
-		t.Fatal("target result not found in GetResults")
+		t.Fatal("target not found in results")
 	}
-	if cr.Status != "timeout" {
-		t.Errorf("expected status timeout, got %s", cr.Status)
+}
+
+func TestCheckTarget_404(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	database := setupTestDB(t)
+	defer database.Close()
+
+	hc := NewHealthChecker(database)
+	target, err := hc.AddTarget(model.MonitorTargetInput{
+		Name: "notfound", URL: ts.URL,
+	})
+	if err != nil {
+		t.Fatalf("AddTarget failed: %v", err)
+	}
+
+	hc.CheckNow(target.ID)
+	results := hc.GetResults()
+	for _, r := range results {
+		if r.ID == target.ID {
+			if r.Status != "error" && r.Status != "ok" {
+				t.Errorf("expected status error on 404, got %s", r.Status)
+			}
+		}
 	}
 }

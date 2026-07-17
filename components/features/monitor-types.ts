@@ -28,13 +28,6 @@ export interface MonitorEditTarget {
   ssh_user?: string; ssh_pass?: string;
 }
 
-/** 格式化字节数为人类可读字符串 */
-export const fmt = (b: number) => {
-  if (!b) return '0 B';
-  const u = ['B', 'KB', 'MB', 'GB', 'TB'], i = Math.floor(Math.log(b) / Math.log(1024));
-  return (b / Math.pow(1024, i)).toFixed(1) + ' ' + u[i];
-};
-
 /** 格式化秒数为中文时长字符串 */
 export const uptimeStr = (s: number) => {
   const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;

@@ -142,3 +142,8 @@ var defaultLLMConfig = LLMConfig{
 	BaseURL: "https://api.openai.com/v1",
 	Model:   "gpt-4o-mini",
 }
+
+// CallLLMWithContext 带上下文的 AI 对话（导出包装 callLLM）
+func CallLLMWithContext(cfg LLMConfig, uid, text string) string {
+	return callLLM(cfg, uid, text)
+}

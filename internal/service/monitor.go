@@ -316,7 +316,7 @@ func (h *HealthChecker) GetTargets() []model.MonitorTarget {
 // getTargets retrieves all monitor targets from the database.
 func (h *HealthChecker) getTargets() []model.MonitorTarget {
 	rows, err := h.db.Query(
-		"SELECT id, name, url, COALESCE(icon,''), COALESCE(mac,''), timeout, created_at FROM monitor_targets ORDER BY created_at",
+		"SELECT id, name, url, COALESCE(icon,''), COALESCE(mac,''), timeout, created_at, COALESCE(ssh_user,''), COALESCE(ssh_pass,'') FROM monitor_targets ORDER BY created_at",
 	)
 	if err != nil {
 		slog.Warn("查询监控目标失败", "error", err)
@@ -381,7 +381,7 @@ func (h *HealthChecker) AddTarget(input model.MonitorTargetInput) (*model.Monito
 	}
 
 	_, err := h.db.Exec(
-		"INSERT INTO monitor_targets (id, name, url, icon, mac, timeout, created_at, ssh_user, ssh_pass) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO monitor_targets (id, name, url, icon, mac, timeout, created_at, ssh_user, ssh_pass) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		target.ID, target.Name, target.URL, target.Icon, target.MAC, target.Timeout, target.CreatedAt, target.SSHUser, target.SSHPass,
 	)
 	if err != nil {

@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { req, API, SystemInfo, CheckResult, MonitorData, ConfirmState, ProgressBar, fm, ft } from '../admin-tabs';
+import { req, API, SystemInfo, CheckResult, MonitorData, ConfirmState, ProgressBar, ft } from '../admin-tabs';
+import { formatFileSize } from '@/lib/utils/format';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   Plus, Trash2, Check, X, Search, Upload, ExternalLink,
@@ -126,7 +127,7 @@ export default function MonitorTab({ showConfirm }: { showConfirm: (opts: Omit<C
             <div className="mt-2">
               <span className="text-xl font-semibold">{sys?.memory?.usedPercent || 0}%</span>
               <ProgressBar percent={sys?.memory?.usedPercent || 0} />
-              <span className="text-muted-foreground text-xs whitespace-nowrap">{fm(sys?.memory?.used)} / {fm(sys?.memory?.total)}</span>
+              <span className="text-muted-foreground text-xs whitespace-nowrap">{formatFileSize(sys?.memory?.used)} / {formatFileSize(sys?.memory?.total)}</span>
             </div>
           </CardContent>
         </Card>
@@ -139,7 +140,7 @@ export default function MonitorTab({ showConfirm }: { showConfirm: (opts: Omit<C
             <div className="mt-2">
               <span className="text-xl font-semibold">{sys?.disk?.usedPercent || 0}%</span>
               <ProgressBar percent={sys?.disk?.usedPercent || 0} />
-              <span className="text-muted-foreground text-xs whitespace-nowrap">{fm(sys?.disk?.used)} / {fm(sys?.disk?.total)}</span>
+              <span className="text-muted-foreground text-xs whitespace-nowrap">{formatFileSize(sys?.disk?.used)} / {formatFileSize(sys?.disk?.total)}</span>
             </div>
           </CardContent>
         </Card>

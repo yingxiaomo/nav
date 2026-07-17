@@ -3,7 +3,8 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { ChevronDown, Cpu, HardDrive, XCircle, Box, MemoryStick, Container, ExternalLink, FileText, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SystemInfo, CheckResult, ContainerInfo, ContainerStats, fmt, uptimeStr, serverName, parseContainerUrl, mockResource } from "@/components/features/monitor-types";
+import { SystemInfo, CheckResult, ContainerInfo, ContainerStats, uptimeStr, serverName, parseContainerUrl, mockResource } from "@/components/features/monitor-types";
+import { formatFileSize } from "@/lib/utils/format";
 import { CircleProgress } from "@/components/features/circle-progress";
 import { MonitorEditDialog } from "@/components/features/monitor-edit-dialog";
 import { LogViewer } from "@/components/features/log-viewer";
@@ -106,7 +107,7 @@ export function SystemStatusFloater() {
               </div>
               <div className="flex gap-4">
                 <CircleProgress percent={cpuPct} size={56} stroke={5} color={cpuC} label="CPU" sub={sys ? `${sys.cpu.cores}核` : "—"} />
-                <CircleProgress percent={memPct} size={56} stroke={5} color={memC} label="RAM" sub={sys ? `${fmt(sys.memory.used)} / ${fmt(sys.memory.total)}` : "—"} />
+                <CircleProgress percent={memPct} size={56} stroke={5} color={memC} label="RAM" sub={sys ? `${formatFileSize(sys.memory.used)} / ${formatFileSize(sys.memory.total)}` : "—"} />
               </div>
             </div>
           </div>
@@ -179,8 +180,8 @@ export function SystemStatusFloater() {
               <span className="text-xs font-medium text-muted-foreground">存储空间</span>
             </div>
             <div className="flex justify-between text-xs mb-1.5 text-muted-foreground/70">
-              <span>已用 {sys ? fmt(sys.disk?.used) : "-"}</span>
-              <span>总量 {sys ? fmt(sys.disk?.total) : "-"}</span>
+              <span>已用 {sys ? formatFileSize(sys.disk?.used) : "-"}</span>
+              <span>总量 {sys ? formatFileSize(sys.disk?.total) : "-"}</span>
             </div>
             <div className="h-2 rounded-full bg-border/60">
               <div className="h-full rounded-full transition-all duration-1000" style={{ width: Math.min(diskPct, 100) + "%", background: diskC }} />

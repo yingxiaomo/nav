@@ -107,12 +107,6 @@ export function ProgressBar({ percent, color }: { percent: number; color?: strin
 
 // ── Format helpers ──
 
-export function fm(b?: number): string {
-  if (!b) return '0B';
-  const u = ['B', 'KB', 'MB', 'GB', 'TB'], i = Math.floor(Math.log(b) / Math.log(1024));
-  return (b / Math.pow(1024, i)).toFixed(1) + u[i];
-}
-
 export function ft(s: number): string {
   const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
   return (d ? d + '天' : '') + h + '小时' + m + '分';

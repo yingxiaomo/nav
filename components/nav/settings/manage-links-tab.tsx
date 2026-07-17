@@ -37,6 +37,7 @@ const setChildren = (item: Category | LinkItem, children: (Category | LinkItem)[
   else if ('children' in item) (item as LinkItem).children = children as LinkItem[];
 };
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps) {
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
   const [activeLink, setActiveLink] = useState<LinkItem | null>(null);

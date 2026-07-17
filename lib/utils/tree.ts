@@ -1,5 +1,6 @@
 // 树遍历工具 — 消除重复的递归遍历
 // 支持自定义 children 访问器，适配 Category['links'] 和 LinkItem['children'] 两种结构
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 type ChildrenAccessor<T> = (item: T) => T[] | undefined;
 

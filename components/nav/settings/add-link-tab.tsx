@@ -7,7 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/compon
 import { Wand2, Plus, FolderPlus, Upload, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { IconRender, PRESET_ICONS } from "./shared";
-import { generateFaviconUrl } from "@/lib/utils/common";
+import { generateFaviconUrl, generateId } from "@/lib/utils/common";
 import { extractTitleFromUrl } from "@/lib/utils/favicon";
 import {
   isValidUrl,
@@ -27,23 +27,6 @@ interface AddLinkTabProps {
 }
 
 export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTabProps) {
-  // 安全生成唯一 ID，兼容非 HTTPS 环境（crypto.randomUUID 在不安全上下文中不可用）
-  function generateId(): string {
-    try {
-      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-        return crypto.randomUUID();
-      }
-    } catch {}
-    const hex = "0123456789abcdef";
-    const arr = new Uint8Array(16);
-    crypto.getRandomValues(arr);
-    let id = "";
-    for (let i = 0; i < 16; i++) {
-      id += hex[arr[i] & 15];
-      if (i === 3 || i === 5 || i === 7 || i === 9) id += "-";
-    }
-    return id;
-  }
   const [newUrl, setNewUrl] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("");

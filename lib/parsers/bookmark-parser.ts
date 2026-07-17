@@ -1,26 +1,5 @@
-﻿import { LinkItem, DataSchema, DEFAULT_DATA } from "../types/types";
-
-/**
- * 生成唯一 ID
- * 使用 crypto.randomUUID()，不支持时回退到 crypto.getRandomValues()
- */
-function generateId(): string {
-  try {
-    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-      return crypto.randomUUID();
-    }
-  } catch (err) { console.debug('crypto.randomUUID not available, using fallback', err); }
-  // 降级方案：使用 getRandomValues + 时间戳
-  const hex = "0123456789abcdef";
-  const arr = new Uint8Array(16);
-  crypto.getRandomValues(arr);
-  let id = "";
-  for (let i = 0; i < 16; i++) {
-    id += hex[arr[i] & 15];
-    if (i === 3 || i === 5 || i === 7 || i === 9) id += "-";
-  }
-  return id;
-}
+﻿import { generateId } from "@/lib/utils/common";
+import { LinkItem, DataSchema, DEFAULT_DATA } from "../types/types";
 
 /**
  * 从 DT 元素的直接子元素中查找指定标签名的第一个元素

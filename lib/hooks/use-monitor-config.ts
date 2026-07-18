@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { STORAGE_CONFIG_KEY } from '@/lib/adapters/storage';
 import { isPrivateHost } from '@/lib/utils';
 import { useUIStore } from '@/lib/stores';
@@ -21,61 +22,56 @@ export interface MonitorConfig {
 export function useMonitorConfig(): MonitorConfig {
   const backendAvailable = useUIStore(s => s.backendAvailable);
 
-  // 尝试从 localStorage 解析存储配置
-  let config: { type?: string; apiServer?: { baseUrl?: string; token?: string } } | null = null;
-  try {
-    const raw = localStorage.getItem(STORAGE_CONFIG_KEY);
-    if (raw) {
-      config = JSON.parse(raw);
-    }
-  } catch {
-    // localStorage 数据损坏或旧版加密格式，忽略后走自动检测
-  }
-
-  // 有 API-Server 配置 → 按配置连后端
-  if (config?.type === 'api-server') {
-    const authHeaders: Record<string, string> = {};
-    if (config.apiServer?.token) {
-      authHeaders['Authorization'] = `Bearer ${config.apiServer.token}`;
+  return useMemo(() => {
+    // 尝试从 localStorage 解析存储配置
+    let config: { type?: string; apiServer?: { baseUrl?: string; token?: string } } | null = null;
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_CONFIG_KEY) : null;
+      if (raw) {
+        config = JSON.parse(raw);
+      }
+    } catch {
+      // localStorage 数据损坏或旧版加密格式，忽略后走自动检测
     }
 
-    // baseUrl 为空 → 同源模式
-    if (!config.apiServer?.baseUrl) {
+    // 有 API-Server 配置 → 按配置连后端
+    if (config?.type === 'api-server') {
+      const authHeaders: Record<string, string> = {};
+      if (config.apiServer?.token) {
+        authHeaders['Authorization'] = `Bearer ${config.apiServer.token}`;
+      }
+
+      // baseUrl 为空 → 同源模式
+      if (!config.apiServer?.baseUrl) {
+        if (!backendAvailable) {
+          return { baseUrl: null, authHeaders: {}, isActive: false };
+        }
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        return { baseUrl: origin, authHeaders, isActive: true };
+      }
+
+      const baseUrl = config.apiServer.baseUrl.replace(/\/+$/, '');
+      try {
+        if (!isPrivateHost(new URL(baseUrl).hostname)) {
+          return { baseUrl: null, authHeaders: {}, isActive: false };
+        }
+      } catch {
+        return { baseUrl: null, authHeaders: {}, isActive: false };
+      }
+
+      return { baseUrl, authHeaders, isActive: true };
+    }
+
+    // 无配置 / 配置损坏 / 非 API-Server → 同源/内网环境自动检测
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+    if (hostname && isPrivateHost(hostname)) {
       if (!backendAvailable) {
-        console.warn('[MonitorConfig] 后端不可用，跳过同源模式');
         return { baseUrl: null, authHeaders: {}, isActive: false };
       }
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      console.debug('[MonitorConfig] 同源模式激活', { origin, authHeaders, backendAvailable });
-      return { baseUrl: origin, authHeaders, isActive: true };
+      return { baseUrl: origin, authHeaders: {}, isActive: true };
     }
 
-    const baseUrl = config.apiServer.baseUrl.replace(/\/+$/, '');
-    try {
-      if (!isPrivateHost(new URL(baseUrl).hostname)) {
-        console.warn('[MonitorConfig] 非内网地址，跳过', { baseUrl });
-        return { baseUrl: null, authHeaders: {}, isActive: false };
-      }
-    } catch {
-      return { baseUrl: null, authHeaders: {}, isActive: false };
-    }
-
-    console.debug('[MonitorConfig] 远程模式激活', { baseUrl, authHeaders });
-    return { baseUrl, authHeaders, isActive: true };
-  }
-
-  // 无配置 / 配置损坏 / 非 API-Server → 同源/内网环境自动检测
-  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-  if (hostname && isPrivateHost(hostname)) {
-    if (!backendAvailable) {
-      console.warn('[MonitorConfig] 内网检测到但后端不可用', { hostname });
-      return { baseUrl: null, authHeaders: {}, isActive: false };
-    }
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    console.debug('[MonitorConfig] 内网自动检测激活', { hostname, origin });
-    return { baseUrl: origin, authHeaders: {}, isActive: true };
-  }
-
-  console.warn('[MonitorConfig] 未激活', { hostname, backendAvailable, config });
-  return { baseUrl: null, authHeaders: {}, isActive: false };
+    return { baseUrl: null, authHeaders: {}, isActive: false };
+  }, [backendAvailable]);
 }

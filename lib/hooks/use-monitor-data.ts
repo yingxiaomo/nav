@@ -18,6 +18,8 @@ interface MonitorData {
   refresh: () => void;
 }
 
+const POLL_MS = 30_000;
+
 /** 监控面板数据获取 hook — 每 30 秒轮询 /api/v1/admin/monitor/all */
 export function useMonitorData(): MonitorData {
   const [sys, setSys] = useState<SystemInfo | null>(null);
@@ -31,6 +33,9 @@ export function useMonitorData(): MonitorData {
 
   const { baseUrl, authHeaders } = useMonitorConfig();
   const mountedRef = useRef(true);
+  // 用 ref 持有 headers，避免对象引用变化触发 effect 重建
+  const headersRef = useRef(authHeaders);
+  headersRef.current = authHeaders;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -40,7 +45,9 @@ export function useMonitorData(): MonitorData {
   const fetchData = useCallback(async () => {
     if (!baseUrl) return;
     try {
-      const res = await fetch(`${baseUrl}/api/v1/admin/monitor/all`, { headers: authHeaders });
+      const res = await fetch(`${baseUrl}/api/v1/admin/monitor/all`, {
+        headers: headersRef.current,
+      });
       if (res.ok && mountedRef.current) {
         const d = await res.json();
         setSys(d.system);
@@ -52,15 +59,16 @@ export function useMonitorData(): MonitorData {
         setUptime(d.uptime || {});
         setLoading(false);
       }
-    } catch (err) { console.warn("[Monitor] fetch data failed:", err); }
-  }, [baseUrl, authHeaders]);
+    } catch (err) {
+      console.warn("[Monitor] fetch data failed:", err);
+    }
+  }, [baseUrl]);
 
   useEffect(() => {
-    fetchData(); // eslint-disable-line react-hooks/set-state-in-effect
-    if (baseUrl) {
-      const t = setInterval(fetchData, 30000);
-      return () => clearInterval(t);
-    }
+    if (!baseUrl) return;
+    fetchData();
+    const t = setInterval(fetchData, POLL_MS);
+    return () => clearInterval(t);
   }, [fetchData, baseUrl]);
 
   return { sys, checks, targets, containers, containerStats, dockerMeta, uptime, loading, refresh: fetchData };

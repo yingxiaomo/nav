@@ -35,7 +35,9 @@ export function useMonitorData(): MonitorData {
   const mountedRef = useRef(true);
   // 用 ref 持有 headers，避免对象引用变化触发 effect 重建
   const headersRef = useRef(authHeaders);
-  headersRef.current = authHeaders;
+  useEffect(() => {
+    headersRef.current = authHeaders;
+  }, [authHeaders]);
 
   useEffect(() => {
     mountedRef.current = true;

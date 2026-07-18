@@ -33,79 +33,117 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
   const { isCommandPaletteOpen, setCommandPaletteOpen } = useUIStore();
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
-  const [groups, setGroups] = useState<{ label: string; items: { id: string; title: string; description?: string; url?: string; prefix?: string }[] }[]>([]);
+  const [groups, setGroups] = useState<{ label: string; items: any[] }[]>([]);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // 设备别名缓存
   const [deviceAliases, setDeviceAliases] = useState<{ name: string; host?: string; type: string }[]>([]);
 
-  // 面板打开/关闭时的副作用
   useEffect(() => {
-    if (isCommandPaletteOpen) {
-      inputRef.current?.focus();
-      // 加载监控目标和远程设备列表
-      fetch("/api/v1/admin/monitor/checks")
-        .then(r => r.json())
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .then((d: any) => {
-          const targets = (d?.targets || []).map((t: any) => ({ name: t.name, host: t.url, type: "monitor" }));
-          setDeviceAliases((prev: any[]) => [...targets, ...prev.filter((p: any) => p.type !== "monitor")]);
-        })
-        .catch(() => {});
-      fetch("/api/v1/settings/device_config")
-        .then(r => r.ok ? r.json() : null)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .then((d: any) => {
-          if (d?.value) {
-            try {
-              const devices = JSON.parse(d.value);
-              const aliases = (devices.devices || []).map((dv: any) => ({ name: dv.name, host: dv.host, type: "device" }));
-              setDeviceAliases((prev: any[]) => [...prev.filter((p: any) => p.type !== "device"), ...aliases]);
-            } catch {}
-          }
-        })
-        .catch(() => {});
-    } else {
-      setQuery(""); // eslint-disable-next-line react-hooks/exhaustive-deps
-    }
+    if (!isCommandPaletteOpen) return;
+    fetch("/api/v1/admin/monitor/checks")
+      .then(r => r.json())
+      .then((d: any) => {
+        const targets = (d?.targets || []).map((t: any) => ({ name: t.name, host: t.url, type: "monitor" }));
+        setDeviceAliases((prev: any[]) => [...targets, ...prev.filter((p: any) => p.type !== "monitor")]);
+      })
+      .catch(() => {});
+    fetch("/api/v1/settings/device_config")
+      .then(r => r.ok ? r.json() : null)
+      .then((d: any) => {
+        if (d?.value) {
+          try {
+            const devices = JSON.parse(d.value);
+            const aliases = (devices.devices || []).map((dv: any) => ({ name: dv.name, host: dv.host, type: "device" }));
+            setDeviceAliases((prev: any[]) => [...prev.filter((p: any) => p.type !== "device"), ...aliases]);
+          } catch {}
+        }
+      })
+      .catch(() => {});
   }, [isCommandPaletteOpen]);
 
   // 执行命令
   const executeCommand = async (cmd: string, args: string[]) => {
     const argsStr = args.join(" ");
+    setLoading(true);
+
     switch (cmd) {
-      case "docker":
+      case "docker": {
         if (!argsStr) {
-          setGroups([{ label: "Docker 操作", items: [
-            { id: "ls", title: "列出所有容器", description: "docker ps" },
-            { id: "logs", title: "查看容器日志", description: "/docker logs <容器名>" },
-          ]}]);
+          try {
+            const res = await fetch("/api/v1/admin/docker/containers");
+            const data = await res.json();
+            const cis = data || [];
+            setGroups([{ label: `Docker 容器 (${cis.length})`, items: cis.map((c: any) => ({
+              id: c.id, title: c.name.replace(/^\//, ""), description: `${c.image} · ${c.status}`,
+            })) }]);
+          } catch { toast.error("获取容器列表失败"); }
+          setLoading(false);
           return;
         }
-        toast.info(`执行 docker ${argsStr}...`);
+        const [action, ...nameParts] = args;
+        const containerName = nameParts.join(" ");
+        if (!containerName) {
+          setGroups([{ label: "Docker 操作", items: [
+            { id: "ps", title: "docker ps", description: "列出所有容器" },
+            { id: "restart", title: "docker restart <容器>", description: "重启容器" },
+            { id: "start", title: "docker start <容器>", description: "启动容器" },
+            { id: "stop", title: "docker stop <容器>", description: "停止容器" },
+            { id: "logs", title: "docker logs <容器>", description: "查看容器日志" },
+          ]}]);
+          setLoading(false);
+          return;
+        }
+        const validActions = ["start", "stop", "restart"];
+        if (validActions.includes(action)) {
+          try {
+            await fetch(`/api/v1/admin/docker/${encodeURIComponent(containerName)}/${action}`, { method: "POST" });
+            toast.success(`Docker ${action} ${containerName} ✅`);
+            setCommandPaletteOpen(false);
+          } catch { toast.error(`Docker ${action} 失败`); }
+        } else if (action === "logs") {
+          try {
+            const res = await fetch(`/api/v1/admin/docker/logs/${encodeURIComponent(containerName)}`);
+            const logs = await res.text();
+            setGroups([{ label: `日志: ${containerName}`, items: [{ id: "logs", title: logs.slice(0, 2000) || "(空)", description: "" }] }]);
+          } catch { toast.error("获取日志失败"); }
+        } else {
+          toast.error(`未知操作: ${action}，支持 start/stop/restart/logs`);
+        }
+        setLoading(false);
         break;
+      }
+
       case "ssh": {
         if (!argsStr) {
           setGroups([{ label: "可用设备", items: deviceAliases.map(d => ({
-            id: d.name, title: d.name, description: d.host || "",
+            id: d.name, title: d.name, description: d.host || "", alias: d,
           }))}]);
+          setLoading(false);
           return;
         }
         const alias = deviceAliases.find(d => argsStr.startsWith(d.name));
         if (alias) {
           const cmdStr = argsStr.slice(alias.name.length).trim();
-          if (!cmdStr) { onToggleSSH(); setCommandPaletteOpen(false); return; }
-          toast.info(`SSH ${alias.name}: ${cmdStr}...`);
-          setCommandPaletteOpen(false);
+          if (!cmdStr) { onToggleSSH(); setCommandPaletteOpen(false); setLoading(false); return; }
+          try {
+            const res = await fetch("/api/v1/ssh/exec", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ host: alias.host, user: alias.name, pass: "", command: cmdStr }),
+            });
+            const data = await res.json();
+            setGroups([{ label: `SSH ${alias.name}: ${cmdStr}`, items: [{ id: "output", title: data.output || "(无输出)", description: "" }] }]);
+          } catch { toast.error("SSH 执行失败"); }
         } else {
-          toast.error("未找到设备");
+          toast.error(`未找到设备 "${argsStr}"`);
         }
+        setLoading(false);
         break;
       }
+
       case "ai": {
         if (!argsStr) { onToggleAI(); setCommandPaletteOpen(false); return; }
-        setLoading(true);
         try {
           const res = await fetch("/api/v1/ai/chat", {
             method: "POST", headers: { "Content-Type": "application/json" },
@@ -113,26 +151,26 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
           });
           const data = await res.json();
           setGroups([{ label: "AI 回复", items: [{ id: "reply", title: data.reply || data.error, description: "" }] }]);
-        } catch (err) {
-          toast.error("AI 调用失败");
-        }
+        } catch { toast.error("AI 调用失败"); }
         setLoading(false);
         break;
       }
+
       case "wol":
         if (!argsStr) {
           setGroups([{ label: "可唤醒设备", items: deviceAliases.map(d => ({
             id: d.name, title: d.name, description: "发送 WOL 魔术包",
           }))}]);
+          setLoading(false);
           return;
         }
         toast.success(`已发送 WOL 唤醒包到 ${argsStr}`);
         setCommandPaletteOpen(false);
+        setLoading(false);
         break;
     }
   };
 
-  // 搜索同步数据（书签 + 命令），用 useMemo
   const searchGroups = useMemo(() => {
     if (!isCommandPaletteOpen) return [];
     if (!query) {
@@ -157,16 +195,14 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
       : [{ label: "没有找到", items: [{ id: "empty", title: "尝试 /search 进行全局搜索", description: "", prefix: "search" }] }];
   }, [isCommandPaletteOpen, query, allBookmarks]);
 
-  // 同步搜索计算 → setGroups
   const prevSearchKey = useRef("");
   useEffect(() => {
     const key = JSON.stringify(searchGroups);
     if (key === prevSearchKey.current) return;
     prevSearchKey.current = key;
     setGroups(searchGroups);
-  }, [searchGroups]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchGroups]);
 
-  // 命令模式：执行命令
   useEffect(() => {
     if (!isCommandPaletteOpen || !query.startsWith("/")) return;
     const parts = query.slice(1).split(/\s+/);
@@ -176,23 +212,15 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
     if (matched.length === 1 && cmd && args.length > 0) {
       executeCommand(matched[0].prefix, args);
     }
-  }, [query]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [query]);
 
-  // 重置 activeIndex 当搜索组变化时
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [searchGroups]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setActiveIndex(0); }, [searchGroups]);
 
   const flatItems = useMemo(() => groups.flatMap(g => g.items), [groups]);
 
   const selectItem = (item: any) => {
-    if (item.url) {
-      recordClick(item.id);
-      onOpenLink(item.url);
-      setCommandPaletteOpen(false);
-    } else if (item.prefix) {
-      setQuery("/" + item.prefix + " ");
-    }
+    if (item.url) { recordClick(item.id); onOpenLink(item.url); setCommandPaletteOpen(false); }
+    else if (item.prefix) { setQuery("/" + item.prefix + " "); }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -225,7 +253,7 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
                       onClick={() => selectItem(item)}
                     >
                       <span className="w-7 h-7 flex items-center justify-center rounded-md bg-muted text-muted-foreground text-xs shrink-0">
-                        {item.url ? "🔗" : ">"}
+                        {item.url ? "🔗" : item.prefix === "docker" ? "📦" : item.prefix === "ssh" ? "🔌" : item.prefix === "ai" ? "🤖" : ">"}
                       </span>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium truncate">{item.title}</div>
@@ -237,7 +265,7 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
               </div>
             </div>
           ))}
-          {loading && <div className="py-8 text-center text-sm text-muted-foreground/50">搜索中...</div>}
+          {loading && <div className="py-8 text-center text-sm text-muted-foreground/50">执行中...</div>}
           {!loading && groups.length === 0 && <div className="py-8 text-center text-sm text-muted-foreground/50">没有结果</div>}
         </div>
         <div className="px-4 py-2 border-t text-[11px] text-muted-foreground/30 flex gap-4">

@@ -78,6 +78,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, sessionMW func(http.Handler
 
 	// SSH
 	mux.Handle("GET /api/v1/ws/ssh", http.HandlerFunc(h.SSHWebSocket()))
+	mux.Handle("POST /api/v1/ssh/exec", http.HandlerFunc(h.SSHExec()))
 
 	// Data / Upload / Parse / Suggest
 	mux.Handle("GET /api/v1/data", http.HandlerFunc(h.GetData()))

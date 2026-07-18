@@ -80,12 +80,12 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, sessionMW func(http.Handler
 	mux.Handle("GET /api/v1/ws/ssh", sessionMW(http.HandlerFunc(h.SSHWebSocket())))
 
 	// Data / Upload / Parse / Suggest
-	mux.Handle("GET /api/v1/data", sessionMW(http.HandlerFunc(h.GetData())))
+	mux.Handle("GET /api/v1/data", http.HandlerFunc(h.GetData()))
 	mux.Handle("PUT /api/v1/data", sessionMW(http.HandlerFunc(h.PutData())))
 	mux.Handle("POST /api/v1/upload", sessionMW(http.HandlerFunc(h.Upload())))
-	mux.Handle("GET /api/v1/parse", sessionMW(http.HandlerFunc(ParseURLHandler())))
-	mux.Handle("GET /api/v1/suggest", sessionMW(http.HandlerFunc(SuggestHandler())))
-	mux.Handle("GET /api/v1/search", sessionMW(http.HandlerFunc(SearchHandler(h.DB))))
+	mux.Handle("GET /api/v1/parse", http.HandlerFunc(ParseURLHandler()))
+	mux.Handle("GET /api/v1/suggest", http.HandlerFunc(SuggestHandler()))
+	mux.Handle("GET /api/v1/search", http.HandlerFunc(SearchHandler(h.DB)))
 
 	// Admin — Docker
 	mux.Handle("GET /api/v1/admin/docker/containers", sessionMW(http.HandlerFunc(h.DockerContainers())))

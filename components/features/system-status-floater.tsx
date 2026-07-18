@@ -78,7 +78,9 @@ export function SystemStatusFloater() {
   const memC = memPct > 80 ? "#ef4444" : memPct > 50 ? "#06b6d4" : "#22c55e";
   const diskC = diskPct > 85 ? "#ef4444" : diskPct > 60 ? "#06b6d4" : "#22c55e";
 
-  const runningCount = checks.filter((c) => c.status === "ok").length;
+  const runningCount =
+    checks.filter((c) => c.status === "ok").length +
+    containers.filter((c) => c.state === "running").length;
   const totalCount = checks.length + containers.length;
   const offlineCount = totalCount - runningCount;
   const glassPanel = "bg-background/70 dark:bg-background/60 backdrop-blur-xl border border-border/40";

@@ -185,7 +185,7 @@ export function ResizablePanel({
       {/* 标题栏 — 拖拽手柄 */}
       <div
         className={cn(
-          "h-12 px-4 flex items-center justify-between shrink-0 transition-colors",
+          "h-10 px-3 flex items-center justify-between shrink-0 transition-colors",
           isPinned
             ? "bg-transparent cursor-default border-b border-transparent hover:bg-black/20"
             : "bg-muted/40 border-b cursor-move group hover:bg-muted/60",

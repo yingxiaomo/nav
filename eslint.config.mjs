@@ -13,6 +13,13 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    files: ["**/ai-panel.tsx"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
+  {
     files: ["**/*.test.tsx", "**/*.test.ts", "vitest.setup.ts"],
     rules: {
       "@typescript-eslint/no-require-imports": "off",

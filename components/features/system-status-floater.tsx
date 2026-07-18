@@ -86,26 +86,22 @@ export function SystemStatusFloater() {
   return (
     <div className="fixed top-4 right-4 z-[60]" style={{ width: "min(360px, calc(100vw - 32px))" }}>
 
-      {/* Collapsed pill — 4 equal blocks centered around chevron */}
-      <div className={cn("flex items-center justify-between px-3 h-10 cursor-pointer select-none rounded-2xl transition-all duration-300 hover:border-border/80", glassPanel)} onClick={() => setExpanded(!expanded)}>
-        <div className="flex items-center gap-4 text-sm font-medium tabular-nums flex-1 justify-center">
-          <div className="flex items-center gap-1.5 min-w-[70px] justify-center">
-            <Cpu className="w-4 h-4 text-blue-400 shrink-0" /> <span>{cpuPct}%</span>
-          </div>
-          <div className="flex items-center gap-1.5 min-w-[70px] justify-center">
-            <MemoryStick className="w-4 h-4 text-amber-400 shrink-0" /> <span>{memPct}%</span>
-          </div>
+      {/* Collapsed pill — grid 5 columns, equal spacing */}
+      <div className={cn("flex items-center justify-between px-3 h-10 cursor-pointer select-none rounded-2xl transition-all duration-300 hover:border-border/80 grid grid-cols-5", glassPanel)} onClick={() => setExpanded(!expanded)}>
+        <div className="flex items-center gap-1.5 justify-center text-sm font-medium tabular-nums">
+          <Cpu className="w-4 h-4 text-blue-400 shrink-0" /><span>{cpuPct}%</span>
         </div>
-        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted/30 hover:bg-muted/50 transition-colors shrink-0">
+        <div className="flex items-center gap-1.5 justify-center text-sm font-medium tabular-nums">
+          <MemoryStick className="w-4 h-4 text-amber-400 shrink-0" /><span>{memPct}%</span>
+        </div>
+        <div className="flex items-center justify-center w-8 h-8 mx-auto rounded-full bg-muted/30 hover:bg-muted/50 transition-colors shrink-0">
           <ChevronDown className={cn("w-5 h-5 text-muted-foreground/70 transition-transform", expanded && "rotate-180")} />
         </div>
-        <div className="flex items-center gap-4 text-sm font-medium tabular-nums flex-1 justify-center">
-          <div className="flex items-center gap-1.5 min-w-[70px] justify-center">
-            <Box className="w-4 h-4 text-green-400 shrink-0" /> <span>{runningCount}</span>
-          </div>
-          <div className="flex items-center gap-1.5 min-w-[70px] justify-center">
-            <XCircle className="w-4 h-4 text-red-400 shrink-0" /> <span>{offlineCount}</span>
-          </div>
+        <div className="flex items-center gap-1.5 justify-center text-sm font-medium tabular-nums">
+          <span>{runningCount}</span><Box className="w-4 h-4 text-green-400 shrink-0" />
+        </div>
+        <div className="flex items-center gap-1.5 justify-center text-sm font-medium tabular-nums">
+          <span>{offlineCount}</span><XCircle className="w-4 h-4 text-red-400 shrink-0" />
         </div>
       </div>
       {/* Expanded panel */}

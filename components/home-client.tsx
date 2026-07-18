@@ -13,9 +13,11 @@ import { FeaturesLauncher } from "@/components/features/features-launcher";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { ResizablePanel } from "@/components/ui/resizable-panel";
 import { SystemStatusFloater } from "@/components/features/system-status-floater";
 import { AuthSetupDialog } from "@/components/features/auth-setup-dialog";
 import Image from "next/image";
+import { Brain, TerminalSquare } from "lucide-react";
 
 import { useWallpaper, useNavData, useKeyboardShortcuts, useBackendCheck } from "@/lib";
 import { useUIStore } from "@/lib/stores";
@@ -74,7 +76,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const folderNavRef = useRef<FolderModalHandle>(null);
-  const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels, isCheatSheetOpen, setCheatSheetOpen, setBackendAvailable, setCommandPaletteOpen, isCommandPaletteOpen, togglePanel } = useUIStore();
+  const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels, isCheatSheetOpen, setCheatSheetOpen, setBackendAvailable, setCommandPaletteOpen, isCommandPaletteOpen, togglePanel, setActivePanel } = useUIStore();
   const { sidebarCollapsed } = useUIStore();
 
   // 检测后端是否可用（静态部署时禁用后端功能），定期重试
@@ -329,10 +331,18 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
           />
         )}
         <ErrorBoundary name="ai-panel" fallback={null}>
-          <AIPanel />
+          {activePanel === 'ai' && (
+            <ResizablePanel title="AI 助手" icon={<Brain className="w-5 h-5 text-purple-500" />} defaultWidth={650} defaultHeight={520} onClose={() => togglePanel('ai')} zIndex={101} onFocus={() => setActivePanel('ai')}>
+              <AIPanel />
+            </ResizablePanel>
+          )}
         </ErrorBoundary>
         <ErrorBoundary name="ssh-terminal" fallback={null}>
-          <SSHTerminalPanel />
+          {activePanel === 'ssh' && (
+            <ResizablePanel title="SSH 终端" icon={<TerminalSquare className="w-5 h-5 text-green-500" />} defaultWidth={800} defaultHeight={450} onClose={() => togglePanel('ssh')} zIndex={101} onFocus={() => setActivePanel('ssh')}>
+              <SSHTerminalPanel />
+            </ResizablePanel>
+          )}
         </ErrorBoundary>
       </main>
     </ThemeProvider>

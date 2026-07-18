@@ -33,7 +33,7 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
   const { isCommandPaletteOpen, setCommandPaletteOpen } = useUIStore();
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
-  const [groups, setGroups] = useState<{ label: string; items: any[] }[]>([]);
+  const [groups, setGroups] = useState<{ label: string; items: { id: string; title: string; description?: string; url?: string; prefix?: string }[] }[]>([]);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 

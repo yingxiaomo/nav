@@ -92,7 +92,7 @@ export function SSHTerminalPanel() {
   if (activePanel !== "ssh") return null;
 
   return (
-    <div className="fixed bottom-0 right-4 z-40 w-[800px] h-[400px] bg-[#1a1a2e] border border-border rounded-t-xl overflow-hidden shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-200">
+    <div className="flex flex-col h-full bg-[#1a1a2e]">
       {/* Tab bar */}
       <div className="flex items-center bg-[#16162a] px-2 py-1 gap-0.5 shrink-0">
         {instances.map(inst => (

@@ -54,7 +54,7 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
         })
         .catch(() => {});
       fetch("/api/v1/settings/device_config")
-        .then(r => r.json())
+        .then(r => r.ok ? r.json() : null)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .then((d: any) => {
           if (d?.value) {

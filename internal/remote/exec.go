@@ -3,6 +3,7 @@ package remote
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -23,14 +24,30 @@ func NewSSHExec() *SSHExec {
 }
 
 func (e *SSHExec) ExecSSH(host, username, password, cmd string) (string, error) {
+	// host 可能是 "192.168.0.10" 或 "192.168.0.10:22"
+	addr := host
+	if _, _, err := net.SplitHostPort(host); err != nil {
+		addr = net.JoinHostPort(host, "22")
+	}
+
 	config := &ssh.ClientConfig{
-		User:            username,
-		Auth:            []ssh.AuthMethod{ssh.Password(password)},
+		User: username,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(password),
+			// OpenWrt / 部分发行版只接受 keyboard-interactive
+			ssh.KeyboardInteractive(func(user, instruction string, questions []string, echos []bool) ([]string, error) {
+				answers := make([]string, len(questions))
+				for i := range questions {
+					answers[i] = password
+				}
+				return answers, nil
+			}),
+		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         10 * time.Second,
 	}
 
-	conn, err := ssh.Dial("tcp", host, config)
+	conn, err := ssh.Dial("tcp", addr, config)
 	if err != nil {
 		return "", fmt.Errorf("SSH 连接失败: %w", err)
 	}
@@ -60,7 +77,6 @@ func (e *SSHExec) ExecSSH(host, username, password, cmd string) (string, error) 
 	}
 	return truncate(out, 2000), nil
 }
-
 
 func truncate(s string, n int) string {
 	runes := []rune(s)

@@ -128,10 +128,14 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
         if (alias) {
           const cmdStr = argsStr.slice(alias.name.length).trim();
           if (!cmdStr) { onToggleSSH(); setCommandPaletteOpen(false); setLoading(false); return; }
+          // 从 URL 中提取主机名（监控目标 URL 可能是 http://192.168.1.100:8080）
+          let sshHost = alias.host || "";
+          try { sshHost = new URL(sshHost).hostname; } catch {}
+          if (!sshHost) { toast.error("设备没有可用的 SSH 地址"); setLoading(false); return; }
           try {
             const res = await fetch("/api/v1/ssh/exec", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ host: alias.host, user: alias.user || alias.name, pass: alias.pass || "", command: cmdStr }),
+              body: JSON.stringify({ host: sshHost, user: alias.user || alias.name, pass: alias.pass || "", command: cmdStr }),
             });
             const data = await res.json();
             setGroups([{ label: `SSH ${alias.name}: ${cmdStr}`, items: [{ id: "output", title: data.output || "(无输出)", description: "" }] }]);

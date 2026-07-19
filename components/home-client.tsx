@@ -339,7 +339,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
         </ErrorBoundary>
         <ErrorBoundary name="ssh-terminal" fallback={null}>
           {activePanel === 'ssh' && (
-            <ResizablePanel title="SSH 终端" icon={<TerminalSquare className="w-5 h-5 text-green-500" />} defaultWidth={800} defaultHeight={450} onClose={() => togglePanel('ssh')} zIndex={101} onFocus={() => setActivePanel('ssh')}>
+            <ResizablePanel title="SSH 终端" icon={<TerminalSquare className="w-5 h-5 text-green-500" />} defaultWidth={960} defaultHeight={540} onClose={() => togglePanel('ssh')} zIndex={101} onFocus={() => setActivePanel('ssh')}>
               <SSHTerminalPanel />
             </ResizablePanel>
           )}

@@ -248,9 +248,11 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
     if (item.url) { recordClick(item.id); onOpenLink(item.url); setCommandPaletteOpen(false); }
     else if (item.prefix) { setQuery("/" + item.prefix + " "); }
     else if (item.title && !item.prefix) {
-      // 容器 → /docker <容器名>
+      // 选择容器/设备 → 补全命令，保持面板打开
       if (item.alias) setQuery("/ssh " + item.alias.name + " ");
       else setQuery("/docker " + item.title + " ");
+      // 立即重新聚焦输入框，防止输入中断
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
   };
 

@@ -74,7 +74,8 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
           try {
             const res = await fetch("/api/v1/admin/docker/containers");
             const data = await res.json();
-            const cis = data || [];
+            const cis = data?.containers || [];
+
             setGroups([{ label: `Docker 容器 (${cis.length})`, items: cis.map((c: any) => ({
               id: c.id, title: c.name.replace(/^\//, ""), description: `${c.image} · ${c.status}`,
             })) }]);

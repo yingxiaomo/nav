@@ -11,6 +11,7 @@ import { LogViewer } from "@/components/features/log-viewer";
 import { useMonitorData } from "@/lib/hooks/use-monitor-data";
 import type { MonitorEditTarget } from "@/components/features/monitor-types";
 import { useMonitorConfig } from "@/lib/hooks/use-monitor-config";
+import { useUIStore } from "@/lib/stores";
 
 export function SystemStatusFloater() {
   const [expanded, setExpanded] = useState(false);
@@ -207,9 +208,26 @@ export function SystemStatusFloater() {
           style={{ left: Math.max(8, Math.min(contextMenu.x, window.innerWidth - 160)), top: Math.max(8, Math.min(contextMenu.y, window.innerHeight - 140)), background: "hsl(var(--background) / 0.85)" }}
         >
           {!contextMenu.id.startsWith("docker:") && (
+            <>
+            <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-foreground/80 hover:bg-accent rounded-lg transition-colors" onClick={() => {
+              const t = targets.find(t => t.id === contextMenu.id);
+              if (t) setEditTarget({ id: t.id, name: t.name, url: t.url, icon: t.icon, mac: t.mac, sshUser: t.sshUser, sshPass: t.sshPass });
+              setContextMenu(null);
+            }}>
+              编辑
+            </button>
+            {targets.find(t => t.id === contextMenu.id && (t.sshUser || t.sshPass)) && (
+              <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-green-400 hover:bg-green-500/10 rounded-lg transition-colors" onClick={() => {
+                setContextMenu(null);
+                useUIStore.getState().setActivePanel('ssh');
+              }}>
+                SSH 连接
+              </button>
+            )}
             <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" onClick={() => handleDelete(contextMenu.id)}>
               <Trash2 className="w-3 h-3" /> 删除
             </button>
+            </>
           )}
           {getMac(contextMenu.id) && (
             <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors" onClick={() => handleWake(contextMenu.id)}>

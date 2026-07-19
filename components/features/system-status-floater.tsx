@@ -218,8 +218,18 @@ export function SystemStatusFloater() {
             </button>
             {targets.find(t => t.id === contextMenu.id && (t.sshUser || t.sshPass)) && (
               <button className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-green-400 hover:bg-green-500/10 rounded-lg transition-colors" onClick={() => {
+                const t = targets.find(x => x.id === contextMenu.id);
                 setContextMenu(null);
-                useUIStore.getState().setActivePanel('ssh');
+                if (!t) return;
+                let host = t.url || "";
+                try { host = new URL(host).hostname; } catch { /* bare host */ }
+                if (!host) return;
+                useUIStore.getState().openSSHConnection({
+                  name: t.name,
+                  host,
+                  user: t.sshUser || "root",
+                  pass: t.sshPass || "",
+                });
               }}>
                 SSH 连接
               </button>

@@ -127,20 +127,40 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
         const alias = deviceAliases.find(d => argsStr.startsWith(d.name));
         if (alias) {
           const cmdStr = argsStr.slice(alias.name.length).trim();
-          if (!cmdStr) { onToggleSSH(); setCommandPaletteOpen(false); setLoading(false); return; }
           // 从 URL 中提取主机名（监控目标 URL 可能是 http://192.168.1.100:8080）
           let sshHost = alias.host || "";
-          try { sshHost = new URL(sshHost).hostname; } catch {}
+          try { sshHost = new URL(sshHost).hostname; } catch {
+            // 可能是裸 IP
+          }
           if (!sshHost) { toast.error("设备没有可用的 SSH 地址"); setLoading(false); return; }
+          if (!alias.user && !alias.pass) {
+            toast.error(`「${alias.name}」未配置 SSH 凭证，请在监控右键 → 编辑里填写`);
+            setLoading(false);
+            return;
+          }
+
+          // 无命令 → 打开交互终端
+          if (!cmdStr) {
+            useUIStore.getState().openSSHConnection({
+              name: alias.name,
+              host: sshHost,
+              user: alias.user || "root",
+              pass: alias.pass || "",
+            });
+            setLoading(false);
+            return;
+          }
+
+          // 有命令 → 快速执行
           try {
             const res = await fetch("/api/v1/ssh/exec", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ host: sshHost, user: alias.user || alias.name, pass: alias.pass || "", command: cmdStr }),
+              body: JSON.stringify({ host: sshHost, user: alias.user || "root", pass: alias.pass || "", command: cmdStr }),
             });
             const data = await res.json();
             if (!res.ok) { toast.error("SSH 失败: " + (data.error || data.message || "未知错误")); setLoading(false); return; }
             setGroups([{ label: `SSH ${alias.name}: ${cmdStr}`, items: [{ id: "output", title: data.output || "(无输出)", description: "" }] }]);
-          } catch { setLoading(false); toast.error("SSH 执行失败"); }
+          } catch { toast.error("SSH 执行失败"); }
         } else {
           toast.error(`未找到设备 "${argsStr}"`);
         }

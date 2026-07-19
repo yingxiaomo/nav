@@ -1,5 +1,16 @@
 import { create } from 'zustand';
 
+/** 待建立的 SSH 连接请求（由命令面板 / 监控右键发起） */
+export interface SSHConnectRequest {
+  name: string;
+  host: string;
+  user: string;
+  pass: string;
+  port?: number;
+  /** 递增 token，确保相同参数也能重复触发 */
+  token: number;
+}
+
 interface UIState {
   /** 设置对话框是否打开 */
   isSettingsOpen: boolean;
@@ -13,6 +24,8 @@ interface UIState {
   sidebarCollapsed: boolean;
   /** 后端 API 是否可用（静态部署时为 false） */
   backendAvailable: boolean;
+  /** 待处理的 SSH 连接请求 */
+  sshConnectRequest: SSHConnectRequest | null;
 
   /** 打开/关闭设置对话框 */
   setSettingsOpen: (open: boolean) => void;
@@ -30,6 +43,10 @@ interface UIState {
   setSidebarCollapsed: (collapsed: boolean) => void;
   /** 设置后端可用状态 */
   setBackendAvailable: (available: boolean) => void;
+  /** 发起 SSH 终端连接（打开面板 + 投递连接请求） */
+  openSSHConnection: (req: Omit<SSHConnectRequest, 'token'>) => void;
+  /** SSH 面板消费完连接请求后清除 */
+  clearSSHConnectRequest: () => void;
 }
 
 const useUIStore = create<UIState>((set, get) => ({
@@ -39,6 +56,7 @@ const useUIStore = create<UIState>((set, get) => ({
   isCheatSheetOpen: false,
   sidebarCollapsed: true,
   backendAvailable: true,
+  sshConnectRequest: null,
 
   setSettingsOpen: (open) => set({ isSettingsOpen: open }),
 
@@ -57,11 +75,20 @@ const useUIStore = create<UIState>((set, get) => ({
 
   setBackendAvailable: (available) => set({ backendAvailable: available }),
 
+  openSSHConnection: (req) => set({
+    activePanel: 'ssh',
+    isCommandPaletteOpen: false,
+    sshConnectRequest: { ...req, port: req.port || 22, token: Date.now() },
+  }),
+
+  clearSSHConnectRequest: () => set({ sshConnectRequest: null }),
+
   closeAllPanels: () => set({
     isSettingsOpen: false,
     activePanel: null,
     isCheatSheetOpen: false,
     isCommandPaletteOpen: false,
+    sshConnectRequest: null,
   }),
 }));
 

@@ -38,14 +38,14 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
   const inputRef = useRef<HTMLInputElement>(null);
 
   // 设备别名缓存
-  const [deviceAliases, setDeviceAliases] = useState<{ name: string; host?: string; type: string }[]>([]);
+  const [deviceAliases, setDeviceAliases] = useState<{ name: string; host?: string; type: string; user?: string; pass?: string }[]>([]);
 
   useEffect(() => {
     if (!isCommandPaletteOpen) return;
     fetch("/api/v1/admin/monitor/checks")
       .then(r => r.json())
       .then((d: any) => {
-        const targets = (d?.targets || []).map((t: any) => ({ name: t.name, host: t.url, type: "monitor" }));
+        const targets = (d?.targets || []).map((t: any) => ({ name: t.name, host: t.url, type: "monitor", user: t.sshUser, pass: t.sshPass }));
         setDeviceAliases((prev: any[]) => [...targets, ...prev.filter((p: any) => p.type !== "monitor")]);
       })
       .catch(() => {});
@@ -55,7 +55,7 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
         if (d?.value) {
           try {
             const devices = JSON.parse(d.value);
-            const aliases = (devices.devices || []).map((dv: any) => ({ name: dv.name, host: dv.host, type: "device" }));
+            const aliases = (devices.devices || []).map((dv: any) => ({ name: dv.name, host: dv.host, type: "device", user: dv.username, pass: dv.password }));
             setDeviceAliases((prev: any[]) => [...prev.filter((p: any) => p.type !== "device"), ...aliases]);
           } catch {}
         }
@@ -131,7 +131,7 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
           try {
             const res = await fetch("/api/v1/ssh/exec", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ host: alias.host, user: alias.name, pass: "", command: cmdStr }),
+              body: JSON.stringify({ host: alias.host, user: alias.user || alias.name, pass: alias.pass || "", command: cmdStr }),
             });
             const data = await res.json();
             setGroups([{ label: `SSH ${alias.name}: ${cmdStr}`, items: [{ id: "output", title: data.output || "(无输出)", description: "" }] }]);

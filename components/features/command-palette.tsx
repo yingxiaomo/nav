@@ -138,8 +138,9 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
               body: JSON.stringify({ host: sshHost, user: alias.user || alias.name, pass: alias.pass || "", command: cmdStr }),
             });
             const data = await res.json();
+            if (!res.ok) { toast.error("SSH 失败: " + (data.error || data.message || "未知错误")); setLoading(false); return; }
             setGroups([{ label: `SSH ${alias.name}: ${cmdStr}`, items: [{ id: "output", title: data.output || "(无输出)", description: "" }] }]);
-          } catch { toast.error("SSH 执行失败"); }
+          } catch { setLoading(false); toast.error("SSH 执行失败"); }
         } else {
           toast.error(`未找到设备 "${argsStr}"`);
         }

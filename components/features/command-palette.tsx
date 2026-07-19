@@ -222,6 +222,7 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
   const selectItem = (item: any) => {
     if (item.url) { recordClick(item.id); onOpenLink(item.url); setCommandPaletteOpen(false); }
     else if (item.prefix) { setQuery("/" + item.prefix + " "); }
+    else if (item.title && !item.prefix) { setQuery("/docker " + item.title + " "); }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

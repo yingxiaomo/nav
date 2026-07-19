@@ -46,7 +46,7 @@ func (h *Handler) GetSetting() http.HandlerFunc {
 				return
 			}
 			if _, exists := all[key]; !exists {
-				model.RespondError(w, http.StatusNotFound, "配置项不存在")
+				model.RespondJSON(w, http.StatusOK, map[string]string{"key": key, "value": ""})
 				return
 			}
 		}

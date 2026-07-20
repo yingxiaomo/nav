@@ -14,8 +14,10 @@ interface Command {
 }
 
 const COMMANDS: Command[] = [
-  { prefix: "docker", label: "/docker", description: "管理 Docker 容器", action: "docker" },
-  { prefix: "ssh", label: "/ssh <别名>", description: "远程连接设备（可选加命令）", action: "ssh" },
+  { prefix: "docker", label: "/docker", description: "管理 Docker 容器（含资源占用）", action: "docker" },
+  { prefix: "ssh", label: "/ssh <别名>", description: "远程连接设备", action: "ssh" },
+  { prefix: "monitor", label: "/monitor", description: "查看内网监控状态", action: "monitor" },
+  { prefix: "stats", label: "/stats", description: "查看系统资源仪表", action: "stats" },
   { prefix: "ai", label: "/ai <问题>", description: "AI 快速问答", action: "ai" },
   { prefix: "wol", label: "/wol <别名>", description: "Wake-on-LAN 唤醒设备", action: "wol" },
   { prefix: "search", label: "/search <关键词>", description: "全局搜索", action: "search" },
@@ -112,6 +114,48 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
         } else {
           toast.error(`未知操作: ${action}，支持 start/stop/restart/logs`);
         }
+        setLoading(false);
+        break;
+      }
+
+      case "monitor": {
+        try {
+          const res = await fetch("/api/v1/admin/monitor/all");
+          const d = await res.json();
+          const results = d.results || [];
+          const statusIcons: Record<string, string> = { ok: "✅", timeout: "⏳", error: "❌" };
+          setGroups([{
+            label: `服务巡检（${results.filter((r: any) => r.status === "ok").length}/${results.length} 在线）`,
+            items: results.map((r: any) => ({
+              id: r.id, title: `${statusIcons[r.status] || "❓"} ${r.name}`,
+              description: r.latency != null ? `${r.latency}ms` : "—",
+              url: r.url,
+            })),
+          }]);
+        } catch { toast.error("获取监控数据失败"); }
+        setLoading(false);
+        break;
+      }
+
+      case "stats": {
+        try {
+          const res = await fetch("/api/v1/admin/monitor/all");
+          const d = await res.json();
+          const s = d.system;
+          if (!s) { toast.error("获取系统信息失败"); setLoading(false); return; }
+
+          // 格式辅助
+          const bar = (pct: number, color: string) =>
+            `<div class="flex items-center gap-2"><div class="flex-1 h-2 rounded-full bg-muted/40"><div class="h-full rounded-full" style="width:${Math.min(pct, 100)}%;background:${color}"></div></div><span class="tabular-nums w-10 text-right text-xs">${pct}%</span></div>`;
+
+          const items = [
+            { id: "cpu", title: `💻 CPU  ${s.cpu.usage}%  ·  ${s.cpu.cores} 核`, description: `${(s.cpu.usage / s.cpu.cores).toFixed(0)}% / 核` },
+            { id: "mem", title: `🧠 内存  ${(s.memory.used / 1073741824).toFixed(1)} GB / ${(s.memory.total / 1073741824).toFixed(1)} GB`, description: `${s.memory.usedPercent}% 已用` },
+            { id: "disk", title: `💾 磁盘  ${(s.disk.used / 1073741824).toFixed(1)} GB / ${(s.disk.total / 1073741824).toFixed(1)} GB`, description: `${s.disk.usedPercent}% 已用` },
+          ];
+
+          setGroups([{ label: "📊 系统资源", items }]);
+        } catch { toast.error("获取系统信息失败"); }
         setLoading(false);
         break;
       }

@@ -307,10 +307,27 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
     if (item.url) { recordClick(item.id); onOpenLink(item.url); setCommandPaletteOpen(false); }
     else if (item.prefix) { setQuery("/" + item.prefix + " "); }
     else if (item.title && !item.prefix) {
-      // 选择容器/设备 → 补全命令，保持面板打开
-      if (item.alias) setQuery("/ssh " + item.alias.name + " ");
-      else setQuery("/docker " + item.title + " ");
-      // 立即重新聚焦输入框，防止输入中断
+      // 容器 → 直接显示操作菜单
+      if (item.dockerName) {
+        setQuery("/docker " + item.dockerName + " ");
+        return;
+      }
+      // SSH 设备
+      if (item.alias) {
+        // 有凭据且无命令 → 直接打开终端
+        if (item.alias.user && item.alias.pass) {
+          const name = item.alias.name;
+          let host = item.alias.host || "";
+          try { host = new URL(host).hostname; } catch {}
+          useUIStore.getState().openSSHConnection({
+            name, host, user: item.alias.user || "root", pass: item.alias.pass || "",
+          });
+          return;
+        }
+        setQuery("/ssh " + item.alias.name + " ");
+        return;
+      }
+      setQuery("/docker " + item.title + " ");
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   };

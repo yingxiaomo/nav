@@ -102,7 +102,7 @@ func (h *Handler) collectMonitorContext() string {
 
 	sys := service.GetSystemInfo()
 	if sys.CPU.Cores > 0 {
-		parts = append(parts, fmt.Sprintf("CPU: %.0f%% (%d核), 内存: %.0f%% (%dG/%dG), 磁盘: %.0f%%, 运行: %.1f天",
+		parts = append(parts, fmt.Sprintf("CPU: %.0f%% (%d核), 内存: %d%% (%dG/%dG), 磁盘: %d%%, 运行: %.1f天",
 			sys.CPU.Usage, sys.CPU.Cores,
 			sys.Memory.UsedPercent, sys.Memory.Used/1073741824, sys.Memory.Total/1073741824,
 			sys.Disk.UsedPercent,

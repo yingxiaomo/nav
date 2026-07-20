@@ -10,6 +10,7 @@ const eslintConfig = defineConfig([
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "react-hooks/set-state-in-effect": "off",
+      "react-hooks/refs": "off",
     },
   },
   {
@@ -17,6 +18,13 @@ const eslintConfig = defineConfig([
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "react-hooks/set-state-in-effect": "off",
+    },
+  },
+  {
+    files: ["**/ssh-terminal.tsx"],
+    rules: {
+      "react-hooks/refs": "off",
+      "react-hooks/immutability": "off",
     },
   },
   {

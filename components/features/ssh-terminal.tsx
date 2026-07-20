@@ -84,7 +84,11 @@ export function SSHTerminalPanel() {
   const terminalsRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const handledTokenRef = useRef<number>(0);
   const instancesRef = useRef(instances);
-  instancesRef.current = instances;
+
+  // 同步 instances 到 ref（用于主题切换回调访问最新列表）
+  useEffect(() => {
+    instancesRef.current = instances;
+  }, [instances]);
 
   // 主题切换时同步已打开终端配色
   useEffect(() => {

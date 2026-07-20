@@ -74,13 +74,22 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
       case "docker": {
         if (!argsStr) {
           try {
-            const res = await fetch("/api/v1/admin/docker/containers");
-            const data = await res.json();
-            const cis = data?.containers || [];
+            const [contsRes, statsRes] = await Promise.all([
+              fetch("/api/v1/admin/docker/containers"),
+              fetch("/api/v1/admin/docker/stats"),
+            ]);
+            const conts = (await contsRes.json())?.containers || [];
+            const stats = (await statsRes.json()) || [];
+            const statsMap: Record<string, any> = {};
+            for (const s of stats) statsMap[s.name] = s;
 
-            setGroups([{ label: `Docker 容器 (${cis.length})`, items: cis.map((c: any) => ({
-              id: c.id, title: c.name.replace(/^\//, ""), description: `${c.image} · ${c.status}`,
-            })) }]);
+            setGroups([{ label: `Docker 容器 (${conts.length})`, items: conts.map((c: any) => {
+              const name = c.name.replace(/^\//, "");
+              const st = statsMap[name];
+              const info = st ? ` 💻${st.cpuPercent || "—"}% 🧠${(st.memUsage || 0) / 1048576 < 1024 ? ((st.memUsage || 0) / 1048576).toFixed(0) + "MB" : ((st.memUsage || 0) / 1073741824).toFixed(1) + "GB"}` : "";
+              const desc = `${c.image?.split("/").pop()?.split(":")[0] || c.image} · ${c.state}${info}`;
+              return { id: c.id, title: name, description: desc };
+            })}]);
           } catch { toast.error("获取容器列表失败"); }
           setLoading(false);
           return;

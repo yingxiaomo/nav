@@ -118,10 +118,16 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
 
       case "ssh": {
         if (!argsStr) {
-          setGroups([{ label: "可用设备", items: deviceAliases.map(d => ({
+          const sshDevices = deviceAliases.filter(d => d.user && d.pass);
+          if (sshDevices.length === 0) {
+            setGroups([{ label: "可用设备", items: [{ id: "none", title: "没有可 SSH 连接的设备", description: "请先在监控编辑弹窗中配置 SSH 账号密码", prefix: "" }] }]);
+          } else {
+          setGroups([{ label: "可用设备", items: sshDevices.map(d => ({
             id: d.name, title: d.name, description: d.host || "", alias: d,
           }))}]);
+          }
           setLoading(false);
+          setTimeout(() => inputRef.current?.focus(), 0);
           return;
         }
         const alias = deviceAliases.find(d => argsStr.startsWith(d.name));

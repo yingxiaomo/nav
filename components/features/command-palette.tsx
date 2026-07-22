@@ -98,11 +98,11 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
         const containerName = nameParts.join(" ");
         if (!containerName) {
           setGroups([{ label: "Docker 操作", items: [
-            { id: "ps", title: "docker ps", description: "列出所有容器" },
-            { id: "restart", title: "docker restart <容器>", description: "重启容器" },
-            { id: "start", title: "docker start <容器>", description: "启动容器" },
-            { id: "stop", title: "docker stop <容器>", description: "停止容器" },
-            { id: "logs", title: "docker logs <容器>", description: "查看容器日志" },
+            { id: "ps", title: "📋 列出所有容器", description: "查看容器列表和资源占用", prefix: "docker", action: "list" },
+            { id: "restart", title: "🔄 重启容器", description: "docker restart <容器名>", prefix: "docker" },
+            { id: "start", title: "▶️ 启动容器", description: "docker start <容器名>", prefix: "docker" },
+            { id: "stop", title: "⏹️ 停止容器", description: "docker stop <容器名>", prefix: "docker" },
+            { id: "logs", title: "📜 查看日志", description: "docker logs <容器名>", prefix: "docker" },
           ]}]);
           setLoading(false);
           return;

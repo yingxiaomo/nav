@@ -97,9 +97,21 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 			return
 		}
 
-		stdout, _ := session.StdoutPipe()
-		stderr, _ := session.StderrPipe()
-		stdin, _ := session.StdinPipe()
+		stdout, err := session.StdoutPipe()
+		if err != nil {
+			_ = conn.WriteMessage(websocket.TextMessage, []byte("\r\nSSH 管道初始化失败: "+err.Error()+"\r\n"))
+			return
+		}
+		stderr, err := session.StderrPipe()
+		if err != nil {
+			_ = conn.WriteMessage(websocket.TextMessage, []byte("\r\nSSH 管道初始化失败: "+err.Error()+"\r\n"))
+			return
+		}
+		stdin, err := session.StdinPipe()
+		if err != nil {
+			_ = conn.WriteMessage(websocket.TextMessage, []byte("\r\nSSH 管道初始化失败: "+err.Error()+"\r\n"))
+			return
+		}
 
 		if err := session.Shell(); err != nil {
 			_ = conn.WriteMessage(websocket.TextMessage, []byte("\r\nShell 启动失败: "+err.Error()+"\r\n"))

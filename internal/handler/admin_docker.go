@@ -234,6 +234,8 @@ func FetchDockerIcon() http.HandlerFunc {
 				model.RespondJSON(w, http.StatusOK, map[string]any{"icon": ddgURL})
 				return
 			}
+		} else if resp != nil {
+			resp.Body.Close()
 		}
 
 		favURL := "https://" + domain + "/favicon.ico"
@@ -244,6 +246,8 @@ func FetchDockerIcon() http.HandlerFunc {
 				model.RespondJSON(w, http.StatusOK, map[string]any{"icon": favURL})
 				return
 			}
+		} else if resp != nil {
+			resp.Body.Close()
 		}
 
 		model.RespondJSON(w, http.StatusOK, map[string]any{"icon": nil})
@@ -292,7 +296,9 @@ func (h *Handler) ReorderContainers() http.HandlerFunc {
 		for i, name := range req.Order {
 			if meta, err := h.DockerMeta.Get(name); err == nil {
 				meta.Order = i
-				h.DockerMeta.Set(name, meta)
+				if err := h.DockerMeta.Set(name, meta); err != nil {
+					slog.Error("保存容器排序失败", "container", name, "error", err)
+				}
 			}
 		}
 

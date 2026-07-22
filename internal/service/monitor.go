@@ -63,10 +63,17 @@ func (h *HealthChecker) Start(ctx context.Context) {
 	h.runAllChecks(ctx)
 
 	go func() {
+		cleanupTicker := time.NewTicker(24 * time.Hour)
+		defer cleanupTicker.Stop()
+
 		for {
 			select {
 			case <-h.ticker.C:
 				h.runAllChecks(ctx)
+			case <-cleanupTicker.C:
+				if err := h.cleanOldHistory(); err != nil {
+					slog.Warn("清理历史检查记录失败", "error", err)
+				}
 			case <-ctx.Done():
 				return
 			}
@@ -315,7 +322,7 @@ func (h *HealthChecker) GetTargets() []model.MonitorTarget {
 
 // getTargets retrieves all monitor targets from the database.
 func (h *HealthChecker) getTargets() []model.MonitorTarget {
-	rows, err := h.db.Query(
+	rows, err := h.db.QueryContext(context.Background(),
 		"SELECT id, name, url, COALESCE(icon,''), COALESCE(mac,''), timeout, created_at, COALESCE(ssh_user,''), COALESCE(ssh_pass,''), COALESCE(check_type,'') FROM monitor_targets ORDER BY created_at",
 	)
 	if err != nil {
@@ -348,7 +355,8 @@ func (h *HealthChecker) cleanOldHistory() error {
 func (h *HealthChecker) GetUptime(targetID string) float64 {
 	dayAgo := time.Now().Add(-24 * time.Hour).UnixMilli()
 	var total, ok int
-	h.db.QueryRow("SELECT COUNT(*), COALESCE(SUM(CASE WHEN status='ok' THEN 1 ELSE 0 END),0) FROM check_history WHERE target_id=? AND checked_at > ?", targetID, dayAgo).Scan(&total, &ok)
+	h.db.QueryRowContext(context.Background(),
+		"SELECT COUNT(*), COALESCE(SUM(CASE WHEN status='ok' THEN 1 ELSE 0 END),0) FROM check_history WHERE target_id=? AND checked_at > ?", targetID, dayAgo).Scan(&total, &ok)
 	if total == 0 { return 0 }
 	return float64(ok) / float64(total) * 100
 }

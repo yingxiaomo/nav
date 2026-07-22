@@ -16,7 +16,6 @@ import (
 	"github.com/YingXiaoMo/nav/internal/db"
 	"github.com/YingXiaoMo/nav/internal/db/queries"
 	"github.com/YingXiaoMo/nav/internal/handler"
-	"github.com/YingXiaoMo/nav/internal/middleware"
 	"github.com/YingXiaoMo/nav/internal/notify"
 	"github.com/YingXiaoMo/nav/internal/remote"
 	"github.com/YingXiaoMo/nav/internal/service"
@@ -70,6 +69,19 @@ func loadConfig() Config {
 	}
 }
 
+	// recoveryMiddleware 捕获 handler panic，防止服务崩溃
+func recoveryMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				slog.Error("handler panic 已恢复", "error", err, "path", r.URL.Path)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
 // run 执行服务初始化流程，可单元测试
 func run(ctx context.Context, cfg Config) error {
 	database, err := db.Open(cfg.DBPath)
@@ -86,6 +98,10 @@ func run(ctx context.Context, cfg Config) error {
 	if err := os.MkdirAll(cfg.UploadDir, 0755); err != nil {
 		return fmt.Errorf("创建上传目录失败: %w", err)
 	}
+
+	// 启动后台清理任务
+	handler.StartLoginAttemptsCleanup(ctx)
+	tgbot.StartHistoryCleanup(ctx)
 
 	// Docker service (optional)
 	dockerSvc, err := service.NewDockerService()
@@ -156,8 +172,8 @@ func run(ctx context.Context, cfg Config) error {
 		UploadDir:     cfg.UploadDir,
 		DataDir:       cfg.DataDir,
 	}
-	sessionMW := middleware.SessionAuth(database)
-	app.RegisterRoutes(mux, sessionMW)
+
+		app.RegisterRoutes(mux)
 
 	// Uploads
 	mux.Handle("GET /uploads/", http.StripPrefix("/uploads/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -177,9 +193,11 @@ func run(ctx context.Context, cfg Config) error {
 		mux.Handle("GET /", http.FileServer(http.Dir(cfg.StaticDir)))
 	}
 
+	handler := recoveryMiddleware(mux)
+
 	srv := &http.Server{
 		Addr:         ":" + strconv.Itoa(cfg.Port),
-		Handler:      mux,
+		Handler:      handler,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,

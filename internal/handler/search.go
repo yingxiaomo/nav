@@ -30,7 +30,7 @@ func SearchHandler(db *sql.DB) http.HandlerFunc {
 		seen := make(map[string]bool)
 
 		// 搜索书签（标题和 URL）
-		rows, err := db.Query(
+		rows, err := db.QueryContext(r.Context(),
 			"SELECT title, url, COALESCE(icon,'') FROM bookmarks WHERE LOWER(title) LIKE ? OR LOWER(url) LIKE ? LIMIT 10",
 			"%"+qLower+"%", "%"+qLower+"%",
 		)
@@ -46,7 +46,7 @@ func SearchHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// 搜索笔记
-		noteRows, err := db.Query(
+		noteRows, err := db.QueryContext(r.Context(),
 			"SELECT title, content FROM notes WHERE LOWER(title) LIKE ? OR LOWER(content) LIKE ? LIMIT 5",
 			"%"+qLower+"%", "%"+qLower+"%",
 		)
@@ -65,7 +65,7 @@ func SearchHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// 搜索监控目标
-		monRows, err := db.Query(
+		monRows, err := db.QueryContext(r.Context(),
 			"SELECT name, url, COALESCE(icon,'') FROM monitor_targets WHERE LOWER(name) LIKE ? OR LOWER(url) LIKE ? LIMIT 5",
 			"%"+qLower+"%", "%"+qLower+"%",
 		)

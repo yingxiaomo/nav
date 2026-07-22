@@ -85,25 +85,16 @@ func (h *Handler) UpdateBookmark() http.HandlerFunc {
 			}
 			existing.CategoryID = input.CategoryID
 		}
-		if input.Title != "" {
-			existing.Title = input.Title
-		}
-		if input.URL != "" {
-			if !strings.HasPrefix(input.URL, "http://") && !strings.HasPrefix(input.URL, "https://") {
-				return nil, "链接格式无效，仅允许 http/https 链接", false
-			}
-			existing.URL = input.URL
-		}
-		if input.Icon != "" {
-			existing.Icon = input.Icon
-		}
-		if input.Description != "" {
-			existing.Description = input.Description
+		// 直接使用输入值更新（允许清空字段）
+		title := input.Title
+		url := input.URL
+		if url != "" && !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+			return nil, "链接格式无效，仅允许 http/https 链接", false
 		}
 
 		if _, err := queries.UpdateBookmark(ctx, db, id, model.BookmarkInput{
-			CategoryID: existing.CategoryID, Title: existing.Title, URL: existing.URL,
-			Icon: existing.Icon, Description: existing.Description, Order: existing.Order,
+			CategoryID: existing.CategoryID, Title: title, URL: url,
+			Icon: input.Icon, Description: input.Description, Order: existing.Order,
 		}); err != nil {
 			return nil, "服务器内部错误", false
 		}

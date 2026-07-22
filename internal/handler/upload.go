@@ -86,24 +86,49 @@ func (h *Handler) Upload() http.HandlerFunc {
 
 		filename := model.NewID() + "." + ext
 		dst := filepath.Join(h.UploadDir, filename)
+		tmpFile := dst + ".tmp"
 
-		out, err := os.Create(dst)
+		// Atomic write: temp file -> rename for crash safety
+		out, err := os.Create(tmpFile)
 		if err != nil {
-			slog.Error("创建文件失败", "error", err)
+			slog.Error("创建临时文件失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "保存文件失败")
 			return
 		}
-		defer out.Close()
 
 		if _, err := out.Write(head); err != nil {
-			slog.Error("写入文件失败", "error", err)
+			out.Close()
+			os.Remove(tmpFile)
+			slog.Error("写入临时文件失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "保存文件失败")
 			return
 		}
 		if _, err := io.Copy(out, file); err != nil {
-			slog.Error("写入文件失败", "error", err)
+			out.Close()
+			os.Remove(tmpFile)
+			slog.Error("写入临时文件失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "保存文件失败")
 			return
+		}
+		if err := out.Sync(); err != nil {
+			out.Close()
+			os.Remove(tmpFile)
+			slog.Error("同步临时文件失败", "error", err)
+			model.RespondError(w, http.StatusInternalServerError, "保存文件失败")
+			return
+		}
+		out.Close()
+
+		if err := os.Rename(tmpFile, dst); err != nil {
+			os.Remove(tmpFile)
+			// On Windows, try removing destination first then retry rename
+			os.Remove(dst)
+			if err := os.Rename(tmpFile, dst); err != nil {
+				os.Remove(tmpFile)
+				slog.Error("重命名上传文件失败", "error", err)
+				model.RespondError(w, http.StatusInternalServerError, "保存文件失败")
+				return
+			}
 		}
 
 		model.RespondJSON(w, http.StatusCreated, map[string]any{

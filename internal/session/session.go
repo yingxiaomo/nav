@@ -22,7 +22,7 @@ const (
 func Sign(userID, secret string) string {
 	expires := time.Now().Add(Duration).UnixMilli()
 	payload := userID + ":" + strconv.FormatInt(expires, 10)
-	payloadBase64 := base64.StdEncoding.EncodeToString([]byte(payload))
+	payloadBase64 := base64.URLEncoding.EncodeToString([]byte(payload))
 
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(payload))
@@ -41,7 +41,7 @@ func Verify(cookieValue, secret string) bool {
 	payloadBase64 := cookieValue[:dotIdx]
 	sigHex := cookieValue[dotIdx+1:]
 
-	payloadBytes, err := base64.StdEncoding.DecodeString(payloadBase64)
+	payloadBytes, err := base64.URLEncoding.DecodeString(payloadBase64)
 	if err != nil {
 		return false
 	}

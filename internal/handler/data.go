@@ -395,8 +395,8 @@ func (h *Handler) PutData() http.HandlerFunc {
 					}
 
 					if _, err := tx.ExecContext(r.Context(),
-						"INSERT INTO settings (key, value) VALUES (?, ?)",
-						key, valStr); err != nil {
+						"INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?",
+						key, valStr, valStr); err != nil {
 						slog.Error("插入设置失败", "error", err, "key", key)
 						model.RespondError(w, http.StatusInternalServerError, "写入设置失败")
 						return
@@ -408,8 +408,8 @@ func (h *Handler) PutData() http.HandlerFunc {
 		if len(body.PinnedLinks) > 0 {
 			valBytes, _ := json.Marshal(body.PinnedLinks)
 			if _, err := tx.ExecContext(r.Context(),
-				"INSERT INTO settings (key, value) VALUES (?, ?)",
-				"pinnedLinks", string(valBytes)); err != nil {
+				"INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?",
+				"pinnedLinks", string(valBytes), string(valBytes)); err != nil {
 				slog.Error("插入 pinnedLinks 失败", "error", err)
 				model.RespondError(w, http.StatusInternalServerError, "写入固定链接失败")
 				return

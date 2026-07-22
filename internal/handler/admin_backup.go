@@ -153,6 +153,7 @@ func (h *Handler) ImportBackup() http.HandlerFunc {
 		db := h.DB
 
 		var body adminBackupImport
+		r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10MB limit
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return

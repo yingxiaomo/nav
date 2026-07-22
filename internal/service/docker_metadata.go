@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -38,11 +39,13 @@ func (s *DockerMetadataStore) load() {
 
 	data, err := os.ReadFile(s.filePath)
 	if err != nil {
+		slog.Debug("读取 Docker 元数据文件失败", "path", s.filePath, "error", err)
 		return // file doesn't exist yet
 	}
 
 	var store map[string]model.DockerMetadata
 	if err := json.Unmarshal(data, &store); err != nil {
+		slog.Warn("Docker 元数据文件损坏，重新创建", "path", s.filePath, "error", err)
 		return // corrupt file, start fresh
 	}
 	s.data = store

@@ -206,6 +206,7 @@ type DockerSnapshotter struct {
 	stats   []model.DockerStat
 	updated time.Time
 	ready   bool
+	cancel  context.CancelFunc
 }
 
 // NewDockerSnapshotter 创建快照器
@@ -215,6 +216,8 @@ func NewDockerSnapshotter(svc *DockerService) *DockerSnapshotter {
 
 // Start 启动后台轮询（每 10s 更新一次快照）
 func (s *DockerSnapshotter) Start(ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
+	s.cancel = cancel
 	go func() {
 		// 首次运行立即执行
 		s.refresh(ctx)
@@ -231,8 +234,12 @@ func (s *DockerSnapshotter) Start(ctx context.Context) {
 	}()
 }
 
-// Stop 停止轮询（通过 ctx cancel 触发）
-func (s *DockerSnapshotter) Stop() {}
+// Stop 停止轮询
+func (s *DockerSnapshotter) Stop() {
+	if s.cancel != nil {
+		s.cancel()
+	}
+}
 
 // Snapshot 返回当前快照（读锁，不阻塞其余前端请求）
 func (s *DockerSnapshotter) Snapshot() ([]model.DockerStat, bool, time.Time) {

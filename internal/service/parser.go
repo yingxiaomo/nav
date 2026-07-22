@@ -264,16 +264,9 @@ func ParseURL(rawURL string) (*ParseResult, error) {
 
 	// 5. Detect charset and decode
 	contentType := resp.Header.Get("Content-Type")
-	charset := detectCharset(contentType, body)
+	_ = detectCharset(contentType, body)
 
-	// If charset is not UTF-8, try common conversions; otherwise just use as-is.
 	htmlBody := string(body)
-	if charset != "utf-8" && charset != "" {
-		// For Go, the body is always raw bytes. If it's not UTF-8, the text content
-		// may be garbled, but HTML tag/attribute extraction still works since tags
-		// use ASCII characters. We don't add a full charset conversion dependency.
-		// The raw string is still useful for tag extraction.
-	}
 
 	// 6. Parse HTML
 	baseURLStr := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)

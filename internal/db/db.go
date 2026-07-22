@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -120,13 +121,13 @@ func migrateV4(database *sql.DB) error {
 
 func addColumnIfNotExists(database *sql.DB, table, column, alterSQL string) error {
 	var count int
-	if err := database.QueryRow(
+	if err := database.QueryRowContext(context.Background(),
 		`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name=?`, table, column,
 	).Scan(&count); err != nil {
 		return fmt.Errorf("检查列 %s.%s 失败: %w", table, column, err)
 	}
 	if count == 0 {
-		if _, err := database.Exec(alterSQL); err != nil {
+		if _, err := database.ExecContext(context.Background(), alterSQL); err != nil {
 			return fmt.Errorf("添加列 %s.%s 失败: %w", table, column, err)
 		}
 	}

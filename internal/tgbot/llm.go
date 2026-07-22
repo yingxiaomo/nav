@@ -2,6 +2,7 @@ package tgbot
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,13 +14,42 @@ import (
 
 var chatHistory struct {
 	sync.Mutex
-	data map[string][]chatMessage
+	data      map[string][]chatMessage
+	lastSeen  map[string]time.Time
 }
 
 var chatHistoryInit sync.Once
 
 func initHistory() {
-	chatHistoryInit.Do(func() { chatHistory.data = make(map[string][]chatMessage) })
+	chatHistoryInit.Do(func() {
+		chatHistory.data = make(map[string][]chatMessage)
+		chatHistory.lastSeen = make(map[string]time.Time)
+	})
+}
+
+// StartHistoryCleanup 定期清理超过 1 小时未活跃的聊天历史
+func StartHistoryCleanup(ctx context.Context) {
+	initHistory()
+	go func() {
+		ticker := time.NewTicker(30 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				chatHistory.Lock()
+				now := time.Now()
+				for uid, last := range chatHistory.lastSeen {
+					if now.Sub(last) > time.Hour {
+						delete(chatHistory.data, uid)
+						delete(chatHistory.lastSeen, uid)
+					}
+				}
+				chatHistory.Unlock()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 }
 
 type chatMessage struct {
@@ -123,6 +153,7 @@ func callLLM(cfg LLMConfig, uid, text string) string {
 	chatHistory.data[uid] = append(chatHistory.data[uid],
 		chatMessage{Role: "user", Content: text},
 		chatMessage{Role: "assistant", Content: reply})
+	chatHistory.lastSeen[uid] = time.Now()
 	if len(chatHistory.data[uid]) > 40 {
 		chatHistory.data[uid] = chatHistory.data[uid][len(chatHistory.data[uid])-40:]
 	}

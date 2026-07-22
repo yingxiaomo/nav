@@ -48,12 +48,8 @@ func (h *Handler) UpdateTodo() http.HandlerFunc {
 			return nil, "not_found", false
 		}
 
-		text := existing.Text
-		if input.Text != "" {
-			text = input.Text
-		}
-
-		if _, err := queries.UpdateTodo(ctx, db, id, text, input.Completed); err != nil {
+		// 直接使用输入值更新（允许清空字段）
+		if _, err := queries.UpdateTodo(ctx, db, id, input.Text, input.Completed); err != nil {
 			return nil, "服务器内部错误", false
 		}
 

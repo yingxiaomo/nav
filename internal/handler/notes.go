@@ -50,16 +50,8 @@ func (h *Handler) UpdateNote() http.HandlerFunc {
 			return nil, "not_found", false
 		}
 
-		title := existing.Title
-		if input.Title != "" {
-			title = input.Title
-		}
-		content := existing.Content
-		if input.Content != "" {
-			content = input.Content
-		}
-
-		if _, err := queries.UpdateNote(ctx, db, id, title, content); err != nil {
+		// 直接使用输入值更新（允许清空字段）
+		if _, err := queries.UpdateNote(ctx, db, id, input.Title, input.Content); err != nil {
 			return nil, "服务器内部错误", false
 		}
 

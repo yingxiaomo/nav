@@ -84,6 +84,7 @@ export function SSHTerminalPanel() {
   const terminalsRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const handledTokenRef = useRef<number>(0);
   const instancesRef = useRef(instances);
+  const cleanupRef = useRef<Map<string, () => void>>(new Map());
 
   // 同步 instances 到 ref（用于主题切换回调访问最新列表）
   useEffect(() => {
@@ -155,9 +156,10 @@ export function SSHTerminalPanel() {
       prev.map((i) => (i.id === id ? { ...i, term, ws, fitAddon } : i))
     );
 
-    return () => {
+    // Store cleanup so resize listener is removed when terminal closes
+    cleanupRef.current.set(id, () => {
       window.removeEventListener("resize", onResize);
-    };
+    });
   }, []);
 
   const connect = useCallback((name: string, host: string, user: string, pass: string, port = 22) => {
@@ -188,6 +190,8 @@ export function SSHTerminalPanel() {
   }, [sshConnectRequest, connect, clearSSHConnectRequest]);
 
   const closeInstance = (id: string) => {
+    cleanupRef.current.get(id)?.();
+    cleanupRef.current.delete(id);
     setInstances((prev) => {
       const inst = prev.find((i) => i.id === id);
       inst?.ws?.close();

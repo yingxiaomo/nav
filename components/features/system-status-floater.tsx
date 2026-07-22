@@ -31,7 +31,7 @@ export function SystemStatusFloater() {
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [contextMenu]);
+  }, []);
 
   if (!isActive) return null;
 

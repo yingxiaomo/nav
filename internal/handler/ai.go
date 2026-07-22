@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 
@@ -76,7 +77,7 @@ func (h *Handler) AIConversation() http.HandlerFunc {
 			message = fmt.Sprintf("以下是当前监控数据：\n%s\n\n用户问题：%s", ctx, message)
 		}
 
-		userID := r.RemoteAddr
+		userID := stripPort(r.RemoteAddr)
 		reply := tgbot.CallLLMWithContext(cfg, userID, message)
 		model.RespondJSON(w, http.StatusOK, map[string]any{"reply": reply})
 	}
@@ -155,4 +156,12 @@ func loadLLMConfig(ctx context.Context, db *sql.DB) (tgbot.LLMConfig, error) {
 		cfg.Model = "gpt-4o-mini"
 	}
 	return cfg, nil
+}
+
+// stripPort removes the port number from RemoteAddr, leaving only the IP.
+func stripPort(addr string) string {
+	if host, _, err := net.SplitHostPort(addr); err == nil {
+		return host
+	}
+	return addr
 }

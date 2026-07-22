@@ -24,8 +24,7 @@ type Handler struct {
 }
 
 // RegisterRoutes registers all API routes on the given ServeMux.
-// sessionMW protects write endpoints with session cookie auth.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux, sessionMW func(http.Handler) http.Handler) {
+func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// Health check — always public
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		model.RespondJSON(w, http.StatusOK, map[string]any{"status": "ok", "time": model.Now()})

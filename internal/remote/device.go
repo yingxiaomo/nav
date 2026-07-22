@@ -94,13 +94,14 @@ func (m *Manager) Remove(name string) bool {
 	return false
 }
 
-// Find 查找设备
+// Find 查找设备（返回副本避免竞态）
 func (m *Manager) Find(keyword string) *Device {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	for i := range m.cfg.Devices {
 		if m.cfg.Devices[i].Name == keyword || strings.Contains(m.cfg.Devices[i].Name, keyword) {
-			return &m.cfg.Devices[i]
+			d := m.cfg.Devices[i]
+			return &d
 		}
 	}
 	return nil

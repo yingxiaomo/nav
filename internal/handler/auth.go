@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"log/slog"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -45,6 +47,41 @@ func clearSessionCookie(w http.ResponseWriter) {
 		HttpOnly: true,
 		MaxAge:   -1,
 	})
+}
+
+func resetSessionSecret() string {
+	secret := generateSessionSecret()
+	return secret
+}
+
+func ipFromRemote(addr string) string {
+	if host, _, err := net.SplitHostPort(addr); err == nil {
+		return host
+	}
+	return addr
+}
+
+// StartLoginAttemptsCleanup 定期清理过期的登录尝试记录
+func StartLoginAttemptsCleanup(ctx context.Context) {
+	go func() {
+		ticker := time.NewTicker(30 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				loginAttemptsMu.Lock()
+				now := time.Now().UnixMilli()
+				for ip, entry := range loginAttempts {
+					if entry.until > 0 && entry.until < now {
+						delete(loginAttempts, ip)
+					}
+				}
+				loginAttemptsMu.Unlock()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 }
 
 func isSecureRequest(r *http.Request) bool {
@@ -131,7 +168,7 @@ func (h *Handler) Login() http.HandlerFunc {
 			return
 		}
 
-		ip := r.RemoteAddr
+		ip := ipFromRemote(r.RemoteAddr)
 
 		pwHash, err := queries.GetSetting(r.Context(), db, "admin_password_hash")
 		if err != nil {

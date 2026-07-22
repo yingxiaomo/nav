@@ -41,26 +41,26 @@ type backupMonitorTarget struct {
 }
 
 type adminBackupExport struct {
-	Version       int                  `json:"version"`
-	ExportedAt    int64                `json:"exportedAt"`
-	Settings      map[string]string    `json:"settings"`
-	Categories    []backupCategory     `json:"categories"`
-	Bookmarks     []backupBookmark     `json:"bookmarks"`
-	Todos         []model.Todo         `json:"todos"`
-	Notes         []model.Note         `json:"notes"`
-	MonitorTargets []backupMonitorTarget `json:"monitorTargets"`
-	DockerMetadata  map[string]model.DockerMetadata `json:"dockerMetadata,omitempty"`
+	Version        int                            `json:"version"`
+	ExportedAt     int64                          `json:"exportedAt"`
+	Settings       map[string]string              `json:"settings"`
+	Categories     []backupCategory               `json:"categories"`
+	Bookmarks      []backupBookmark               `json:"bookmarks"`
+	Todos          []model.Todo                   `json:"todos"`
+	Notes          []model.Note                   `json:"notes"`
+	MonitorTargets []backupMonitorTarget          `json:"monitorTargets"`
+	DockerMetadata map[string]model.DockerMetadata `json:"dockerMetadata,omitempty"`
 }
 
 type adminBackupImport struct {
-	Version       int                  `json:"version"`
-	Settings      map[string]string    `json:"settings"`
-	Categories    []backupCategory     `json:"categories"`
-	Bookmarks     []backupBookmark     `json:"bookmarks"`
-	Todos         []model.Todo         `json:"todos"`
-	Notes         []model.Note         `json:"notes"`
-	MonitorTargets []backupMonitorTarget `json:"monitorTargets"`
-	DockerMetadata  map[string]model.DockerMetadata `json:"dockerMetadata,omitempty"`
+	Version        int                            `json:"version"`
+	Settings       map[string]string              `json:"settings"`
+	Categories     []backupCategory               `json:"categories"`
+	Bookmarks      []backupBookmark               `json:"bookmarks"`
+	Todos          []model.Todo                   `json:"todos"`
+	Notes          []model.Note                   `json:"notes"`
+	MonitorTargets []backupMonitorTarget          `json:"monitorTargets"`
+	DockerMetadata map[string]model.DockerMetadata `json:"dockerMetadata,omitempty"`
 }
 
 // ===== Handlers =====
@@ -163,12 +163,12 @@ func (h *Handler) ImportBackup() http.HandlerFunc {
 			return
 		}
 
-		authKeys := []string{"admin_password_hash", "session_secret"}
-		preserved := make(map[string]string)
-		for _, key := range authKeys {
-			if val, err := queries.GetSetting(r.Context(), db, key); err == nil && val != "" {
-				preserved[key] = val
-			}
+		// 保存全部现有设置，避免导入覆盖未备份的配置（如 bot_config、ai_config 等）
+		existingSettings, err := queries.GetAllSettings(r.Context(), db)
+		if err != nil {
+			slog.Error("备份导入: 读取现有设置失败", "error", err)
+			model.RespondError(w, http.StatusInternalServerError, "恢复失败")
+			return
 		}
 
 		tx, err := db.BeginTx(r.Context(), nil)
@@ -249,7 +249,7 @@ func (h *Handler) ImportBackup() http.HandlerFunc {
 			}
 		}
 
-			for _, mt := range body.MonitorTargets {
+		for _, mt := range body.MonitorTargets {
 			if _, err := tx.ExecContext(r.Context(),
 				"INSERT INTO monitor_targets (id, name, url, icon, mac, timeout, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
 				mt.ID, mt.Name, mt.URL, mt.Icon, mt.MAC, mt.Timeout, mt.CreatedAt); err != nil {
@@ -259,12 +259,16 @@ func (h *Handler) ImportBackup() http.HandlerFunc {
 			}
 		}
 
-		for key, value := range preserved {
+		// 保留导入未覆盖的现有设置
+		for key, value := range existingSettings {
+			if _, exists := body.Settings[key]; exists {
+				continue // 备份已提供此设置
+			}
 			if _, err := tx.ExecContext(r.Context(),
 				"INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?",
 				key, value, value); err != nil {
-				slog.Error("备份导入: 恢复密钥失败", "error", err, "key", key)
-				model.RespondError(w, http.StatusInternalServerError, "恢复密钥失败")
+				slog.Error("备份导入: 保留现有设置失败", "error", err, "key", key)
+				model.RespondError(w, http.StatusInternalServerError, "恢复失败")
 				return
 			}
 		}

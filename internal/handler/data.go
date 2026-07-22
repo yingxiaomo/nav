@@ -61,7 +61,6 @@ func bookmarkToLinkItem(b model.Bookmark) model.LinkItem {
 		li.Children = []model.LinkItem{}
 	}
 	if b.URL == "" && li.Type == "" {
-		// 部分旧数据可能没有 type=folder 但有空的 URL，统一处理
 		li.URL = ""
 	}
 	return li
@@ -132,7 +131,6 @@ func saveLinksTree(ctx context.Context, tx *sql.Tx, categoryID, parentID string,
 			return err
 		}
 
-		// 递归保存子项
 		if len(link.Children) > 0 {
 			if err := saveLinksTree(ctx, tx, categoryID, linkID, link.Children, now); err != nil {
 				return err
@@ -237,7 +235,6 @@ func (h *Handler) GetData() http.HandlerFunc {
 				model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 				return
 			}
-			// 树形重建 — 支持嵌套文件夹
 			linkItems := bookmarksToTree(bms)
 
 			exportCats = append(exportCats, categoryExport{
@@ -270,7 +267,7 @@ func (h *Handler) GetData() http.HandlerFunc {
 	}
 }
 
-// PutData 处理 PUT /api/v1/data — 完整替换数据，支持文件夹树。
+// PutData 处理 PUT /api/v1/data — 增量保存，只 upsert 导入体提供的数据。
 func (h *Handler) PutData() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		db := h.DB
@@ -281,14 +278,6 @@ func (h *Handler) PutData() http.HandlerFunc {
 			return
 		}
 
-		authKeys := []string{"admin_password_hash", "session_secret"}
-		preserved := make(map[string]string)
-		for _, key := range authKeys {
-			if val, err := queries.GetSetting(r.Context(), db, key); err == nil && val != "" {
-				preserved[key] = val
-			}
-		}
-
 		tx, err := db.BeginTx(r.Context(), nil)
 		if err != nil {
 			slog.Error("开启事务失败", "error", err)
@@ -297,87 +286,126 @@ func (h *Handler) PutData() http.HandlerFunc {
 		}
 		defer tx.Rollback()
 
-		tables := []string{"bookmarks", "categories", "todos", "notes", "settings"}
-		for _, t := range tables {
-			if _, err := tx.ExecContext(r.Context(), "DELETE FROM "+t); err != nil {
-				slog.Error("清空表失败", "error", err, "table", t)
-				model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-				return
-			}
-		}
-
 		now := model.Now()
 
-		for _, cat := range body.Categories {
-			catID := cat.ID
-			if catID == "" {
-				catID = model.NewID()
-			}
-			createdAt := cat.UpdatedAt
-			if createdAt == 0 {
-				createdAt = now
-			}
-
-			if _, err := tx.ExecContext(r.Context(),
-				`INSERT INTO categories (id, title, icon, "order", created_at) VALUES (?, ?, ?, ?, ?)`,
-				catID, cat.Title, cat.Icon, cat.Order, createdAt); err != nil {
-				slog.Error("插入分类失败", "error", err)
-				model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-				return
-			}
-
-			// 递归保存书签树（支持嵌套文件夹）
-			if len(cat.Links) > 0 {
-				if err := saveLinksTree(r.Context(), tx, catID, "", cat.Links, now); err != nil {
-					slog.Error("保存书签树失败", "error", err)
+		// 分类 + 书签（增量）：只处理 body 提供的分类，未提供的分类不受影响
+		if body.Categories != nil {
+			if len(body.Categories) == 0 {
+				if _, err := tx.ExecContext(r.Context(), `DELETE FROM bookmarks`); err != nil {
+					slog.Error("清空书签失败", "error", err)
 					model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 					return
+				}
+				if _, err := tx.ExecContext(r.Context(), `DELETE FROM categories`); err != nil {
+					slog.Error("清空分类失败", "error", err)
+					model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
+					return
+				}
+			} else {
+				for _, cat := range body.Categories {
+					catID := cat.ID
+					if catID == "" {
+						catID = model.NewID()
+					}
+					createdAt := cat.UpdatedAt
+					if createdAt == 0 {
+						createdAt = now
+					}
+
+					if _, err := tx.ExecContext(r.Context(),
+						`INSERT INTO categories (id, title, icon, "order", created_at) VALUES (?, ?, ?, ?, ?)
+						 ON CONFLICT(id) DO UPDATE SET title = ?, icon = ?, "order" = ?`,
+						catID, cat.Title, cat.Icon, cat.Order, createdAt,
+						cat.Title, cat.Icon, cat.Order); err != nil {
+						slog.Error("插入分类失败", "error", err)
+						model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
+						return
+					}
+
+					if _, err := tx.ExecContext(r.Context(), `DELETE FROM bookmarks WHERE category_id = ?`, catID); err != nil {
+						slog.Error("清空分类书签失败", "error", err)
+						model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
+						return
+					}
+
+					if len(cat.Links) > 0 {
+						if err := saveLinksTree(r.Context(), tx, catID, "", cat.Links, now); err != nil {
+							slog.Error("保存书签树失败", "error", err)
+							model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
+							return
+						}
+					}
 				}
 			}
 		}
 
-		for _, todo := range body.Todos {
-			todoID := todo.ID
-			if todoID == "" {
-				todoID = model.NewID()
-			}
-			createdAt := todo.CreatedAt
-			if createdAt == 0 {
-				createdAt = now
-			}
-			completed := 0
-			if todo.Completed {
-				completed = 1
-			}
+		// 待办（增量）：只处理 body 提供的待办
+		if body.Todos != nil {
+			if len(body.Todos) == 0 {
+				if _, err := tx.ExecContext(r.Context(), `DELETE FROM todos`); err != nil {
+					slog.Error("清空待办失败", "error", err)
+					model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
+					return
+				}
+			} else {
+				for _, todo := range body.Todos {
+					todoID := todo.ID
+					if todoID == "" {
+						todoID = model.NewID()
+					}
+					createdAt := todo.CreatedAt
+					if createdAt == 0 {
+						createdAt = now
+					}
+					completed := 0
+					if todo.Completed {
+						completed = 1
+					}
 
-			if _, err := tx.ExecContext(r.Context(),
-				"INSERT INTO todos (id, text, completed, created_at) VALUES (?, ?, ?, ?)",
-				todoID, todo.Text, completed, createdAt); err != nil {
-				slog.Error("插入待办失败", "error", err)
-				model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-				return
+					if _, err := tx.ExecContext(r.Context(),
+						`INSERT INTO todos (id, text, completed, created_at) VALUES (?, ?, ?, ?)
+						 ON CONFLICT(id) DO UPDATE SET text = ?, completed = ?`,
+						todoID, todo.Text, completed, createdAt, todo.Text, completed); err != nil {
+						slog.Error("插入待办失败", "error", err)
+						model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
+						return
+					}
+				}
 			}
 		}
 
-		for _, note := range body.Notes {
-			noteID := note.ID
-			if noteID == "" {
-				noteID = model.NewID()
-			}
-			updatedAt := note.UpdatedAt
-			if updatedAt == 0 {
-				updatedAt = now
-			}
+		// 笔记（增量）：只处理 body 提供的笔记
+		if body.Notes != nil {
+			if len(body.Notes) == 0 {
+				if _, err := tx.ExecContext(r.Context(), `DELETE FROM notes`); err != nil {
+					slog.Error("清空笔记失败", "error", err)
+					model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
+					return
+				}
+			} else {
+				for _, note := range body.Notes {
+					noteID := note.ID
+					if noteID == "" {
+						noteID = model.NewID()
+					}
+					updatedAt := note.UpdatedAt
+					if updatedAt == 0 {
+						updatedAt = now
+					}
 
-			if _, err := tx.ExecContext(r.Context(),
-				"INSERT INTO notes (id, title, content, updated_at) VALUES (?, ?, ?, ?)",
-				noteID, note.Title, note.Content, updatedAt); err != nil {
-				slog.Error("插入笔记失败", "error", err)
-				model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-				return
+					if _, err := tx.ExecContext(r.Context(),
+						`INSERT INTO notes (id, title, content, updated_at) VALUES (?, ?, ?, ?)
+						 ON CONFLICT(id) DO UPDATE SET title = ?, content = ?, updated_at = ?`,
+						noteID, note.Title, note.Content, updatedAt, note.Title, note.Content, updatedAt); err != nil {
+						slog.Error("插入笔记失败", "error", err)
+						model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
+						return
+					}
+				}
 			}
 		}
 
+		// 设置（增量）：只 upsert 导入体提供的键，不删除已有设置
 		if len(body.Settings) > 0 {
 			var settingsMap map[string]any
 			if err := json.Unmarshal(body.Settings, &settingsMap); err == nil {
@@ -412,16 +440,6 @@ func (h *Handler) PutData() http.HandlerFunc {
 				"pinnedLinks", string(valBytes), string(valBytes)); err != nil {
 				slog.Error("插入 pinnedLinks 失败", "error", err)
 				model.RespondError(w, http.StatusInternalServerError, "写入固定链接失败")
-				return
-			}
-		}
-
-		for key, value := range preserved {
-			if _, err := tx.ExecContext(r.Context(),
-				"INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?",
-				key, value, value); err != nil {
-				slog.Error("恢复密钥失败", "error", err, "key", key)
-				model.RespondError(w, http.StatusInternalServerError, "恢复密钥失败")
 				return
 			}
 		}

@@ -12,7 +12,27 @@ import (
 
 func (h *Handler) ListCategories() http.HandlerFunc {
 	return h.handleList("分类", func(ctx context.Context, db *sql.DB) (any, error) {
-		return queries.GetAllCategories(ctx, db)
+		cats, err := queries.GetAllCategories(ctx, db)
+		if err != nil {
+			return nil, err
+		}
+		// 获取所有书签并按分类分组，使前端能显示书签数
+		allBms, err := queries.GetAllBookmarks(ctx, db, "")
+		if err != nil {
+			return cats, nil // 书签获取失败时只返回分类基本信息
+		}
+		byCat := make(map[string][]model.Bookmark)
+		for _, bm := range allBms {
+			byCat[bm.CategoryID] = append(byCat[bm.CategoryID], bm)
+		}
+		for i, cat := range cats {
+			if links, ok := byCat[cat.ID]; ok {
+				cats[i].Links = links
+			} else {
+				cats[i].Links = []model.Bookmark{}
+			}
+		}
+		return cats, nil
 	})
 }
 

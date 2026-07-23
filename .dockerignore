@@ -4,3 +4,14 @@ out
 .git
 *.md
 server/node_modules
+
+# 本地编译产物
+*.exe
+*.tsbuildinfo
+
+# 开发缓存
+data/
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { format } from "date-fns";
-import { zhCN } from "date-fns/locale";
 import { motion, useReducedMotion } from "framer-motion";
 
 export function ClockWidget() {
@@ -37,6 +35,11 @@ export function ClockWidget() {
     ? { initial: false as const, animate: { opacity: 1, y: 0, scale: 1 } as const }
     : {};
 
+  const timeStr = time.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  const dateStr = time.toLocaleDateString('zh-CN', {
+    year: 'numeric', month: 'long', day: 'numeric', weekday: 'long',
+  });
+
   return (
     <motion.div
       className="text-center text-white mb-8"
@@ -51,7 +54,7 @@ export function ClockWidget() {
         animate={motionProps.animate ?? { opacity: 1, scale: 1 }}
         transition={{ duration: prefersReducedMotion ? 0 : 0.3 }}
       >
-        {format(time, "HH:mm")}
+        {timeStr}
       </motion.div>
       <motion.div
         className="text-xl md:text-2xl mt-2 font-medium opacity-90"
@@ -59,7 +62,7 @@ export function ClockWidget() {
         animate={motionProps.animate ?? { opacity: 1, y: 0 }}
         transition={{ duration: prefersReducedMotion ? 0 : 0.4, delay: prefersReducedMotion ? 0 : 0.2 }}
       >
-        {format(time, "yyyy年MM月dd日 EEEE", { locale: zhCN })}
+        {dateStr}
       </motion.div>
     </motion.div>
   );

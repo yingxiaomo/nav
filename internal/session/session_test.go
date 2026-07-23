@@ -29,14 +29,14 @@ func TestVerify_ValidCookie(t *testing.T) {
 	secret := "my-secret-key-here-1234567890"
 	cookie := Sign("admin", secret)
 
-	if !Verify(cookie, secret) {
+	if uid := Verify(cookie, secret); uid == "" {
 		t.Fatal("Verify() should accept a validly signed cookie")
 	}
 }
 
 func TestVerify_WrongSecret(t *testing.T) {
 	cookie := Sign("admin", "real-secret-that-should-be-used")
-	if Verify(cookie, "wrong-secret") {
+	if uid := Verify(cookie, "wrong-secret"); uid != "" {
 		t.Fatal("Verify() should reject cookie signed with a different secret")
 	}
 }
@@ -48,7 +48,7 @@ func TestVerify_TamperedPayload(t *testing.T) {
 	// Tamper with the payload
 	parts := strings.Split(cookie, ".")
 	tampered := "AAAA" + parts[0][4:] + "." + parts[1]
-	if Verify(tampered, secret) {
+	if uid := Verify(tampered, secret); uid != "" {
 		t.Fatal("Verify() should reject a tampered payload")
 	}
 }
@@ -65,8 +65,8 @@ func TestVerify_MalformedCookie(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if Verify(tc.cookie, "secret") {
-				t.Errorf("Verify(%q) should return false", tc.cookie)
+			if uid := Verify(tc.cookie, "secret"); uid != "" {
+				t.Errorf("Verify(%q) should return empty string", tc.cookie)
 			}
 		})
 	}
@@ -101,7 +101,17 @@ func TestVerify_RejectsExpiredCookie(t *testing.T) {
 	sig := hex.EncodeToString(mac.Sum(nil))
 	cookie := payloadBase64 + "." + sig
 
-	if Verify(cookie, secret) {
+	if uid := Verify(cookie, secret); uid != "" {
 		t.Fatal("Verify() should reject an expired cookie")
+	}
+}
+
+func TestVerify_ReturnsUserID(t *testing.T) {
+	secret := "test-userid-return-secret!!"
+	cookie := Sign("myuser", secret)
+
+	uid := Verify(cookie, secret)
+	if uid != "myuser" {
+		t.Fatalf("Verify() should return user ID 'myuser', got %q", uid)
 	}
 }

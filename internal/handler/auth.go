@@ -49,11 +49,6 @@ func clearSessionCookie(w http.ResponseWriter) {
 	})
 }
 
-func resetSessionSecret() string {
-	secret := generateSessionSecret()
-	return secret
-}
-
 func ipFromRemote(addr string) string {
 	if host, _, err := net.SplitHostPort(addr); err == nil {
 		return host
@@ -91,13 +86,17 @@ func isSecureRequest(r *http.Request) bool {
 	return r.TLS != nil
 }
 
-func checkSession(r *http.Request, db *sql.DB) bool {
+func checkSession(r *http.Request, db *sql.DB) (string, bool) {
 	cookie, err := r.Cookie(session.CookieName)
 	if err != nil {
-		return false
+		return "", false
 	}
 	sessionSecret, _ := queries.GetSetting(r.Context(), db, "session_secret")
-	return sessionSecret != "" && session.Verify(cookie.Value, sessionSecret)
+	if sessionSecret == "" {
+		return "", false
+	}
+	uid := session.Verify(cookie.Value, sessionSecret)
+	return uid, uid != ""
 }
 
 // ===== Rate limiting for login =====
@@ -157,32 +156,19 @@ func (h *Handler) Login() http.HandlerFunc {
 		db := h.DB
 
 		var body struct {
+			Username string `json:"username"`
 			Password string `json:"password"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return
 		}
-		if body.Password == "" {
-			model.RespondError(w, http.StatusBadRequest, "请输入管理员密码")
+		if body.Username == "" || body.Password == "" {
+			model.RespondError(w, http.StatusBadRequest, "请输入用户名和密码")
 			return
 		}
 
 		ip := ipFromRemote(r.RemoteAddr)
-
-		pwHash, err := queries.GetSetting(r.Context(), db, "admin_password_hash")
-		if err != nil {
-			slog.Error("读取密码设置失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
-			return
-		}
-		if pwHash == "" {
-			model.RespondJSON(w, http.StatusBadRequest, map[string]any{
-				"error":         "管理员密码未配置，请先完成初始化",
-				"setupRequired": true,
-			})
-			return
-		}
 
 		if !checkRateLimit(ip) {
 			slog.Warn("登录限流", "ip", ip)
@@ -190,10 +176,23 @@ func (h *Handler) Login() http.HandlerFunc {
 			return
 		}
 
-		if err := bcrypt.CompareHashAndPassword([]byte(pwHash), []byte(body.Password)); err != nil {
+		user, err := queries.GetUserByUsername(r.Context(), db, body.Username)
+		if err != nil {
+			slog.Error("查询用户失败", "error", err)
+			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
+			return
+		}
+		if user == nil {
 			recordLoginAttempt(ip, false)
-			slog.Warn("登录失败 - 密码错误", "ip", ip)
-			model.RespondError(w, http.StatusUnauthorized, "密码错误")
+			slog.Warn("登录失败 - 用户不存在", "ip", ip, "username", body.Username)
+			model.RespondError(w, http.StatusUnauthorized, "用户名或密码错误")
+			return
+		}
+
+		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(body.Password)); err != nil {
+			recordLoginAttempt(ip, false)
+			slog.Warn("登录失败 - 密码错误", "ip", ip, "username", body.Username)
+			model.RespondError(w, http.StatusUnauthorized, "用户名或密码错误")
 			return
 		}
 
@@ -209,10 +208,10 @@ func (h *Handler) Login() http.HandlerFunc {
 			}
 		}
 
-		cookieValue := session.Sign("admin", secret)
+		cookieValue := session.Sign(user.ID, secret)
 		setSessionCookie(w, cookieValue, isSecureRequest(r))
 
-		slog.Info("登录成功", "ip", ip)
+		slog.Info("登录成功", "ip", ip, "username", body.Username)
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 	}
 }
@@ -231,27 +230,36 @@ func (h *Handler) Logout() http.HandlerFunc {
 	}
 }
 
-// Setup handles POST /api/v1/auth/setup — initial password creation
+// Setup handles POST /api/v1/auth/setup — initial admin account creation
 func (h *Handler) Setup() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		db := h.DB
 
-		pwHash, err := queries.GetSetting(r.Context(), db, "admin_password_hash")
+		count, err := queries.GetUserCount(r.Context(), db)
 		if err != nil {
-			slog.Error("读取密码设置失败", "error", err)
+			slog.Error("查询用户数失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-		if pwHash != "" {
-			model.RespondError(w, http.StatusBadRequest, "管理员密码已配置，不能重复初始化")
+		if count > 0 {
+			model.RespondError(w, http.StatusBadRequest, "管理员账号已配置，不能重复初始化")
 			return
 		}
 
 		var body struct {
+			Username string `json:"username"`
 			Password string `json:"password"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
+			return
+		}
+		if body.Username == "" {
+			model.RespondError(w, http.StatusBadRequest, "请输入用户名")
+			return
+		}
+		if len(body.Username) < 2 {
+			model.RespondError(w, http.StatusBadRequest, "用户名至少 2 个字符")
 			return
 		}
 		if len(body.Password) < 6 {
@@ -265,13 +273,13 @@ func (h *Handler) Setup() http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-		if err := queries.SetSetting(r.Context(), db, "admin_password_hash", string(hashed)); err != nil {
-			slog.Error("保存密码失败", "error", err)
-			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
+		if err := queries.CreateUser(r.Context(), db, model.NewID(), body.Username, string(hashed), model.Now()); err != nil {
+			slog.Error("创建用户失败", "error", err)
+			model.RespondError(w, http.StatusInternalServerError, "创建用户失败，用户名可能已存在")
 			return
 		}
 
-		slog.Info("管理员初始化完成")
+		slog.Info("管理员初始化完成", "username", body.Username)
 		model.RespondJSON(w, http.StatusCreated, map[string]any{"success": true})
 	}
 }
@@ -279,11 +287,12 @@ func (h *Handler) Setup() http.HandlerFunc {
 // AuthStatus handles GET /api/v1/auth/status
 func (h *Handler) AuthStatus() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		pwHash, _ := queries.GetSetting(r.Context(), h.DB, "admin_password_hash")
+		count, _ := queries.GetUserCount(r.Context(), h.DB)
+		_, loggedIn := checkSession(r, h.DB)
 
 		model.RespondJSON(w, http.StatusOK, map[string]any{
-			"setupRequired": pwHash == "",
-			"loggedIn":      checkSession(r, h.DB),
+			"setupRequired": count == 0,
+			"loggedIn":      loggedIn,
 		})
 	}
 }
@@ -296,6 +305,12 @@ func (h *Handler) ChangePassword() http.HandlerFunc {
 		if !checkRateLimit(r.RemoteAddr) {
 			slog.Warn("修改密码限流", "ip", r.RemoteAddr)
 			model.RespondError(w, http.StatusTooManyRequests, "操作过于频繁，请 15 分钟后再试")
+			return
+		}
+
+		uid, loggedIn := checkSession(r, db)
+		if !loggedIn || uid == "" {
+			model.RespondError(w, http.StatusUnauthorized, "请先登录")
 			return
 		}
 
@@ -316,12 +331,15 @@ func (h *Handler) ChangePassword() http.HandlerFunc {
 			return
 		}
 
-		pwHash, err := queries.GetSetting(r.Context(), db, "admin_password_hash")
+		// 直接用 uid 查用户
+		var pwHash string
+		err := db.QueryRowContext(r.Context(), `SELECT password_hash FROM users WHERE id = ?`, uid).Scan(&pwHash)
 		if err != nil {
-			slog.Error("读取密码失败", "error", err)
+			slog.Error("查询用户密码失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
+
 		if err := bcrypt.CompareHashAndPassword([]byte(pwHash), []byte(body.CurrentPassword)); err != nil {
 			recordLoginAttempt(r.RemoteAddr, false)
 			slog.Warn("修改密码 - 当前密码错误", "ip", r.RemoteAddr)
@@ -337,8 +355,8 @@ func (h *Handler) ChangePassword() http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-		if err := queries.SetSetting(r.Context(), db, "admin_password_hash", string(newHash)); err != nil {
-			slog.Error("保存密码失败", "error", err)
+		if err := queries.UpdateUserPassword(r.Context(), db, uid, string(newHash)); err != nil {
+			slog.Error("更新密码失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
@@ -350,7 +368,7 @@ func (h *Handler) ChangePassword() http.HandlerFunc {
 			return
 		}
 
-		slog.Info("密码修改成功")
+		slog.Info("密码修改成功", "uid", uid)
 		model.RespondJSON(w, http.StatusOK, map[string]any{
 			"success": true,
 			"message": "密码已修改，请重新登录",

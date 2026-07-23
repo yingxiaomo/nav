@@ -32,35 +32,39 @@ func Sign(userID, secret string) string {
 }
 
 // Verify checks the session cookie format, expiration, and HMAC signature.
-// Format expected: base64("<userID>:<expiresAtUnixMs>") + "." + hmac_hex
-func Verify(cookieValue, secret string) bool {
+// Returns the user ID if valid, empty string otherwise.
+func Verify(cookieValue, secret string) string {
 	dotIdx := strings.LastIndex(cookieValue, ".")
 	if dotIdx < 0 {
-		return false
+		return ""
 	}
 	payloadBase64 := cookieValue[:dotIdx]
 	sigHex := cookieValue[dotIdx+1:]
 
 	payloadBytes, err := base64.URLEncoding.DecodeString(payloadBase64)
 	if err != nil {
-		return false
+		return ""
 	}
 	payload := string(payloadBytes)
 
 	colonIdx := strings.LastIndex(payload, ":")
 	if colonIdx < 0 {
-		return false
+		return ""
 	}
+	userID := payload[:colonIdx]
 	expiresStr := payload[colonIdx+1:]
 
 	expires, err := strconv.ParseInt(expiresStr, 10, 64)
 	if err != nil || time.Now().UnixMilli() > expires {
-		return false
+		return ""
 	}
 
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(payload))
 	expectedHex := hex.EncodeToString(mac.Sum(nil))
 
-	return subtle.ConstantTimeCompare([]byte(sigHex), []byte(expectedHex)) == 1
+	if subtle.ConstantTimeCompare([]byte(sigHex), []byte(expectedHex)) == 1 {
+		return userID
+	}
+	return ""
 }

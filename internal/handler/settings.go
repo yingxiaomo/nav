@@ -11,8 +11,7 @@ import (
 )
 
 var protectedSettings = map[string]bool{
-	"admin_password_hash": true,
-	"session_secret":      true,
+	"session_secret": true,
 }
 
 func (h *Handler) ListSettings() http.HandlerFunc {

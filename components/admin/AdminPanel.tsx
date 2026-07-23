@@ -122,19 +122,22 @@ function TabContent({ tab, showConfirm }: { tab: TabId; showConfirm: (opts: Omit
 // ══════ Auth Screens ══════
 
 function SetupScreen() {
+  const [username, setUsername] = useState('');
   const [pw1, setPw1] = useState('');
   const [pw2, setPw2] = useState('');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const [showPw, setShowPw] = useState(false);
+  const pw1Ref = useRef<HTMLInputElement>(null);
   const pw2Ref = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
+    if (username.length < 2) { setMsg('用户名至少需要 2 个字符'); return; }
     if (pw1.length < 6) { setMsg('密码至少需要 6 位字符'); return; }
     if (pw1 !== pw2) { setMsg('两次输入的密码不一致'); return; }
     setBusy(true); setMsg('');
-    const { ok, data } = await req('POST', `${API}/auth/setup`, { password: pw1 });
+    const { ok, data } = await req('POST', `${API}/auth/setup`, { username, password: pw1 });
     if (ok) location.reload();
     else { setBusy(false); setMsg((data as { error?: string }).error || '配置失败'); }
   };
@@ -144,17 +147,27 @@ function SetupScreen() {
       <div className="card card-narrow auth-card">
         <div className="auth-header">
           <div className="auth-icon"><Lock className="icon-lg" /></div>
-          <h1>设置管理员密码</h1>
-          <p className="auth-subtitle">首次使用，请创建管理员密码以保护你的数据。</p>
+          <h1>初始化管理员账号</h1>
+          <p className="auth-subtitle">首次使用，请创建管理员账号以保护你的数据。</p>
         </div>
 
         <form onSubmit={handleSubmit}>
+          <div className="setup-field">
+            <label htmlFor="setup-user" className="setup-label">
+              <Key className="icon-xs" /> 管理员用户名
+            </label>
+            <input id="setup-user" type="text" value={username}
+              onChange={e => setUsername(e.target.value)} placeholder="至少 2 个字符"
+              autoComplete="username" className="pw-input"
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) pw1Ref.current?.focus(); }} />
+          </div>
+
           <div className="setup-field">
             <label htmlFor="setup-pw1" className="setup-label">
               <Lock className="icon-xs" /> 管理员密码
             </label>
             <div className="pw-input-wrap">
-              <input id="setup-pw1" type={showPw ? 'text' : 'password'} value={pw1}
+              <input id="setup-pw1" ref={pw1Ref} type={showPw ? 'text' : 'password'} value={pw1}
                 onChange={e => setPw1(e.target.value)} placeholder="至少 6 位字符"
                 autoComplete="new-password" className="pw-input"
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) pw2Ref.current?.focus(); }} />
@@ -186,7 +199,7 @@ function SetupScreen() {
           )}
 
           <Button variant="default" className="w-full auth-btn" disabled={busy}>
-            {busy ? <><Loader2 className="icon-sm spin" /> 配置中...</> : <><Key className="icon-sm" /> 创建管理员密码</>}
+            {busy ? <><Loader2 className="icon-sm spin" /> 配置中...</> : <><Key className="icon-sm" /> 创建管理员账号</>}
           </Button>
         </form>
 
@@ -197,17 +210,19 @@ function SetupScreen() {
 }
 
 function LoginScreen() {
+  const [username, setUsername] = useState('');
   const [pw, setPw] = useState('');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pwRef = useRef<HTMLInputElement>(null);
 
   const doLogin = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!pw) { setMsg('请输入密码'); return; }
+    if (!username || !pw) { setMsg('请输入用户名和密码'); return; }
     setBusy(true); setMsg('');
-    const { ok, data } = await req('POST', `${API}/auth/login`, { password: pw });
+    const { ok, data } = await req('POST', `${API}/auth/login`, { username, password: pw });
     if (ok) location.reload();
     else { setBusy(false); setMsg((data as { error?: string }).error || '登录失败'); }
   };
@@ -220,16 +235,25 @@ function LoginScreen() {
         <div className="auth-header">
           <div className="auth-icon"><Key className="icon-lg" /></div>
           <h1>管理员登录</h1>
-          <p className="auth-subtitle">请输入管理员密码以访问控制面板。</p>
+          <p className="auth-subtitle">请输入管理员账号和密码以访问控制面板。</p>
         </div>
 
         <form onSubmit={doLogin}>
           <div className="setup-field">
+            <label htmlFor="login-user" className="setup-label">
+              <Key className="icon-xs" /> 用户名
+            </label>
+            <input id="login-user" ref={inputRef} type="text" value={username}
+              onChange={e => setUsername(e.target.value)} placeholder="输入管理员用户名"
+              autoComplete="username" className="pw-input"
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) pwRef.current?.focus(); }} />
+          </div>
+          <div className="setup-field">
             <label htmlFor="login-pw" className="setup-label">
-              <Lock className="icon-xs" /> 管理员密码
+              <Lock className="icon-xs" /> 密码
             </label>
             <div className="pw-input-wrap">
-              <input id="login-pw" ref={inputRef} type={showPw ? 'text' : 'password'} value={pw}
+              <input id="login-pw" ref={pwRef} type={showPw ? 'text' : 'password'} value={pw}
                 onChange={e => setPw(e.target.value)} placeholder="输入管理员密码"
                 autoComplete="current-password" className="pw-input" />
               <button type="button" className="pw-toggle" onClick={() => setShowPw(!showPw)} tabIndex={-1} aria-label={showPw ? '隐藏密码' : '显示密码'}>

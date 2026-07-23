@@ -16,6 +16,7 @@ import (
 	"github.com/YingXiaoMo/nav/internal/db"
 	"github.com/YingXiaoMo/nav/internal/db/queries"
 	"github.com/YingXiaoMo/nav/internal/handler"
+	"github.com/YingXiaoMo/nav/internal/middleware"
 	"github.com/YingXiaoMo/nav/internal/notify"
 	"github.com/YingXiaoMo/nav/internal/remote"
 	"github.com/YingXiaoMo/nav/internal/service"
@@ -175,6 +176,9 @@ func run(ctx context.Context, cfg Config) error {
 
 		app.RegisterRoutes(mux)
 
+	// Wrap with session auth (protects all POST/PUT/DELETE/PATCH)
+	muxWithAuth := middleware.SessionAuth(database)(mux)
+
 	// Uploads
 	mux.Handle("GET /uploads/", http.StripPrefix("/uploads/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/") {
@@ -193,7 +197,7 @@ func run(ctx context.Context, cfg Config) error {
 		mux.Handle("GET /", http.FileServer(http.Dir(cfg.StaticDir)))
 	}
 
-	handler := recoveryMiddleware(mux)
+	handler := recoveryMiddleware(muxWithAuth)
 
 	srv := &http.Server{
 		Addr:         ":" + strconv.Itoa(cfg.Port),

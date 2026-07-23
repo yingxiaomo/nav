@@ -39,6 +39,7 @@ func Migrate(database *sql.DB) error {
 		{"v2-文件夹列", migrateV2},
 		{"v3-check_history", migrateV3},
 		{"v4-SSH凭证", migrateV4},
+		{"v5-用户表", migrateV5},
 	}
 	for i, m := range migrations {
 		if err := m.fn(database); err != nil {
@@ -117,6 +118,18 @@ func migrateV4(database *sql.DB) error {
 	}
 	return addColumnIfNotExists(database, "monitor_targets", "check_type",
 		`ALTER TABLE monitor_targets ADD COLUMN check_type TEXT NOT NULL DEFAULT ""`)
+}
+
+func migrateV5(database *sql.DB) error {
+	_, err := database.Exec(
+		`CREATE TABLE IF NOT EXISTS users (
+			id TEXT PRIMARY KEY,
+			username TEXT NOT NULL UNIQUE,
+			password_hash TEXT NOT NULL,
+			created_at INTEGER NOT NULL
+		)`,
+	)
+	return err
 }
 
 func addColumnIfNotExists(database *sql.DB, table, column, alterSQL string) error {

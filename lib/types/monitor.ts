@@ -1,4 +1,5 @@
 // 监控面板共享类型和工具函数
+// 合并自 components/features/monitor-types.ts 和 components/admin/admin-tabs.tsx
 
 export interface SystemInfo {
   cpu: { usage: number; cores: number };
@@ -6,31 +7,58 @@ export interface SystemInfo {
   disk: { total: number; used: number; usedPercent: number };
   uptime: number;
 }
+
 export interface CheckResult {
   id: string; name: string; url: string;
   status: 'ok' | 'timeout' | 'error';
   latency: number | null;
+  lastCheck?: number | null;
 }
+
+export interface MonitorData {
+  targets: { id: string; name: string; url: string }[];
+  results: CheckResult[];
+}
+
 export interface TargetInfo {
-  id: string; name: string; url: string; icon?: string; mac?: string; sshUser?: string; sshPass?: string;
+  id: string; name: string; url: string; icon?: string;
+  mac?: string; sshUser?: string; sshPass?: string;
 }
+
 export interface ContainerInfo {
   id: string; name: string; image: string;
   state: string; status: string; ports: string; created: string;
 }
+
 export interface ContainerStats {
   name: string; cpuPercent: number;
   memUsage: number; memLimit: number; memPercent: number;
 }
 
 export interface MonitorEditTarget {
-  id: string; name: string; icon?: string; url?: string; mac?: string;
+  id: string; name: string; icon?: string;
+  url?: string; mac?: string;
   sshUser?: string; sshPass?: string;
+}
+
+export interface LogData {
+  lines: string[];
+}
+
+export interface ConfirmState {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmText?: string;
+  variant?: 'default' | 'destructive';
+  loading?: boolean;
+  onConfirm: () => void;
 }
 
 /** 格式化秒数为中文时长字符串 */
 export const uptimeStr = (s: number) => {
-  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600),
+        m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
   return `${d}天${h}时${m}分${sec}秒`;
 };
 
@@ -40,7 +68,6 @@ export const serverName = typeof window !== 'undefined'
 
 /** 从 Docker 端口字符串提取第一个宿主机 IP:端口的 URL */
 export function parseContainerUrl(ports: string): string | null {
-  // 格式：8080:80（Go 后端 formatPorts）
   const m = ports.match(/(\d+):\d+/);
   if (m) return `http://${window.location.hostname}:${m[1]}`;
   return null;

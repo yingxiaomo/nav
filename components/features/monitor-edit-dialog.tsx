@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Container, Server, Globe, Monitor, Wifi, HardDrive, Database, Cloud, Terminal, Shield, Activity, Settings, Box, MemoryStick, Cpu, Zap, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import type { MonitorEditTarget } from "./monitor-types";
+import type { MonitorEditTarget } from "@/lib/types/monitor";
 
 const QUICK_ICONS = ['Container', 'Server', 'Globe', 'Monitor', 'Wifi', 'HardDrive', 'Database', 'Cloud', 'Terminal', 'Shield', 'Activity', 'Settings', 'Box', 'MemoryStick', 'Cpu', 'Zap'];
 const lucideIconMap: Record<string, React.FC<{className?: string}>> = { Container, Server, Globe, Monitor, Wifi, HardDrive, Database, Cloud, Terminal, Shield, Activity, Settings, Box, MemoryStick, Cpu, Zap };

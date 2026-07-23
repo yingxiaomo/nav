@@ -16,7 +16,7 @@ interface FeaturesLauncherProps {
 }
 
 export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }: FeaturesLauncherProps) {
-  const { activePanel, togglePanel, setActivePanel } = useUIStore();
+  const { activePanel, togglePanel, setActivePanel, backendAvailable } = useUIStore();
   const sidebarCollapsed = useUIStore(s => s.sidebarCollapsed);
 
   return (
@@ -43,6 +43,7 @@ export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }:
           <span className="text-sm">笔记</span>
         </Button>
 
+        {backendAvailable && (
         <Button
           variant="outline"
           onClick={() => togglePanel('ai')}
@@ -51,7 +52,9 @@ export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }:
           <Brain className="w-5 h-5 shrink-0 text-purple-400" />
           <span className="text-sm">AI</span>
         </Button>
+        )}
 
+        {backendAvailable && (
         <Button
           variant="outline"
           onClick={() => togglePanel('ssh')}
@@ -60,6 +63,7 @@ export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }:
           <TerminalSquare className="w-5 h-5 shrink-0 text-green-400" />
           <span className="text-sm">终端</span>
         </Button>
+        )}
       </div>
 
       {/* Panels — remain centered */}

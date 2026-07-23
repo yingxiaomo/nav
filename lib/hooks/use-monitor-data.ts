@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useMonitorConfig } from "@/lib/hooks/use-monitor-config";
 import {
   SystemInfo, CheckResult, TargetInfo, ContainerInfo, ContainerStats,
-} from "@/components/features/monitor-types";
+} from "@/lib/types/monitor";
 
 interface MonitorData {
   sys: SystemInfo | null;
@@ -12,66 +12,47 @@ interface MonitorData {
   targets: TargetInfo[];
   containers: ContainerInfo[];
   containerStats: ContainerStats[];
-  dockerMeta: Record<string, { name: string; icon?: string; label?: string; url?: string; order?: number }>;
-  uptime: Record<string, number>;
-  loading: boolean;
-  refresh: () => void;
+  dockerMeta: Record<string, { label: string; icon: string; url: string; order: number }>;
+  uptime: number;
 }
 
-const POLL_MS = 30_000;
-
-/** 监控面板数据获取 hook — 每 30 秒轮询 /api/v1/admin/monitor/all */
-export function useMonitorData(): MonitorData {
-  const [sys, setSys] = useState<SystemInfo | null>(null);
-  const [checks, setChecks] = useState<CheckResult[]>([]);
-  const [targets, setTargets] = useState<TargetInfo[]>([]);
-  const [containers, setContainers] = useState<ContainerInfo[]>([]);
-  const [containerStats, setContainerStats] = useState<ContainerStats[]>([]);
-  const [dockerMeta, setDockerMeta] = useState<Record<string, { name: string; icon?: string; label?: string; url?: string; order?: number }>>({});
-  const [uptime, setUptime] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-
-  const { baseUrl, authHeaders } = useMonitorConfig();
-  const mountedRef = useRef(true);
-  // 用 ref 持有 headers，避免对象引用变化触发 effect 重建
-  const headersRef = useRef(authHeaders);
-  useEffect(() => {
-    headersRef.current = authHeaders;
-  }, [authHeaders]);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
+export function useMonitorData() {
+  const config = useMonitorConfig();
+  const [data, setData] = useState<MonitorData>({
+    sys: null, checks: [], targets: [], containers: [], containerStats: [], dockerMeta: {}, uptime: 0,
+  });
+  const headersRef = useRef<Record<string, string>>({});
 
   const fetchData = useCallback(async () => {
-    if (!baseUrl) return;
     try {
-      const res = await fetch(`${baseUrl}/api/v1/admin/monitor/all`, {
-        headers: headersRef.current,
+      const res = await fetch("/api/v1/admin/monitor/all", {
+        headers: { ...headersRef.current },
       });
-      if (res.ok && mountedRef.current) {
-        const d = await res.json();
-        setSys(d.system);
-        setChecks(d.results || []);
-        setTargets(d.targets || []);
-        setContainers(d.containers || []);
-        setContainerStats(d.stats || []);
-        setDockerMeta(d.metadata || {});
-        setUptime(d.uptime || {});
-        setLoading(false);
-      }
-    } catch (err) {
-      console.warn("[Monitor] fetch data failed:", err);
-    }
-  }, [baseUrl]);
+      if (!res.ok) return;
+      const d = await res.json();
+      setData({
+        sys: d.system || null,
+        checks: d.results || [],
+        targets: d.targets || [],
+        containers: d.containers || [],
+        containerStats: d.containerStats || [],
+        dockerMeta: d.dockerMeta || {},
+        uptime: d.system?.uptime || 0,
+      });
+    } catch {}
+  }, []);
 
   useEffect(() => {
-    if (!baseUrl) return;
     fetchData();
-    const t = setInterval(fetchData, POLL_MS);
-    return () => clearInterval(t);
-  }, [fetchData, baseUrl]);
+    const timer = setInterval(fetchData, 30000);
+    return () => clearInterval(timer);
+  }, [fetchData]);
 
-  return { sys, checks, targets, containers, containerStats, dockerMeta, uptime, loading, refresh: fetchData };
+  useEffect(() => {
+    if (config?.authHeaders) {
+      headersRef.current = config.authHeaders;
+    }
+  }, [config]);
+
+  return { ...data, refresh: fetchData };
 }

@@ -7,8 +7,8 @@ import {
   ImageIcon,
 } from 'lucide-react';
 import type { Category, LinkItem, Todo, Note } from '@/lib/types';
+import type { SystemInfo, CheckResult, MonitorData, LogData, ConfirmState } from '@/lib/types/monitor';
 import { Card, CardContent } from '@/components/ui/card';
-import { sanitizeText } from '@/lib/utils/validation';
 
 export type TabId = 'overview' | 'cats' | 'bms' | 'todos' | 'notes' | 'monitor' | 'docker' | 'backup' | 'settings' | 'logs' | 'gallery';
 
@@ -21,21 +21,7 @@ export interface StatusInfo {
 export type TodoItem = Todo;
 export type NoteItem = Note;
 export type { Category, LinkItem };
-
-export interface SystemInfo { cpu: { usage: number; cores: number }; memory: { total: number; used: number; usedPercent: number }; disk: { total: number; used: number; usedPercent: number }; uptime: number; }
-export interface CheckResult { id: string; name: string; url: string; status: 'ok' | 'error' | 'timeout'; latency: number | null; lastCheck: number | null; }
-export interface MonitorData { targets: { id: string; name: string; url: string }[]; results: CheckResult[]; }
-export interface LogData { lines: string[]; }
-
-export interface ConfirmState {
-  open: boolean;
-  title: string;
-  description: string;
-  confirmText?: string;
-  variant?: 'default' | 'destructive';
-  loading?: boolean;
-  onConfirm: () => void;
-}
+export type { SystemInfo, CheckResult, MonitorData, LogData, ConfirmState };
 
 // ── API ──
 

@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { req, API, SystemInfo, CheckResult, MonitorData, ConfirmState, ProgressBar, ft } from '../admin-tabs';
+import { req, API, ConfirmState, ProgressBar, ft } from '../admin-tabs';
 import { formatFileSize } from '@/lib/utils/format';
+import type { SystemInfo, CheckResult, MonitorData } from '@/lib/types/monitor';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   Plus, Trash2, Check, X, Search, Upload, ExternalLink,

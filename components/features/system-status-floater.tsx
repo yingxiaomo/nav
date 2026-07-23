@@ -3,13 +3,16 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { ChevronDown, Cpu, HardDrive, XCircle, Box, MemoryStick, Container, ExternalLink, FileText, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SystemInfo, CheckResult, ContainerInfo, ContainerStats, uptimeStr, serverName, parseContainerUrl, mockResource } from "@/components/features/monitor-types";
+import {
+  SystemInfo, CheckResult, ContainerInfo, ContainerStats,
+  uptimeStr, serverName, parseContainerUrl, mockResource,
+} from "@/lib/types/monitor";
 import { formatFileSize } from "@/lib/utils/format";
 import { CircleProgress } from "@/components/features/circle-progress";
 import { MonitorEditDialog } from "@/components/features/monitor-edit-dialog";
 import { LogViewer } from "@/components/features/log-viewer";
 import { useMonitorData } from "@/lib/hooks/use-monitor-data";
-import type { MonitorEditTarget } from "@/components/features/monitor-types";
+import type { MonitorEditTarget } from "@/lib/types/monitor";
 import { useMonitorConfig } from "@/lib/hooks/use-monitor-config";
 import { useUIStore } from "@/lib/stores";
 

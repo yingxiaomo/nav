@@ -77,6 +77,15 @@ export default function SettingsTab() {
     setNotifyMsg(ok ? '✅ 已保存' : '❌ 保存失败');
   };
 
+  const testNotify = async () => {
+    setNotifyBusy(true); setNotifyMsg('测试发送中…');
+    // 先保存当前表单配置，再据此发送测试通知
+    await req('PUT', `${API}/settings`, { monitor_notify: JSON.stringify({ enabled: notifyEnabled, apprise_url: appriseUrl, cooldown_minutes: cooldown }) });
+    const { ok, data } = await req('POST', `${API}/admin/monitor/test-notify`);
+    setNotifyBusy(false);
+    setNotifyMsg(ok ? '✅ 测试通知已发送，请查收' : `❌ ${(data as { error?: string })?.error || '发送失败'}`);
+  };
+
   const inputCls = "w-full px-3 py-2 rounded-md text-sm bg-background border border-border outline-none focus:border-primary/50 transition-colors";
 
   return (
@@ -139,8 +148,11 @@ export default function SettingsTab() {
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={notifyEnabled} onChange={e => setNotifyEnabled(e.target.checked)} /> 启用通知</label>
           <input value={appriseUrl} onChange={e => setAppriseUrl(e.target.value)} placeholder="Apprise API 地址（可选）" className={inputCls} />
           <input value={cooldown} onChange={e => setCooldown(Number(e.target.value))} type="number" min={1} placeholder="冷却时间（分钟，默认 30）" className={inputCls} />
-          <Button variant="outline" size="sm" onClick={saveNotify} disabled={notifyBusy}>{notifyBusy ? <Loader2 className="size-3.5 animate-spin" /> : null} 保存通知配置</Button>
-          {notifyMsg && <span className="text-xs text-muted-foreground ml-2">{notifyMsg}</span>}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={saveNotify} disabled={notifyBusy}>{notifyBusy ? <Loader2 className="size-3.5 animate-spin" /> : null} 保存通知配置</Button>
+            <Button variant="ghost" size="sm" onClick={testNotify} disabled={notifyBusy || !appriseUrl}><Bell className="size-3.5" /> 发送测试</Button>
+            {notifyMsg && <span className="text-xs text-muted-foreground">{notifyMsg}</span>}
+          </div>
         </div>
       </section>
     </div>

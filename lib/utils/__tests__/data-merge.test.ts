@@ -40,6 +40,30 @@ describe("mergeItems", () => {
     expect(mergeItems(remote, local)[0].id).toBe("1");
   });
 
+  it("三方合并：本地新增（不在基线）应保留", () => {
+    const remote = [{ id: "1", title: "a", url: "https://a.com" }];
+    const local = [
+      { id: "1", title: "a", url: "https://a.com" },
+      { id: "2", title: "本地新增", url: "https://b.com" },
+    ];
+    const base = new Set(["1"]); // 基线只有 1，2 是本地离线新增
+    const result = mergeItems(remote, local, undefined, base);
+    expect(result).toHaveLength(2);
+    expect(result.find(i => i.id === "2")?.title).toBe("本地新增");
+  });
+
+  it("三方合并：远程删除（在基线、远程已无）应丢弃", () => {
+    const remote = [{ id: "1", title: "a", url: "https://a.com" }];
+    const local = [
+      { id: "1", title: "a", url: "https://a.com" },
+      { id: "2", title: "已被远程删除", url: "https://b.com" },
+    ];
+    const base = new Set(["1", "2"]); // 基线有 2，远程现在没有 → 远程删了
+    const result = mergeItems(remote, local, undefined, base);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("1");
+  });
+
   it("当时间相同时调用 nestedMergeFn", () => {
     const remote = [{ id: "1", title: "r", url: "https://r.com", updatedAt: 100, children: [{ id: "c1", title: "rc", url: "https://rc.com" }] }];
     const local = [{ id: "1", title: "r", url: "https://r.com", updatedAt: 100, children: [{ id: "c1", title: "lc", url: "https://lc.com" }] }];
@@ -73,6 +97,34 @@ describe("mergeCategories", () => {
     const local: Category[] = [{ id: "cat2", title: "本地分类", links: [] }];
     expect(mergeCategories(remote, local)).toHaveLength(1);
     expect(mergeCategories(remote, local)[0].id).toBe("cat1");
+  });
+
+  it("三方合并：本地新增分类（不在基线）应保留", () => {
+    const remote: Category[] = [{ id: "cat1", title: "远程分类", links: [] }];
+    const local: Category[] = [
+      { id: "cat1", title: "远程分类", links: [] },
+      { id: "cat2", title: "本地新增分类", links: [] },
+    ];
+    const base: Category[] = [{ id: "cat1", title: "远程分类", links: [] }];
+    const result = mergeCategories(remote, local, base);
+    expect(result).toHaveLength(2);
+    expect(result.find(c => c.id === "cat2")?.title).toBe("本地新增分类");
+  });
+
+  it("三方合并：分类内本地新增链接（不在基线）应保留", () => {
+    const remote: Category[] = [{ id: "cat1", title: "分类", links: [
+      { id: "l1", title: "远程链接", url: "https://r.com" },
+    ]}];
+    const local: Category[] = [{ id: "cat1", title: "分类", links: [
+      { id: "l1", title: "远程链接", url: "https://r.com" },
+      { id: "l2", title: "本地新增链接", url: "https://l.com" },
+    ]}];
+    const base: Category[] = [{ id: "cat1", title: "分类", links: [
+      { id: "l1", title: "远程链接", url: "https://r.com" },
+    ]}];
+    const result = mergeCategories(remote, local, base);
+    expect(result[0].links).toHaveLength(2);
+    expect(result[0].links.find(l => l.id === "l2")?.title).toBe("本地新增链接");
   });
 
   it("两边分类都为空时应返回空数组", () => {

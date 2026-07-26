@@ -92,7 +92,3 @@ export function ft(s: number): string {
   const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
   return (d ? d + '天' : '') + h + '小时' + m + '分';
 }
-
-export function f(...args: Parameters<typeof Intl.NumberFormat.prototype.format>) {
-  return new Intl.NumberFormat('zh-CN').format(args[0] as number);
-}

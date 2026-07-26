@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Input, Button } from "@/components/ui";
 import { useSearchHistory } from "@/lib";
 import { LinkItem } from "@/lib/types";
+import { openExternalUrl } from "@/lib/utils/url";
 import Fuse, { type IFuseOptions } from "fuse.js";
 import { STORAGE_CONFIG_KEY } from "@/lib/adapters/storage";
 
@@ -267,7 +268,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
         }
       } else if (item.kind === "global") {
         if (item.url) {
-          window.open(item.url, "_blank");
+          openExternalUrl(item.url);
         } else {
           setQuery(item.title);
           if (engine.url === "local") onLocalSearch?.(item.title);

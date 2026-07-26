@@ -7,6 +7,7 @@ import (
 
 	"github.com/YingXiaoMo/nav/internal/db/queries"
 	"github.com/YingXiaoMo/nav/internal/model"
+	"github.com/YingXiaoMo/nav/internal/remote"
 	"github.com/YingXiaoMo/nav/internal/tgbot"
 )
 
@@ -85,6 +86,10 @@ func (h *Handler) UpdateSettings() http.HandlerFunc {
 			if protectedSettings[key] {
 				slog.Warn("跳过保护键", "key", key)
 				continue
+			}
+			// 设备配置含 SSH 明文密码：写入前对密码字段做静态加密（配置 NAV_SECRET_KEY 时生效）
+			if key == "device_config" {
+				value = remote.EncryptDeviceConfigJSON(value)
 			}
 			if _, err := stmt.ExecContext(r.Context(), key, value, value); err != nil {
 				slog.Error("批量更新设置失败", "error", err, "key", key)

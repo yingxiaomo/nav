@@ -36,8 +36,3 @@ func SetSetting(ctx context.Context, db *sql.DB, key, value string) error {
 	_, err := db.ExecContext(ctx, "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?", key, value, value)
 	return err
 }
-
-func DeleteSetting(ctx context.Context, db *sql.DB, key string) error {
-	_, err := db.ExecContext(ctx, "DELETE FROM settings WHERE key = ?", key)
-	return err
-}

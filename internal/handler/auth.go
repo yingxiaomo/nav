@@ -273,13 +273,26 @@ func (h *Handler) Setup() http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
-		if err := queries.CreateUser(r.Context(), db, model.NewID(), body.Username, string(hashed), model.Now()); err != nil {
+		userID := model.NewID()
+		if err := queries.CreateUser(r.Context(), db, userID, body.Username, string(hashed), model.Now()); err != nil {
 			slog.Error("创建用户失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "创建用户失败，用户名可能已存在")
 			return
 		}
 
-		slog.Info("管理员初始化完成", "username", body.Username)
+		// 初始化后自动登录：签发会话 cookie，免去再手动登录一次
+		secret, _ := queries.GetSetting(r.Context(), db, "session_secret")
+		if secret == "" {
+			secret = generateSessionSecret()
+			if err := queries.SetSetting(r.Context(), db, "session_secret", secret); err != nil {
+				slog.Error("保存会话密钥失败", "error", err)
+				model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
+				return
+			}
+		}
+		setSessionCookie(w, session.Sign(userID, secret), isSecureRequest(r))
+
+		slog.Info("管理员初始化完成并自动登录", "username", body.Username)
 		model.RespondJSON(w, http.StatusCreated, map[string]any{"success": true})
 	}
 }
@@ -302,8 +315,10 @@ func (h *Handler) ChangePassword() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		db := h.DB
 
-		if !checkRateLimit(r.RemoteAddr) {
-			slog.Warn("修改密码限流", "ip", r.RemoteAddr)
+		// 限流 key 必须剥离端口，否则每次连接的随机源端口会被视为不同 IP，限流失效
+		ip := ipFromRemote(r.RemoteAddr)
+		if !checkRateLimit(ip) {
+			slog.Warn("修改密码限流", "ip", ip)
 			model.RespondError(w, http.StatusTooManyRequests, "操作过于频繁，请 15 分钟后再试")
 			return
 		}
@@ -341,13 +356,13 @@ func (h *Handler) ChangePassword() http.HandlerFunc {
 		}
 
 		if err := bcrypt.CompareHashAndPassword([]byte(pwHash), []byte(body.CurrentPassword)); err != nil {
-			recordLoginAttempt(r.RemoteAddr, false)
-			slog.Warn("修改密码 - 当前密码错误", "ip", r.RemoteAddr)
+			recordLoginAttempt(ip, false)
+			slog.Warn("修改密码 - 当前密码错误", "ip", ip)
 			model.RespondError(w, http.StatusForbidden, "当前密码错误")
 			return
 		}
 
-		recordLoginAttempt(r.RemoteAddr, true)
+		recordLoginAttempt(ip, true)
 
 		newHash, err := bcrypt.GenerateFromPassword([]byte(body.NewPassword), bcrypt.DefaultCost)
 		if err != nil {

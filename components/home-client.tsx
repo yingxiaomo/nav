@@ -20,6 +20,7 @@ import Image from "next/image";
 import { Brain, TerminalSquare } from "lucide-react";
 
 import { useWallpaper, useNavData, useKeyboardShortcuts, useBackendCheck } from "@/lib";
+import { openExternalUrl } from "@/lib/utils/url";
 import { useUIStore } from "@/lib/stores";
 import { CommandPalette } from "@/components/features/command-palette";
 import { AIPanel } from "@/components/features/ai-panel";
@@ -279,7 +280,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
                     ref={searchInputRef}
                     onLocalSearch={setSearchQuery}
                     bookmarks={allBookmarks}
-                    onOpenLink={(url) => window.open(url, '_blank', 'noopener,noreferrer')}
+                    onOpenLink={(url) => openExternalUrl(url)}
                   />
                 </div>
                 </div>
@@ -307,7 +308,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
             <footer className="relative mt-auto pt-4 w-full text-center z-0">
               <p className="text-[10px] text-white/30 font-light tracking-widest font-mono select-none">
                 © 2025 Clean Nav · Designed by{' '}
-                <a href="https://github.com/YingXiaoMo/clean-nav" target="_blank" rel="noopener noreferrer" className="hover:text-white/80 transition-colors cursor-pointer hover:underline underline-offset-4 decoration-white/30">
+                <a href="https://github.com/yingxiaomo/nav" target="_blank" rel="noopener noreferrer" className="hover:text-white/80 transition-colors cursor-pointer hover:underline underline-offset-4 decoration-white/30">
                   YingXiaoMo
                 </a>
               </p>
@@ -325,7 +326,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
           <CommandPalette
             data={data}
             allBookmarks={allBookmarks}
-            onOpenLink={(url) => window.open(url, '_blank', 'noopener,noreferrer')}
+            onOpenLink={(url) => openExternalUrl(url)}
             onToggleAI={() => togglePanel('ai')}
             onToggleSSH={() => togglePanel('ssh')}
           />

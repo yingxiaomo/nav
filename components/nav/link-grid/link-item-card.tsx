@@ -10,6 +10,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { FaviconImage } from "@/lib/utils/favicon";
 import { convertToWebP } from "@/lib/utils/image-utils";
 import { isValidImageFile, isValidFileSize } from "@/lib/utils/validation";
+import { openExternalUrl } from "@/lib/utils/url";
 import { useUIStore } from "@/lib/stores";
 
 interface LinkItemCardProps {
@@ -31,7 +32,7 @@ export function LinkItemCard({ item, onClick, className, showPinButton, isPinned
         if (isFolder) {
           onClick?.(item);
         } else if (item.url) {
-          window.open(item.url, '_blank', 'noopener,noreferrer');
+          openExternalUrl(item.url);
         }
       }
     };
@@ -81,7 +82,7 @@ export function LinkItemCard({ item, onClick, className, showPinButton, isPinned
                </svg>
              </button>
            )}
-           <div className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition-all cursor-pointer active:scale-[0.98]" onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')} {...commonProps}>
+           <div className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition-all cursor-pointer active:scale-[0.98]" onClick={() => openExternalUrl(item.url)} {...commonProps}>
                <div className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center overflow-hidden border border-white/20 bg-blue-500/10 text-blue-500">
                  <FaviconImage icon={item.icon} url={item.url} className="h-8 w-8 object-cover" />
                </div>
@@ -132,7 +133,7 @@ export function SortableLinkItemCard({ item, onClick, showPinButton, isPinned, o
           if (item.type === 'folder') {
             onClick?.(item);
           } else if (item.url) {
-            window.open(item.url, '_blank', 'noopener,noreferrer');
+            openExternalUrl(item.url);
           }
         }
       }}
@@ -245,13 +246,13 @@ export function PinnedLinkCard({
         </button>
         <div
           className="flex flex-col items-center gap-1 active:scale-95 transition-transform"
-          onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
+          onClick={() => openExternalUrl(item.url)}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              window.open(item.url, '_blank', 'noopener,noreferrer');
+              openExternalUrl(item.url);
             }
           }}
         >

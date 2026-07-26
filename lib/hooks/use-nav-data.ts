@@ -151,9 +151,21 @@ export function useNavData(initialWallpapers: string[]) {
       const localNotes = currentData.notes || [];
       const localCategories = currentData.categories || [];
 
-      const mergedCategories = mergeCategories(remoteData.categories || [], localCategories);
-      const mergedTodos = mergeItems(remoteData.todos, localTodos);
-      const mergedNotes = mergeItems(remoteData.notes, localNotes);
+      // 上次成功同步的快照，作为三方合并基线：用于区分"远程删除"（丢弃）
+      // 与"本地离线新增"（保留），避免未点保存的新增被云端拉取覆盖。
+      let lastSync: DataSchema | null = null;
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem(LAST_SYNC_KEY);
+          if (raw) lastSync = JSON.parse(raw) as DataSchema;
+        } catch { /* 基线损坏则退化为两方合并 */ }
+      }
+      const baseTodoIds = lastSync ? new Set((lastSync.todos || []).map(t => t.id)) : undefined;
+      const baseNoteIds = lastSync ? new Set((lastSync.notes || []).map(n => n.id)) : undefined;
+
+      const mergedCategories = mergeCategories(remoteData.categories || [], localCategories, lastSync?.categories);
+      const mergedTodos = mergeItems(remoteData.todos, localTodos, undefined, baseTodoIds);
+      const mergedNotes = mergeItems(remoteData.notes, localNotes, undefined, baseNoteIds);
 
       const finalData = {
         ...remoteData,

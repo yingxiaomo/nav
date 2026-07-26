@@ -139,7 +139,9 @@ func run(ctx context.Context, cfg Config) error {
 
 	// Telegram Bot + device manager
 	var tgBot *tgbot.Bot
-	deviceMgr := remote.NewManager(remote.NewSSHExec())
+	// TOFU 主机密钥校验：已知密钥持久化到 data/ssh_known_hosts.json
+	hostKeys := remote.NewHostKeyManager(cfg.DataDir + "/ssh_known_hosts.json")
+	deviceMgr := remote.NewManager(remote.NewSSHExec(hostKeys))
 	if devCfg, err := queries.GetSetting(context.Background(), database, "device_config"); err == nil {
 		deviceMgr.Load(devCfg)
 	}
@@ -170,6 +172,7 @@ func run(ctx context.Context, cfg Config) error {
 		DockerSvc:     dockerSvc,
 		DockerMeta:    dockerMetaStore,
 		DockerSnap:    dockerSnap,
+		HostKeys:      hostKeys,
 		UploadDir:     cfg.UploadDir,
 		DataDir:       cfg.DataDir,
 	}

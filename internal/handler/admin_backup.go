@@ -22,6 +22,8 @@ type backupCategory struct {
 type backupBookmark struct {
 	ID          string `json:"id"`
 	CategoryID  string `json:"categoryId"`
+	ParentID    string `json:"parentId,omitempty"`
+	IsFolder    int    `json:"isFolder,omitempty"`
 	Title       string `json:"title"`
 	URL         string `json:"url"`
 	Icon        string `json:"icon,omitempty"`
@@ -38,6 +40,9 @@ type backupMonitorTarget struct {
 	MAC       string `json:"mac,omitempty"`
 	Timeout   int    `json:"timeout"`
 	CreatedAt int64  `json:"createdAt"`
+	SSHUser   string `json:"sshUser,omitempty"`
+	SSHPass   string `json:"sshPass,omitempty"`
+	CheckType string `json:"checkType,omitempty"`
 }
 
 type adminBackupExport struct {
@@ -103,8 +108,8 @@ func (h *Handler) ExportBackup() http.HandlerFunc {
 		exportBMs := make([]backupBookmark, 0, len(bmRows))
 		for _, bm := range bmRows {
 			exportBMs = append(exportBMs, backupBookmark{
-				ID: bm.ID, CategoryID: bm.CategoryID, Title: bm.Title,
-				URL: bm.URL, Icon: bm.Icon, Description: bm.Description,
+				ID: bm.ID, CategoryID: bm.CategoryID, ParentID: bm.ParentID, IsFolder: bm.IsFolder,
+				Title: bm.Title, URL: bm.URL, Icon: bm.Icon, Description: bm.Description,
 				Order: bm.Order, CreatedAt: bm.CreatedAt,
 			})
 		}
@@ -125,14 +130,14 @@ func (h *Handler) ExportBackup() http.HandlerFunc {
 
 		exportMTs := make([]backupMonitorTarget, 0)
 		mtRows, err := db.QueryContext(r.Context(),
-			`SELECT id, name, url, COALESCE(icon,''), COALESCE(mac,''), timeout, created_at FROM monitor_targets ORDER BY created_at`)
+			`SELECT id, name, url, COALESCE(icon,''), COALESCE(mac,''), timeout, created_at, COALESCE(ssh_user,''), COALESCE(ssh_pass,''), COALESCE(check_type,'') FROM monitor_targets ORDER BY created_at`)
 		if err != nil {
 			slog.Warn("备份导出: 获取监控目标失败", "error", err)
 		} else {
 			defer mtRows.Close()
 			for mtRows.Next() {
 				var mt backupMonitorTarget
-				if err := mtRows.Scan(&mt.ID, &mt.Name, &mt.URL, &mt.Icon, &mt.MAC, &mt.Timeout, &mt.CreatedAt); err == nil {
+				if err := mtRows.Scan(&mt.ID, &mt.Name, &mt.URL, &mt.Icon, &mt.MAC, &mt.Timeout, &mt.CreatedAt, &mt.SSHUser, &mt.SSHPass, &mt.CheckType); err == nil {
 					exportMTs = append(exportMTs, mt)
 				}
 			}
@@ -179,6 +184,14 @@ func (h *Handler) ImportBackup() http.HandlerFunc {
 		}
 		defer tx.Rollback()
 
+		// 书签 parent_id 自引用外键：导入顺序按 "order" 排列而非拓扑序，
+		// 子项可能先于父项插入，故在本事务内推迟外键检查到提交时。
+		if _, err := tx.ExecContext(r.Context(), "PRAGMA defer_foreign_keys=ON"); err != nil {
+			slog.Error("备份导入: 设置延迟外键失败", "error", err)
+			model.RespondError(w, http.StatusInternalServerError, "恢复失败")
+			return
+		}
+
 		tables := []string{"bookmarks", "categories", "todos", "notes", "settings", "monitor_targets"}
 		for _, t := range tables {
 			if _, err := tx.ExecContext(r.Context(), "DELETE FROM "+t); err != nil {
@@ -208,9 +221,13 @@ func (h *Handler) ImportBackup() http.HandlerFunc {
 		}
 
 		for _, bm := range body.Bookmarks {
+			var parentID any
+			if bm.ParentID != "" {
+				parentID = bm.ParentID
+			}
 			if _, err := tx.ExecContext(r.Context(),
-				`INSERT INTO bookmarks (id, category_id, title, url, icon, description, "order", created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-				bm.ID, bm.CategoryID, bm.Title, bm.URL, bm.Icon, bm.Description, bm.Order, bm.CreatedAt); err != nil {
+				`INSERT INTO bookmarks (id, category_id, parent_id, title, url, icon, description, "order", created_at, is_folder) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				bm.ID, bm.CategoryID, parentID, bm.Title, bm.URL, bm.Icon, bm.Description, bm.Order, bm.CreatedAt, bm.IsFolder); err != nil {
 				slog.Error("备份导入: 恢复书签失败", "error", err)
 				model.RespondError(w, http.StatusInternalServerError, "恢复失败")
 				return
@@ -251,8 +268,8 @@ func (h *Handler) ImportBackup() http.HandlerFunc {
 
 		for _, mt := range body.MonitorTargets {
 			if _, err := tx.ExecContext(r.Context(),
-				"INSERT INTO monitor_targets (id, name, url, icon, mac, timeout, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-				mt.ID, mt.Name, mt.URL, mt.Icon, mt.MAC, mt.Timeout, mt.CreatedAt); err != nil {
+				"INSERT INTO monitor_targets (id, name, url, icon, mac, timeout, created_at, ssh_user, ssh_pass, check_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				mt.ID, mt.Name, mt.URL, mt.Icon, mt.MAC, mt.Timeout, mt.CreatedAt, mt.SSHUser, mt.SSHPass, mt.CheckType); err != nil {
 				slog.Error("备份导入: 恢复监控目标失败", "error", err)
 				model.RespondError(w, http.StatusInternalServerError, "恢复失败")
 				return

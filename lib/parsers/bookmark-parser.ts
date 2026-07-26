@@ -1,4 +1,5 @@
 ﻿import { generateId } from "@/lib/utils/common";
+import { sanitizeUrl } from "@/lib/utils/url";
 import { LinkItem, DataSchema, DEFAULT_DATA } from "../types/types";
 
 /**
@@ -32,7 +33,7 @@ export function parseNetscapeBookmarks(html: string): DataSchema | null {
           items.push({
             id: generateId(),
             title: a.textContent || "未命名链接",
-            url: (a.getAttribute("href") || "").trim(),
+            url: sanitizeUrl(a.getAttribute("href") || ""),
             icon: a.getAttribute("icon") || undefined,
             type: "link",
           });

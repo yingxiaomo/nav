@@ -1,5 +1,26 @@
 import { describe, it, expect } from "vitest";
-import { normalizeUrl, extractHostname, extractSiteName, generateFaviconUrl, getFileExtension, isImageFile } from "../url";
+import { normalizeUrl, extractHostname, extractSiteName, generateFaviconUrl, getFileExtension, isImageFile, sanitizeUrl } from "../url";
+
+describe("sanitizeUrl", () => {
+  it("拒绝 javascript: 伪协议", () => {
+    expect(sanitizeUrl("javascript:alert(1)")).toBe("");
+    expect(sanitizeUrl("  JavaScript:alert(1)")).toBe("");
+    expect(sanitizeUrl("\tjavascript:void(0)")).toBe("");
+  });
+  it("拒绝 data: 和 vbscript: 伪协议", () => {
+    expect(sanitizeUrl("data:text/html,<script>alert(1)</script>")).toBe("");
+    expect(sanitizeUrl("vbscript:msgbox(1)")).toBe("");
+  });
+  it("放行正常 http/https/mailto 及裸域名", () => {
+    expect(sanitizeUrl("https://example.com")).toBe("https://example.com");
+    expect(sanitizeUrl("http://a.com/x")).toBe("http://a.com/x");
+    expect(sanitizeUrl("mailto:a@b.com")).toBe("mailto:a@b.com");
+    expect(sanitizeUrl("example.com")).toBe("example.com");
+  });
+  it("空输入返回空", () => {
+    expect(sanitizeUrl("")).toBe("");
+  });
+});
 
 describe("normalizeUrl", () => {
   it("应为无协议的主机名添加 https://", () => {

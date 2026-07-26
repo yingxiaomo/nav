@@ -19,6 +19,7 @@ type Handler struct {
 	DockerSnap    *service.DockerSnapshotter
 	TGBot         *tgbot.Bot
 	DeviceMgr     *remote.Manager
+	HostKeys      *remote.HostKeyManager
 	UploadDir     string
 	DataDir       string
 }
@@ -105,6 +106,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("PUT /api/v1/admin/monitor/checks/{id}", http.HandlerFunc(h.UpdateCheck()))
 	mux.Handle("DELETE /api/v1/admin/monitor/checks/{id}", http.HandlerFunc(h.DeleteCheck()))
 	mux.Handle("POST /api/v1/admin/monitor/fetch-icon", http.HandlerFunc(FetchMonitorIcon()))
+	mux.Handle("POST /api/v1/admin/monitor/test-notify", http.HandlerFunc(h.TestNotify()))
 	mux.Handle("POST /api/v1/admin/monitor/wol/{id}", http.HandlerFunc(h.WOLById()))
 	mux.Handle("POST /api/v1/admin/monitor/wol", http.HandlerFunc(WOLDirect()))
 

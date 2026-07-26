@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"golang.org/x/net/html"
@@ -102,6 +103,50 @@ func IsPrivateHost(hostname string) bool {
 	return false
 }
 
+// isPrivateIP 判定一个已解析出的 IP 是否属于内网/环回/链路本地等不可外呼范围。
+// 这是 SSRF 的真正防线：在实际建连的 IP 上判定，绕过 DNS 解析、十进制/十六进制
+// IP 编码等对主机名字符串检查的规避手段。
+func isPrivateIP(ip net.IP) bool {
+	if ip == nil {
+		return true // 解析失败按不安全处理
+	}
+	if v4 := ip.To4(); v4 != nil {
+		ip = v4
+	}
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() ||
+		ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() {
+		return true
+	}
+	// CGNAT 100.64.0.0/10（运营商级 NAT，视作内网）
+	if v4 := ip.To4(); v4 != nil && v4[0] == 100 && v4[1] >= 64 && v4[1] <= 127 {
+		return true
+	}
+	return false
+}
+
+// safeDialControl 在建立 TCP 连接前校验目标 IP，拒绝内网地址。
+// 作为 net.Dialer.Control 回调，address 此时已是解析后的 "ip:port"。
+func safeDialControl(network, address string, _ syscall.RawConn) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return fmt.Errorf("无效的连接地址")
+	}
+	if isPrivateIP(net.ParseIP(host)) {
+		return fmt.Errorf("不允许访问内网地址")
+	}
+	return nil
+}
+
+// newSafeTransport 返回一个拒绝向内网地址建连的 HTTP Transport（SSRF 防护）。
+func newSafeTransport() *http.Transport {
+	return &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout: 5 * time.Second,
+			Control: safeDialControl,
+		}).DialContext,
+	}
+}
+
 // resolveURL converts a possibly-relative URL to absolute using the base URL.
 func ResolveURL(href, base string) string {
 	if strings.HasPrefix(href, "http://") || strings.HasPrefix(href, "https://") {
@@ -116,79 +161,6 @@ func ResolveURL(href, base string) string {
 		return href
 	}
 	return baseURL.ResolveReference(ref).String()
-}
-
-// detectCharset attempts to extract the charset from Content-Type or HTML meta tag.
-// If not found, returns "utf-8".
-func detectCharset(contentType string, body []byte) string {
-	// Try Content-Type header first
-	if contentType != "" {
-		idx := strings.Index(strings.ToLower(contentType), "charset=")
-		if idx >= 0 {
-			cs := contentType[idx+8:]
-			if semi := strings.IndexByte(cs, ';'); semi >= 0 {
-				cs = cs[:semi]
-			}
-			if cs = strings.TrimSpace(cs); cs != "" {
-				return strings.ToLower(cs)
-			}
-		}
-	}
-
-	// Try HTML <meta charset="...">
-	bodyStr := string(body)
-	if m := extractAttr(bodyStr, "meta", "charset"); m != "" {
-		return strings.ToLower(strings.TrimSpace(m))
-	}
-
-	return "utf-8"
-}
-
-// extractAttr finds the value of a named attribute from the first matching element tag.
-// Simple string-based extraction, works for <meta charset="utf-8"> etc.
-func extractAttr(htmlStr, tagName, attrName string) string {
-	// Build a regex-like search: find <tagName ... attrName="value"...>
-	lower := strings.ToLower(htmlStr)
-	tagStart := strings.Index(lower, "<"+tagName)
-	if tagStart < 0 {
-		return ""
-	}
-	tagEnd := strings.IndexByte(htmlStr[tagStart:], '>')
-	if tagEnd < 0 {
-		return ""
-	}
-	tag := htmlStr[tagStart : tagStart+tagEnd]
-
-	// Look for attrName="value" or attrName='value' or attrName=value
-	searchFor := strings.ToLower(attrName) + "="
-	lowerTag := strings.ToLower(tag)
-	attrIdx := strings.Index(lowerTag, searchFor)
-	if attrIdx < 0 {
-		return ""
-	}
-
-	after := tag[attrIdx+len(searchFor):]
-	if len(after) == 0 {
-		return ""
-	}
-
-	var quote byte
-	var end int
-	if after[0] == '"' || after[0] == '\'' {
-		quote = after[0]
-		end = strings.IndexByte(after[1:], quote)
-		if end < 0 {
-			return after[1:]
-		}
-		return after[1 : 1+end]
-	}
-
-	// Unquoted value
-	end = strings.IndexAny(after, " >")
-	if end < 0 {
-		return after
-	}
-	return after[:end]
 }
 
 // ParseURL fetches a URL and extracts page metadata (title, description, icon, og:image).
@@ -212,9 +184,10 @@ func ParseURL(rawURL string) (*ParseResult, error) {
 		return nil, fmt.Errorf("不允许访问内网地址")
 	}
 
-	// 3. Fetch the page
+	// 3. Fetch the page（Transport 层按解析 IP 拦截内网，覆盖重定向与 DNS 绕过）
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout:   5 * time.Second,
+		Transport: newSafeTransport(),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
 				return fmt.Errorf("重定向次数过多")
@@ -261,10 +234,6 @@ func ParseURL(rawURL string) (*ParseResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败")
 	}
-
-	// 5. Detect charset and decode
-	contentType := resp.Header.Get("Content-Type")
-	_ = detectCharset(contentType, body)
 
 	htmlBody := string(body)
 
@@ -581,7 +550,8 @@ func FetchFavicon(targetURL string) (string, error) {
 	}
 
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout:   5 * time.Second,
+		Transport: newSafeTransport(),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
 				return fmt.Errorf("重定向次数过多")
@@ -644,9 +614,7 @@ func fetchHTML(client *http.Client, url string) string {
 		return ""
 	}
 
-	contentType := resp.Header.Get("Content-Type")
-	charset := detectCharset(contentType, data)
-	return decodeToString(data, charset)
+	return string(data)
 }
 
 // extractOrigin extracts the origin (scheme + host) from a URL.
@@ -676,14 +644,3 @@ func extractOrigin(rawURL string) string {
 	return proto + "://" + host
 }
 
-// decodeToString decodes byte data according to the given charset.
-// Currently always returns string(data); the charset parameter is kept for
-// future proper encoding conversion.
-func decodeToString(data []byte, charset string) string {
-	switch strings.ToLower(charset) {
-	case "utf-8", "utf8", "":
-		return string(data)
-	default:
-		return string(data)
-	}
-}

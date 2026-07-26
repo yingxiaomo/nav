@@ -107,6 +107,11 @@ func (h *Handler) DockerLogs() http.HandlerFunc {
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
 
+		// 清除服务器写超时（默认 30s），否则 follow 日志流会在 30 秒后被掐断。
+		if err := http.NewResponseController(w).SetWriteDeadline(time.Time{}); err != nil {
+			slog.Debug("清除写超时失败（不影响短日志）", "error", err)
+		}
+
 		if svc == nil {
 			fmt.Fprintf(w, "event: error\ndata: Docker 不可用\n\n")
 			flusher.Flush()

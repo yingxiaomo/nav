@@ -25,8 +25,3 @@ export function getFrequentBookmarks<T extends { id: string }>(items: T[], topN 
   const stats = loadStats();
   return [...items].sort((a, b) => (stats[b.id] || 0) - (stats[a.id] || 0)).slice(0, topN);
 }
-
-/** 获取指定书签的点击次数 */
-export function getClickCount(bookmarkId: string): number {
-  return loadStats()[bookmarkId] || 0;
-}

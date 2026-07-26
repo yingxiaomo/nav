@@ -6,11 +6,6 @@
  * GITHUB_CONFIG_KEY 为旧版配置键，仅用于迁移兼容。
  */
 
-import type { GithubRepoSettings } from './storage';
-
-/** @deprecated 请使用 storage.ts 中的 GithubRepoSettings */
-export type GithubConfig = GithubRepoSettings;
-
 /**
  * 旧版 GitHub 配置的 localStorage 键名
  * 用于从旧版本迁移到新版 StorageConfig，不可与 STORAGE_CONFIG_KEY 共用

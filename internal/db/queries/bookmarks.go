@@ -87,28 +87,6 @@ func GetBookmark(ctx context.Context, db *sql.DB, id string) (*model.Bookmark, e
 	return &b, nil
 }
 
-func GetBookmarksByParent(ctx context.Context, db *sql.DB, parentID string) ([]model.Bookmark, error) {
-	rows, err := db.QueryContext(ctx,
-		`SELECT `+bookmarkCols+` FROM bookmarks WHERE parent_id = ? ORDER BY "order" ASC`, parentID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var bms []model.Bookmark
-	for rows.Next() {
-		var b model.Bookmark
-		if err := scanBookmark(rows, &b); err != nil {
-			return nil, err
-		}
-		bms = append(bms, b)
-	}
-	if bms == nil {
-		bms = []model.Bookmark{}
-	}
-	return bms, rows.Err()
-}
-
 func CreateBookmark(ctx context.Context, db *sql.DB, input model.BookmarkInput) (*model.Bookmark, error) {
 	id := model.NewID()
 	now := model.Now()

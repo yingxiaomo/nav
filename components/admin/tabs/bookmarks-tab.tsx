@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { req, API, LinkItem, Category, ConfirmState } from '../admin-tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { sanitizeUrl } from '@/lib/utils/url';
 import { Plus, Pencil, Trash2, Check, X, Link, ExternalLink } from 'lucide-react';
 
 export default function BookmarksTab({ showConfirm }: { showConfirm: (opts: Omit<ConfirmState, 'open'>) => void }) {
@@ -94,7 +95,7 @@ export default function BookmarksTab({ showConfirm }: { showConfirm: (opts: Omit
                     </span>
                   </TableCell>
                   <TableCell className="max-w-[250px] overflow-hidden text-ellipsis whitespace-nowrap">
-                    <a href={b.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary no-underline text-xs hover:underline">
+                    <a href={sanitizeUrl(b.url) || undefined} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary no-underline text-xs hover:underline">
                       <ExternalLink className="size-3" />
                       <span className="truncate max-w-[200px]">{b.url}</span>
                     </a>

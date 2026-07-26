@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/YingXiaoMo/nav/internal/secret"
 )
 
 // Device 内网设备
@@ -39,7 +41,8 @@ func NewManager(exec Executor) *Manager {
 	return &Manager{exec: exec}
 }
 
-// Load 从 JSON 字符串加载配置
+// Load 从 JSON 字符串加载配置。设备密码若为加密存储（配置了 NAV_SECRET_KEY），
+// 加载后解密以供 ExecSSH 使用；明文值原样保留（向后兼容）。
 func (m *Manager) Load(data string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -47,7 +50,36 @@ func (m *Manager) Load(data string) error {
 		m.cfg = Config{Devices: []Device{}}
 		return nil
 	}
-	return json.Unmarshal([]byte(data), &m.cfg)
+	if err := json.Unmarshal([]byte(data), &m.cfg); err != nil {
+		return err
+	}
+	for i := range m.cfg.Devices {
+		if pass, err := secret.Decrypt(m.cfg.Devices[i].Password); err == nil {
+			m.cfg.Devices[i].Password = pass
+		}
+	}
+	return nil
+}
+
+// EncryptDeviceConfigJSON 解析 device_config JSON，对每个设备密码做静态加密后
+// 重新序列化，用于写入 settings 前保护凭证。未配置 NAV_SECRET_KEY 时为透传；
+// 解析失败时原样返回，不阻断写入。
+func EncryptDeviceConfigJSON(data string) string {
+	if data == "" {
+		return data
+	}
+	var cfg Config
+	if err := json.Unmarshal([]byte(data), &cfg); err != nil {
+		return data
+	}
+	for i := range cfg.Devices {
+		cfg.Devices[i].Password = secret.Encrypt(cfg.Devices[i].Password)
+	}
+	out, err := json.Marshal(cfg)
+	if err != nil {
+		return data
+	}
+	return string(out)
 }
 
 // Save 序列化配置

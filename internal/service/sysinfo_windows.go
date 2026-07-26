@@ -27,26 +27,3 @@ func GetSystemInfo() model.SystemInfo {
 		Uptime: 0,
 	}
 }
-
-// Stub functions needed by compilation on Windows.
-
-type cpuSample struct {
-	idle  uint64
-	total uint64
-}
-
-func readCPUSample() (cpuSample, error) {
-	return cpuSample{}, nil
-}
-
-func calcCPUUsage() float64 { return 0 }
-
-func readMemoryInfo() (total int64, avail int64) { return 0, 0 }
-
-func parseMemInfoValue(line string) int64 { return 0 }
-
-func readDiskInfo(path string) (total int64, free int64) { return 0, 0 }
-
-func readUptime() int64 { return 0 }
-
-func countCPUCores() int { return 0 }

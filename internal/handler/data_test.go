@@ -174,6 +174,73 @@ func TestPutData_PreservesAuthSettings(t *testing.T) {
 	}
 }
 
+// TestPutData_NestedFolderRoundTrip 验证嵌套文件夹经 PUT→GET 往返后
+// 结构完整（文件夹类型 + 子链接 + 同级普通链接均保留），
+// 覆盖历史上文件夹层级被拍平/降级的 bug 类。
+func TestPutData_NestedFolderRoundTrip(t *testing.T) {
+	h := setupHandler(t)
+
+	input := dataImport{
+		Categories: []categoryImport{{
+			ID: "cat-a", Title: "Dev", Order: 0,
+			Links: []model.LinkItem{
+				{ID: "f1", Title: "前端", Type: "folder", Order: 0, Children: []model.LinkItem{
+					{ID: "l1", Title: "React", URL: "https://react.dev", Order: 0},
+					{ID: "l2", Title: "Vue", URL: "https://vuejs.org", Order: 1},
+				}},
+				{ID: "l3", Title: "GitHub", URL: "https://github.com", Order: 1},
+			},
+		}},
+	}
+
+	body, _ := json.Marshal(input)
+	req := httptest.NewRequest("PUT", "/api/v1/data", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.PutData()(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	getRec := httptest.NewRecorder()
+	h.GetData()(getRec, httptest.NewRequest("GET", "/api/v1/data", nil))
+	var result dataExport
+	json.NewDecoder(getRec.Body).Decode(&result)
+
+	if len(result.Categories) != 1 {
+		t.Fatalf("expected 1 category, got %d", len(result.Categories))
+	}
+	links := result.Categories[0].Links
+	if len(links) != 2 {
+		t.Fatalf("expected 2 top-level links, got %d", len(links))
+	}
+
+	var folder, plain *model.LinkItem
+	for i := range links {
+		switch links[i].ID {
+		case "f1":
+			folder = &links[i]
+		case "l3":
+			plain = &links[i]
+		}
+	}
+	if folder == nil {
+		t.Fatal("folder f1 missing after round-trip")
+	}
+	if folder.Type != "folder" {
+		t.Errorf("f1 应为 folder，实际 type=%q（层级被降级）", folder.Type)
+	}
+	if len(folder.Children) != 2 {
+		t.Fatalf("folder 应有 2 个子链接，实际 %d（子项被拍平）", len(folder.Children))
+	}
+	if folder.Children[0].ID != "l1" || folder.Children[1].ID != "l2" {
+		t.Errorf("子链接顺序/内容错误：%+v", folder.Children)
+	}
+	if plain == nil || plain.URL != "https://github.com" {
+		t.Error("同级普通链接 l3 丢失或错误")
+	}
+}
+
 func TestPutData_InvalidJSON(t *testing.T) {
 	h := setupHandler(t)
 

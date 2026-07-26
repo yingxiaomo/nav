@@ -95,6 +95,8 @@ func (h *Handler) UpdateBookmark() http.HandlerFunc {
 		if _, err := queries.UpdateBookmark(ctx, db, id, model.BookmarkInput{
 			CategoryID: existing.CategoryID, Title: title, URL: url,
 			Icon: input.Icon, Description: input.Description, Order: existing.Order,
+			// 保留层级/文件夹属性，避免编辑时把文件夹降级或把嵌套书签移到根
+			ParentID: existing.ParentID, IsFolder: existing.IsFolder == 1,
 		}); err != nil {
 			return nil, "服务器内部错误", false
 		}

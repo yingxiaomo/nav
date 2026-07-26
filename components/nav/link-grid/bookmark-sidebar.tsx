@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Category, LinkItem } from "@/lib/types";
 import { PanelLeft, PanelLeftClose, ChevronLeft, Pin } from "lucide-react";
 import { generateFaviconUrl } from "@/lib/utils/common";
+import { openExternalUrl } from "@/lib/utils/url";
 import { useUIStore } from "@/lib/stores";
 import Image from "next/image";
 
@@ -96,7 +97,7 @@ export function BookmarkSidebar({ categories, pinnedLinks, onPinLink, onUnpinLin
 
   const handleNodeClick = (node: TreeNode) => {
     if (node.type === "link" && node.url) {
-      window.open(node.url, "_blank", "noopener,noreferrer");
+      openExternalUrl(node.url);
       return;
     }
     if (node.children && node.children.length > 0) {

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/YingXiaoMo/nav/internal/model"
+	"github.com/YingXiaoMo/nav/internal/secret"
 )
 
 // HealthChecker periodically performs HTTP health checks on monitor targets
@@ -35,7 +36,9 @@ type HealthChecker struct {
 type Notifier interface {
 	ShouldNotify(targetID string) bool
 	MarkNotified(targetID string)
+	ClearNotified(targetID string)
 	Send(name, url, status string)
+	SendRecovery(name, url string)
 }
 
 const maxConcurrentHealthChecks = 10
@@ -146,9 +149,30 @@ func (h *HealthChecker) runAllChecks(ctx context.Context) {
 			defer wg.Done()
 			defer func() { <-h.sem }() // release
 			result := h.checkTarget(ctx, t)
+
+			// 取旧状态用于检测宕机↔恢复的翻转
 			h.mu.Lock()
+			prev, hadPrev := h.results[result.ID]
 			h.results[result.ID] = result
 			h.mu.Unlock()
+
+			// 记录历史，供在线率统计
+			h.recordHistory(result)
+
+			if h.notify != nil {
+				switch {
+				case result.Status != "ok":
+					// 宕机：按 cooldown 告警
+					if h.notify.ShouldNotify(result.ID) {
+						h.notify.Send(result.Name, result.URL, result.Status)
+						h.notify.MarkNotified(result.ID)
+					}
+				case hadPrev && prev.Status != "ok":
+					// 宕机→恢复：一次性恢复通知，并清冷却让下次宕机立即告警
+					h.notify.SendRecovery(result.Name, result.URL)
+					h.notify.ClearNotified(result.ID)
+				}
+			}
 		}(targets[i])
 	}
 	wg.Wait()
@@ -338,11 +362,32 @@ func (h *HealthChecker) getTargets() []model.MonitorTarget {
 			slog.Warn("扫描监控目标失败", "error", err)
 			continue
 		}
+		// SSH 密码可能加密存储（配置了 NAV_SECRET_KEY），使用前解密
+		if pass, err := secret.Decrypt(t.SSHPass); err != nil {
+			slog.Warn("解密监控 SSH 密码失败", "target", t.ID, "error", err)
+			t.SSHPass = ""
+		} else {
+			t.SSHPass = pass
+		}
 		targets = append(targets, t)
 	}
 	return targets
 }
 
+
+// recordHistory 将一次检查结果写入 check_history，供在线率统计。
+func (h *HealthChecker) recordHistory(r model.CheckResult) {
+	var latency any
+	if r.Latency != nil {
+		latency = *r.Latency
+	}
+	if _, err := h.db.Exec(
+		"INSERT INTO check_history (target_id, status, latency, checked_at) VALUES (?, ?, ?, ?)",
+		r.ID, r.Status, latency, model.Now(),
+	); err != nil {
+		slog.Warn("记录检查历史失败", "error", err)
+	}
+}
 
 // cleanOldHistory 清理 7 天前的历史记录
 func (h *HealthChecker) cleanOldHistory() error {
@@ -351,22 +396,34 @@ func (h *HealthChecker) cleanOldHistory() error {
 	return err
 }
 
-// GetUptime 返回指定目标最近 24 小时内的在线率（0-100）
-func (h *HealthChecker) GetUptime(targetID string) float64 {
-	dayAgo := time.Now().Add(-24 * time.Hour).UnixMilli()
-	var total, ok int
-	h.db.QueryRowContext(context.Background(),
-		"SELECT COUNT(*), COALESCE(SUM(CASE WHEN status='ok' THEN 1 ELSE 0 END),0) FROM check_history WHERE target_id=? AND checked_at > ?", targetID, dayAgo).Scan(&total, &ok)
-	if total == 0 { return 0 }
-	return float64(ok) / float64(total) * 100
-}
-
-// GetUptimeAll 返回所有目标的在线率
+// GetUptimeAll 返回所有目标最近 24 小时的在线率（0-100）。
+// 用一条 GROUP BY 聚合查询取代逐目标 COUNT，避免目标多时产生 N 次查询。
 func (h *HealthChecker) GetUptimeAll() map[string]float64 {
-	targets := h.getTargets()
-	result := make(map[string]float64, len(targets))
-	for _, t := range targets {
-		result[t.ID] = h.GetUptime(t.ID)
+	dayAgo := time.Now().Add(-24 * time.Hour).UnixMilli()
+
+	// 先以全部目标初始化为 0（含尚无历史记录的新目标），保持原有行为
+	result := make(map[string]float64)
+	for _, t := range h.getTargets() {
+		result[t.ID] = 0
+	}
+
+	rows, err := h.db.QueryContext(context.Background(),
+		`SELECT target_id, COUNT(*), COALESCE(SUM(CASE WHEN status='ok' THEN 1 ELSE 0 END), 0)
+		 FROM check_history WHERE checked_at > ? GROUP BY target_id`, dayAgo)
+	if err != nil {
+		slog.Warn("查询在线率失败", "error", err)
+		return result
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var total, ok int
+		if err := rows.Scan(&id, &total, &ok); err != nil {
+			continue
+		}
+		if total > 0 {
+			result[id] = float64(ok) / float64(total) * 100
+		}
 	}
 	return result
 }
@@ -386,11 +443,14 @@ func (h *HealthChecker) AddTarget(input model.MonitorTargetInput) (*model.Monito
 		MAC:       input.MAC,
 		Timeout:   timeout,
 		CreatedAt: model.Now(),
+		SSHUser:   input.SSHUser,
+		SSHPass:   input.SSHPass,
+		CheckType: input.CheckType,
 	}
 
 	_, err := h.db.Exec(
-		"INSERT INTO monitor_targets (id, name, url, icon, mac, timeout, created_at, ssh_user, ssh_pass) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		target.ID, target.Name, target.URL, target.Icon, target.MAC, target.Timeout, target.CreatedAt, target.SSHUser, target.SSHPass,
+		"INSERT INTO monitor_targets (id, name, url, icon, mac, timeout, created_at, ssh_user, ssh_pass, check_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		target.ID, target.Name, target.URL, target.Icon, target.MAC, target.Timeout, target.CreatedAt, target.SSHUser, secret.Encrypt(target.SSHPass), target.CheckType,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("添加监控目标失败: %w", err)
@@ -409,7 +469,7 @@ func (h *HealthChecker) AddTarget(input model.MonitorTargetInput) (*model.Monito
 func (h *HealthChecker) UpdateTarget(id string, input model.MonitorTargetInput) error {
 	result, err := h.db.Exec(
 		"UPDATE monitor_targets SET name=?, url=?, icon=?, mac=?, timeout=?, ssh_user=?, ssh_pass=?, check_type=? WHERE id=?",
-		input.Name, input.URL, input.Icon, input.MAC, input.Timeout, input.SSHUser, input.SSHPass, input.CheckType, id,
+		input.Name, input.URL, input.Icon, input.MAC, input.Timeout, input.SSHUser, secret.Encrypt(input.SSHPass), input.CheckType, id,
 	)
 	if err != nil {
 		return fmt.Errorf("更新监控目标失败: %w", err)

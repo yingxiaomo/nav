@@ -14,12 +14,11 @@ export function useStorageConfig() {
 
     let storageConfigStr = localStorage.getItem(STORAGE_CONFIG_KEY);
     if (storageConfigStr) {
-      // 兼容新版 base64 编码格式
+      // 兼容 base64 编码格式：仅在内存中解码用于解析，
+      // 不回写明文（回写会主动抹掉对 token/密钥的目视遮挡）。
       if (storageConfigStr.startsWith('__b64__')) {
         try {
           storageConfigStr = atob(storageConfigStr.slice(7));
-          // 迁移为明文存储，下次写入不再是 __b64__ 格式
-          localStorage.setItem(STORAGE_CONFIG_KEY, storageConfigStr);
         } catch { /* 解码失败，忽略 */
         }
       }

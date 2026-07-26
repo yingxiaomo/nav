@@ -7,7 +7,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/YingXiaoMo/nav/internal/db/queries"
 	"github.com/YingXiaoMo/nav/internal/model"
+	"github.com/YingXiaoMo/nav/internal/notify"
 	"github.com/YingXiaoMo/nav/internal/service"
 )
 
@@ -17,6 +19,28 @@ import (
 func SystemInfo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		model.RespondJSON(w, http.StatusOK, service.GetSystemInfo())
+	}
+}
+
+// TestNotify handles POST /api/v1/admin/monitor/test-notify — 用当前 settings 里的
+// 通知配置发送一条测试通知，便于用户验证 Apprise 地址是否可用（无需等真宕机）。
+func (h *Handler) TestNotify() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := queries.GetSetting(r.Context(), h.DB, "monitor_notify")
+		if raw == "" {
+			model.RespondError(w, http.StatusBadRequest, "尚未配置通知")
+			return
+		}
+		var cfg notify.Config
+		if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+			model.RespondError(w, http.StatusBadRequest, "通知配置格式错误")
+			return
+		}
+		if err := notify.SendTest(cfg); err != nil {
+			model.RespondError(w, http.StatusBadGateway, "测试通知发送失败: "+err.Error())
+			return
+		}
+		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 	}
 }
 
@@ -187,6 +211,12 @@ func (h *Handler) MonitorAll() http.HandlerFunc {
 			Results:  h.HealthChecker.GetResults(),
 			Metadata: h.DockerMeta.GetAll(),
 			Uptime:   h.HealthChecker.GetUptimeAll(),
+		}
+
+		// 该端点对未登录用户公开（首页状态浮层），剥离 SSH 凭证避免泄露。
+		for i := range resp.Targets {
+			resp.Targets[i].SSHUser = ""
+			resp.Targets[i].SSHPass = ""
 		}
 
 		if svc := h.DockerSvc; svc != nil {

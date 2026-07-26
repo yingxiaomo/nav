@@ -67,6 +67,35 @@ func TestCheckTarget_OK(t *testing.T) {
 	}
 }
 
+// TestUptime_FromHistory locks the H-3 fix: check results are now written to
+// check_history, so GetUptimeAll returns a real percentage instead of always 0.
+func TestUptime_FromHistory(t *testing.T) {
+	database := setupTestDB(t)
+	defer database.Close()
+
+	hc := NewHealthChecker(database)
+	target, err := hc.AddTarget(model.MonitorTargetInput{Name: "t", URL: "http://example.invalid"})
+	if err != nil {
+		t.Fatalf("AddTarget: %v", err)
+	}
+
+	// Before any history is recorded, uptime is 0.
+	if up := hc.GetUptimeAll()[target.ID]; up != 0 {
+		t.Errorf("expected 0%% uptime with no history, got %v", up)
+	}
+
+	// Record 3 ok + 1 error → 75%.
+	lat := int64(10)
+	for i := 0; i < 3; i++ {
+		hc.recordHistory(model.CheckResult{ID: target.ID, Status: "ok", Latency: &lat})
+	}
+	hc.recordHistory(model.CheckResult{ID: target.ID, Status: "error"})
+
+	if up := hc.GetUptimeAll()[target.ID]; up != 75 {
+		t.Errorf("expected 75%% uptime, got %v", up)
+	}
+}
+
 func TestCheckTarget_404(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)

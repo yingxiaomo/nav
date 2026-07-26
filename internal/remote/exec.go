@@ -13,14 +13,24 @@ import (
 
 // SSHExec 实现 Executor 接口的 SSH/HTTP 执行器
 type SSHExec struct {
-	client *http.Client
+	client   *http.Client
+	hostKeys *HostKeyManager
 }
 
-// NewSSHExec 创建执行器
-func NewSSHExec() *SSHExec {
+// NewSSHExec 创建执行器。hostKeys 用于 TOFU 主机密钥校验；为 nil 时退回到
+// 不校验主机密钥（仅用于测试）。
+func NewSSHExec(hostKeys *HostKeyManager) *SSHExec {
 	return &SSHExec{
-		client: &http.Client{Timeout: 30 * time.Second},
+		client:   &http.Client{Timeout: 30 * time.Second},
+		hostKeys: hostKeys,
 	}
+}
+
+func (e *SSHExec) hostKeyCallback() ssh.HostKeyCallback {
+	if e.hostKeys != nil {
+		return e.hostKeys.Callback()
+	}
+	return ssh.InsecureIgnoreHostKey()
 }
 
 func (e *SSHExec) ExecSSH(host, username, password, cmd string) (string, error) {
@@ -43,7 +53,7 @@ func (e *SSHExec) ExecSSH(host, username, password, cmd string) (string, error) 
 				return answers, nil
 			}),
 		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: e.hostKeyCallback(),
 		Timeout:         10 * time.Second,
 	}
 

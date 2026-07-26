@@ -26,31 +26,6 @@ export const CardContent = ({ category }: CardContentProps) => (
   </motion.div>
 );
 
-interface StaticCardProps {
-  category: Category;
-  onClick: () => void;
-}
-
-export function StaticCard({ category, onClick }: StaticCardProps) {
-  return (
-    <motion.div
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-      role="button"
-      tabIndex={0}
-      data-category-id={category.id}
-      className="cursor-pointer group relative p-4 transition-transform duration-200 hover:scale-105 active:scale-95 touch-none"
-    >
-      <CardContent category={category} />
-    </motion.div>
-  );
-}
-
 interface SortableCardProps {
   category: Category;
   onClick: () => void;

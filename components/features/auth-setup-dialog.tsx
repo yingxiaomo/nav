@@ -9,6 +9,7 @@ interface Props {
 
 export function AuthSetupDialog({ baseUrl }: Props) {
   const [state, setState] = useState<'loading' | 'uninitialized' | 'ready'>('loading');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
@@ -23,15 +24,16 @@ export function AuthSetupDialog({ baseUrl }: Props) {
   }, [baseUrl]);
 
   const handleSetup = async () => {
+    if (username.trim().length < 2) { setError('用户名至少 2 个字符'); return; }
     if (password.length < 6) { setError('密码至少 6 位'); return; }
     if (password !== confirm) { setError('两次密码不一致'); return; }
     setBusy(true);
     setError('');
     try {
-      // 1. 设置密码
+      // 1. 设置管理员账号（后端 setup 成功即自动签发会话，无需再单独登录）
       const sr = await fetch(`${baseUrl}/api/v1/auth/setup`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
       if (!sr.ok) {
         const sd = await sr.json().catch(() => ({}));
@@ -39,17 +41,7 @@ export function AuthSetupDialog({ baseUrl }: Props) {
         setBusy(false);
         return;
       }
-      // 2. 自动登录
-      const lr = await fetch(`${baseUrl}/api/v1/auth/login`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
-      if (!lr.ok) {
-        setError('密码已设置，但自动登录失败，请手动登录');
-        setBusy(false);
-        return;
-      }
-      // 3. 把前端数据同步到后端（避免刷新后红点）
+      // 2. 把前端数据同步到后端（避免刷新后红点）
       try {
         const localRaw = localStorage.getItem('clean-nav-local-data');
         if (localRaw) {
@@ -87,6 +79,15 @@ export function AuthSetupDialog({ baseUrl }: Props) {
         </div>
 
         <div className="space-y-2.5">
+          <input
+            type="text"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            placeholder="用户名（至少 2 个字符）"
+            autoComplete="username"
+            className="w-full px-3 py-2 rounded-xl text-sm bg-muted/50 border border-border/40 text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border/80 transition-colors"
+            onKeyDown={e => e.key === 'Enter' && handleSetup()}
+          />
           <div className="relative">
             <input
               type={showPw ? 'text' : 'password'}
@@ -120,7 +121,7 @@ export function AuthSetupDialog({ baseUrl }: Props) {
           <button
             className="w-full py-2 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
             style={{ background: '#6366f1' }}
-            disabled={busy || !password || !confirm}
+            disabled={busy || !username || !password || !confirm}
             onClick={handleSetup}
           >
             {busy ? <><Loader2 className="size-4 animate-spin" /> 初始化中...</> : <><Lock className="size-4" /> 初始化并登录</>}

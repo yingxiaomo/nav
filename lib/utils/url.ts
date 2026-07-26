@@ -13,6 +13,31 @@ export const normalizeUrl = (url: string): string => {
   return `https://${url}`;
 };
 
+// 可执行脚本的伪协议：在 window.open / <a href> 导航时会造成 XSS。
+// 导入的书签文件、云端同步数据都可能携带此类 URL，必须在存储与导航前过滤。
+const DANGEROUS_SCHEME = /^\s*(?:javascript|data|vbscript):/i;
+
+/**
+ * 过滤危险协议：命中 javascript:/data:/vbscript: 时返回空串（视为不可导航），
+ * 其余原样返回（trim 后）。http/https/mailto/magnet/ftp 等正常协议不受影响。
+ */
+export const sanitizeUrl = (url: string): string => {
+  if (!url) return '';
+  if (DANGEROUS_SCHEME.test(url)) return '';
+  return url.trim();
+};
+
+/**
+ * 在新标签页安全打开外部链接：自动补协议并过滤危险伪协议。
+ * 危险 URL 直接忽略，不发起导航。
+ */
+export const openExternalUrl = (rawUrl: string): void => {
+  if (typeof window === 'undefined') return;
+  const safe = sanitizeUrl(rawUrl);
+  if (!safe) return;
+  window.open(normalizeUrl(safe), '_blank', 'noopener,noreferrer');
+};
+
 /**
  * 从URL中提取主机名
  */

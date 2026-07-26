@@ -8,6 +8,11 @@ services:
       - nav-data:/app/data
       # 需要 Docker 管理功能（容器列表/日志流）时取消注释：
       # - /var/run/docker.sock:/var/run/docker.sock
+    # 可选：静态加密数据库中的敏感凭证（SSH / 设备密码）。设置任意强随机串即可
+    # （例：openssl rand -hex 32）。不设则明文存储（向后兼容）。
+    # 注意：更换此值会导致已加密的旧凭证无法解密，需要重新录入。
+    # environment:
+    #   - NAV_SECRET_KEY=change-me-to-a-strong-random-string
     restart: unless-stopped
     logging:
       driver: "json-file"

@@ -66,13 +66,6 @@ func (b *Bot) SendMessage(chatID, text string) {
 	resp.Body.Close()
 }
 
-// Broadcast 向已配置的 chat_id 发送消息
-func (b *Bot) Broadcast(text string) {
-	if b.cfg.ChatID != "" {
-		b.SendMessage(b.cfg.ChatID, text)
-	}
-}
-
 // Start 开始长轮询消息
 func (b *Bot) Start(handler CommandHandler) {
 	b.cmd = handler
@@ -102,6 +95,21 @@ func (b *Bot) Stop() {
 	close(b.stopCh)
 }
 
+// isAuthorized 校验消息来源 chat_id 是否在配置的白名单内。
+// cfg.ChatID 支持逗号分隔的多个 ID；未配置时拒绝所有命令（安全默认）。
+func (b *Bot) isAuthorized(chatID string) bool {
+	allow := strings.TrimSpace(b.cfg.ChatID)
+	if allow == "" {
+		return false
+	}
+	for _, id := range strings.Split(allow, ",") {
+		if strings.TrimSpace(id) == chatID {
+			return true
+		}
+	}
+	return false
+}
+
 func (b *Bot) pollLoop() {
 	for {
 		select {
@@ -128,6 +136,13 @@ func (b *Bot) pollLoop() {
 			fromID := fmt.Sprintf("%d", u.Message.From.ID)
 			if u.Message.Chat != nil {
 				fromID = fmt.Sprintf("%d", u.Message.Chat.ID)
+			}
+
+			// 仅处理授权 chat_id 的命令：机器人可对内网设备执行 SSH / Docker
+			// 操作，未授权来源必须拒绝（否则任何 Telegram 用户都能远程控制）。
+			if !b.isAuthorized(fromID) {
+				slog.Warn("TG 未授权来源，已忽略", "from", fromID)
+				continue
 			}
 
 			text := strings.TrimSpace(u.Message.Text)

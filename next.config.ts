@@ -84,7 +84,10 @@ const nextConfig: NextConfig = {
               // img-src: 放开 HTTPS 来源以支持外部 favicon
               "img-src 'self' data: https://* http://*",
               "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com",
-              "connect-src 'self' https://api.github.com https://*.githubusercontent.com https://api.dropboxapi.com https://www.googleapis.com https://iconapi.396638.xyz http://localhost:* http://127.0.0.1:*",
+              // connect-src 需允许用户自配的同步端点（S3/R2/MinIO/WebDAV 主机无法预先枚举）。
+              // 自托管场景下用户自控所配置的目标，故放行任意 https/http 端点；
+              // 命名来源保留以作文档。若要收紧，可改回仅列出实际使用的域名。
+              "connect-src 'self' https: http: https://api.github.com https://*.githubusercontent.com https://api.dropboxapi.com https://www.googleapis.com https://iconapi.396638.xyz",
               "form-action 'self'",
               "frame-src 'self'"
             ].join(";")

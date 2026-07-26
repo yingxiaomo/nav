@@ -64,6 +64,7 @@ next-env.d.ts
 
 *.md
 !README.md
+!CONTRIBUTING.md
 
 # data (本地数据库文件)
 data/

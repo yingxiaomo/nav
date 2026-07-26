@@ -39,7 +39,7 @@ func (h *Handler) SSHExec() http.HandlerFunc {
 		}
 		addr := req.Host + ":" + strconv.Itoa(port)
 
-		exec := remote.NewSSHExec()
+		exec := remote.NewSSHExec(h.HostKeys)
 		output, err := exec.ExecSSH(addr, req.User, req.Pass, req.Command)
 		if err != nil {
 			slog.Error("SSH 执行失败", "error", err)

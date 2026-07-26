@@ -5,7 +5,9 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,9 +20,28 @@ import (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  4096,
 	WriteBufferSize: 4096,
+	// 仅允许同源发起的 WebSocket 握手，防止用户浏览的恶意网页驱动本端点
+	// （跨站 WebSocket 劫持 / 用服务器做内网 SSH 跳板）。无 Origin 头的
+	// 非浏览器客户端放行。
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true
+		}
+		u, err := url.Parse(origin)
+		if err != nil {
+			return false
+		}
+		return u.Host == r.Host
 	},
+}
+
+// hostKeyCallback 返回 TOFU 主机密钥校验回调；未注入 HostKeys 时退回不校验。
+func (h *Handler) hostKeyCallback() ssh.HostKeyCallback {
+	if h.HostKeys != nil {
+		return h.HostKeys.Callback()
+	}
+	return ssh.InsecureIgnoreHostKey()
 }
 
 // SSHWebSocket handles GET /api/v1/ws/ssh — WebSocket SSH 代理
@@ -69,7 +90,7 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 					return answers, nil
 				}),
 			},
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+			HostKeyCallback: h.hostKeyCallback(),
 			Timeout:         10 * time.Second,
 		}
 
@@ -193,33 +214,14 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 // parseSSHHost 从可能的 URL 或 host:port 中提取主机名
 func parseSSHHost(raw string) (string, error) {
 	// 已经是 host 或 host:port
-	if !containsScheme(raw) {
+	i := strings.Index(raw, "://")
+	if i < 0 {
 		return raw, nil
 	}
-	// http(s)://host:port/path
-	// 简单解析，避免依赖 net/url 对不带 scheme 的处理差异
-	rest := raw
-	if i := indexOf(raw, "://"); i >= 0 {
-		rest = raw[i+3:]
-	}
-	if i := indexOf(rest, "/"); i >= 0 {
-		rest = rest[:i]
-	}
-	if i := indexOf(rest, "#"); i >= 0 {
-		rest = rest[:i]
+	// http(s)://host:port/path → 取 host:port 部分
+	rest := raw[i+3:]
+	if j := strings.IndexAny(rest, "/#"); j >= 0 {
+		rest = rest[:j]
 	}
 	return rest, nil
-}
-
-func containsScheme(s string) bool {
-	return indexOf(s, "://") >= 0
-}
-
-func indexOf(s, sub string) int {
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return i
-		}
-	}
-	return -1
 }

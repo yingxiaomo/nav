@@ -5,7 +5,7 @@ import { useUIStore } from "@/lib/stores";
 import { DataSchema, LinkItem } from "@/lib/types";
 import { getFrequentBookmarks, recordClick } from "@/lib/utils/bookmark-stats";
 import { toast } from "sonner";
-import { getAllCommands, getMatching, getCommand } from "./commands/registry";
+import { getAllCommands, getMatching, getCommand, type GroupItem } from "./commands/registry";
 import "./commands/index"; // 触发命令注册
 
 interface CommandPaletteProps {
@@ -20,7 +20,7 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
   const { isCommandPaletteOpen, setCommandPaletteOpen } = useUIStore();
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
-  const [groups, setGroups] = useState<{ label: string; items: any[] }[]>([]);
+  const [groups, setGroups] = useState<{ label: string; items: GroupItem[] }[]>([]);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -51,7 +51,7 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
     if (!isCommandPaletteOpen) return [];
     if (!query) {
       const frequent = getFrequentBookmarks(allBookmarks, 8);
-      const result: { label: string; items: any[] }[] = [];
+      const result: { label: string; items: GroupItem[] }[] = [];
       if (frequent.length > 0) {
         result.push({ label: "🔥 常用书签", items: frequent.map(b => ({ id: b.id, title: b.title, description: b.url, url: b.url })) });
       }
@@ -96,7 +96,7 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
 
   const flatItems = useMemo(() => groups.flatMap(g => g.items), [groups]);
 
-  const selectItem = (item: any) => {
+  const selectItem = (item: GroupItem) => {
     if (item.url) { recordClick(item.id); onOpenLink(item.url); setCommandPaletteOpen(false); }
     else if (item.prefix) { setQuery("/" + item.prefix + " "); }
     else if (item.title && !item.prefix) {

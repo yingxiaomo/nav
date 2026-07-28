@@ -2,7 +2,7 @@
 // 新命令在这里注册即可，无需改路由逻辑
 
 export interface ExecutionContext {
-  setGroups: (groups: { label: string; items: any[] }[]) => void;
+  setGroups: (groups: { label: string; items: GroupItem[] }[]) => void;
   setLoading: (loading: boolean) => void;
   closePalette: () => void;
 }
@@ -13,6 +13,17 @@ export interface DeviceAlias {
   type: string;
   user?: string;
   pass?: string;
+}
+
+export interface GroupItem {
+  id: string;
+  title: string;
+  description?: string;
+  url?: string;
+  prefix?: string;
+  action?: string;
+  dockerName?: string;
+  alias?: DeviceAlias;
 }
 
 export interface CommandDef {

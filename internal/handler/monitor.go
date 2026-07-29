@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/YingXiaoMo/nav/internal/model"
 	"github.com/YingXiaoMo/nav/internal/notify"
 	"github.com/YingXiaoMo/nav/internal/service"
+	"github.com/YingXiaoMo/nav/internal/session"
 )
 
 // ===== Handlers =====
@@ -213,10 +215,14 @@ func (h *Handler) MonitorAll() http.HandlerFunc {
 			Uptime:   h.HealthChecker.GetUptimeAll(),
 		}
 
-		// 该端点对未登录用户公开（首页状态浮层），剥离 SSH 凭证避免泄露。
-		for i := range resp.Targets {
-			resp.Targets[i].SSHUser = ""
-			resp.Targets[i].SSHPass = ""
+		// 该端点对未登录用户公开（首页状态浮层），
+		// 有有效会话时保留 SSH 凭证供右键菜单连接终端；
+		// 无会话时剥离避免泄露。
+		if !hasValidSession(r, h.DB) {
+			for i := range resp.Targets {
+				resp.Targets[i].SSHUser = ""
+				resp.Targets[i].SSHPass = ""
+			}
 		}
 
 		if svc := h.DockerSvc; svc != nil {
@@ -244,3 +250,16 @@ func (h *Handler) MonitorAll() http.HandlerFunc {
 	}
 }
 
+// hasValidSession checks whether the request carries a valid admin session cookie.
+// Used by MonitorAll to decide whether to include SSH credentials in the response.
+func hasValidSession(r *http.Request, db *sql.DB) bool {
+	cookie, err := r.Cookie(session.CookieName)
+	if err != nil {
+		return false
+	}
+	secret, _ := queries.GetSetting(r.Context(), db, "session_secret")
+	if secret == "" {
+		return false
+	}
+	return session.Verify(cookie.Value, secret) != ""
+}

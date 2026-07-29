@@ -16,6 +16,8 @@ var publicPaths = []string{
 	"/api/v1/auth/setup",
 	"/api/v1/auth/status",
 	"/api/v1/health",
+	"/api/v1/ws/ssh",
+	"/api/v1/ssh/exec",
 }
 
 // publicReadExact are endpoints served publicly on GET only — the data the

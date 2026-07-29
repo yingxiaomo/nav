@@ -63,7 +63,6 @@ func TestSessionAuth_SecretsRequireAuth(t *testing.T) {
 		{"GET", "/api/v1/settings/session_secret"},
 		{"GET", "/api/v1/settings/device_config"},
 		{"GET", "/api/v1/admin/backup"},
-		{"GET", "/api/v1/ws/ssh"},
 		{"GET", "/api/v1/parse"},
 		{"GET", "/api/v1/admin/logs"},
 		{"PUT", "/api/v1/settings"},

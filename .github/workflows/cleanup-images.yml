@@ -1,71 +1,32 @@
-name: Build and Push Docker Images
+name: Clean up old GHCR images
 
 on:
-  push:
-    branches: [ "main", "dev", "feat/merge-server", "refactor/go-rewrite" ]
-    tags: [ "v*" ]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
-      - 'LICENSE'
   workflow_dispatch:
+    inputs:
+      keep:
+        description: '保留的最新版本数量'
+        required: false
+        default: '10'
 
 permissions:
   contents: read
   packages: write
 
 jobs:
-  all-in-one:
-    name: All-in-one image
+  cleanup:
+    name: Clean up old versions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Generate tags
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ghcr.io/yingxiaomo/nav
-          tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=sha,prefix=,suffix=,format=short
-            type=semver,pattern={{version}}
-            type=ref,event=branch
-
-      - name: Build and push
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-      - name: Clean up old versions
+      - name: Delete old package versions
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           OWNER="${{ github.repository_owner }}"
           PACKAGE="nav"
-          KEEP=10
+          KEEP=${{ inputs.keep }}
           # 永远保留这些 tag 的版本，避免误删常用镜像
           PROTECT="latest main refactor-go-rewrite feat-merge-server"
-          echo "检查 $OWNER/$PACKAGE 的版本（保留最新 $KEEP 个 + 受保护 tag）..."
-          # 用户级包 API：ghcr.io/{owner}/nav 是用户包，不是 repo 级
+          echo "清理 $OWNER/$PACKAGE，保留最新 $KEEP 个 + 受保护 tag..."
           VERSIONS=$(gh api --paginate "/users/$OWNER/packages/container/$PACKAGE/versions?per_page=100" \
             --jq '.[] | [.created_at, .id] | @tsv' 2>/dev/null | sort || true)
           if [ -z "$VERSIONS" ]; then echo "无版本记录，跳过清理"; exit 0; fi
@@ -89,4 +50,3 @@ jobs:
           else
             echo "版本数未超限，跳过清理"
           fi
-

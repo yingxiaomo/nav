@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { req, API } from '../admin-tabs';
+import { request } from '@/lib/utils/api';
 import { ImageIcon, Trash2, Upload, Loader2, RefreshCw, ExternalLink, Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -38,7 +39,7 @@ export default function GalleryTab() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch(`${API}/upload`, { method: 'POST', body: formData });
+      const res = await request<unknown>(null, `${API}/upload`, { method: 'POST', body: formData });
       if (res.ok) {
         toast.success('上传成功');
         load();

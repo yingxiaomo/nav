@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -28,7 +27,7 @@ type SSHExecResponse struct {
 func (h *Handler) SSHExec() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req SSHExecRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Command == "" {
+		if !model.DecodeJSON(r, &req) || req.Command == "" {
 			model.RespondError(w, http.StatusBadRequest, "请提供 SSH 连接信息和命令")
 			return
 		}

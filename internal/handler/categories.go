@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"net/http"
 
 	"github.com/YingXiaoMo/nav/internal/db/queries"
@@ -56,7 +55,7 @@ func (h *Handler) GetCategory() http.HandlerFunc {
 func (h *Handler) CreateCategory() http.HandlerFunc {
 	return h.handleCreate("分类", func(r *http.Request, ctx context.Context, db *sql.DB) (any, string, bool) {
 		var input model.CategoryInput
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		if !model.DecodeJSON(r, &input) {
 			return nil, "请求体格式错误", false
 		}
 		if input.Title == "" {
@@ -73,7 +72,7 @@ func (h *Handler) CreateCategory() http.HandlerFunc {
 func (h *Handler) UpdateCategory() http.HandlerFunc {
 	return h.handleUpdate("分类", func(r *http.Request, ctx context.Context, db *sql.DB, id string) (any, string, bool) {
 		var input model.CategoryInput
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		if !model.DecodeJSON(r, &input) {
 			return nil, "请求体格式错误", false
 		}
 

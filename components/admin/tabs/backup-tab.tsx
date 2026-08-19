@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { req, API, ConfirmState } from '../admin-tabs';
+import { request } from '@/lib/utils/api';
 import { Download, Upload, RefreshCw, Trash2, Server, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -17,10 +18,9 @@ export default function BackupTab({ showConfirm }: { showConfirm: (opts: Omit<Co
   const [svrImporting, setSvrImporting] = useState(false);
 
   const handleExport = async () => {
-    const res = await fetch(`${API}/data`, {});
+    const res = await request<unknown>(null, `${API}/data`);
     if (!res.ok) return;
-    const data = await res.json();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `nav-${new Date().toISOString().slice(0, 10)}.json`;
@@ -63,10 +63,9 @@ export default function BackupTab({ showConfirm }: { showConfirm: (opts: Omit<Co
   };
 
   const handleServerExport = async () => {
-    const res = await fetch(`${API}/admin/backup`, {});
+    const res = await request<unknown>(null, `${API}/admin/backup`);
     if (!res.ok) return;
-    const data = await res.json();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `nav-server-full-${new Date().toISOString().slice(0, 10)}.json`;

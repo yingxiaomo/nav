@@ -1,5 +1,6 @@
 // /ai 命令 — AI 快速问答
 import type { CommandHandler } from "./registry";
+import { request } from "@/lib/utils/api";
 
 export const handler: CommandHandler = async (args, ctx) => {
   const argsStr = args.join(" ");
@@ -10,18 +11,10 @@ export const handler: CommandHandler = async (args, ctx) => {
     useUIStore.getState().setActivePanel("ai");
     return;
   }
-  try {
-    const res = await fetch("/api/v1/ai/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: argsStr }),
-    });
-    const data = await res.json();
-    ctx.setGroups([{ label: "AI 回复", items: [{ id: "reply", title: data.reply || data.error, description: "" }] }]);
-  } catch {
-    const { toast } = await import("sonner");
-    toast.error("AI 调用失败");
-  }
+  const res = await request<{ reply?: string; error?: string }>(null, "/api/v1/ai/chat", {
+    method: "POST", body: { message: argsStr },
+  });
+  ctx.setGroups([{ label: "AI 回复", items: [{ id: "reply", title: res.ok ? (res.data.reply || res.data.error || "AI 调用失败") : "AI 调用失败", description: "" }] }]);
   ctx.setLoading(false);
 };
 

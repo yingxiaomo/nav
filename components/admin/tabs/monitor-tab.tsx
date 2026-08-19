@@ -12,6 +12,7 @@ import {
   Cpu, Monitor, HardDrive, Clock, Wifi, Loader2, Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { request } from '@/lib/utils/api';
 
 export default function MonitorTab({ showConfirm }: { showConfirm: (opts: Omit<ConfirmState, 'open'>) => void }) {
   const [sys, setSys] = useState<SystemInfo | null>(null);
@@ -58,11 +59,8 @@ export default function MonitorTab({ showConfirm }: { showConfirm: (opts: Omit<C
     const formData = new FormData();
     formData.append('file', file);
     try {
-      const res = await fetch(`${API}/upload`, { method: 'POST', body: formData });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.url) setNewIcon(data.url);
-      }
+      const res = await request<{ url?: string }>(null, `${API}/upload`, { method: 'POST', body: formData });
+      if (res.ok && res.data.url) setNewIcon(res.data.url);
     } catch (err) { console.warn('[Admin] icon upload failed:', err); }
   };
 

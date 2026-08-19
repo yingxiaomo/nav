@@ -7,6 +7,7 @@ import { Input, Button } from "@/components/ui";
 import { useSearchHistory } from "@/lib";
 import { LinkItem } from "@/lib/types";
 import { openExternalUrl } from "@/lib/utils/url";
+import { request } from "@/lib/utils/api";
 import Fuse, { type IFuseOptions } from "fuse.js";
 import { STORAGE_CONFIG_KEY } from "@/lib/adapters/storage";
 
@@ -163,28 +164,23 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
               const token = sc.apiServer.token;
               const headers: Record<string, string> = {};
               if (token) headers['Authorization'] = `Bearer ${token}`;
-              const res = await fetch(`${baseUrl}/api/v1/suggest?q=${encodeURIComponent(val.trim())}&source=google`, { headers });
-              if (res.ok) {
-                const data = await res.json();
-                setWebSuggestions(data.suggestions || []);
-                hasWebResults = (data.suggestions?.length ?? 0) > 0;
+              const suggest = await request<{ suggestions?: string[] }>(baseUrl, `/api/v1/suggest?q=${encodeURIComponent(val.trim())}&source=google`, { headers });
+              if (suggest.ok) {
+                setWebSuggestions(suggest.data.suggestions || []);
+                hasWebResults = (suggest.data.suggestions?.length ?? 0) > 0;
               } else {
                 setWebSuggestions([]);
               }
               // 后端聚合搜索（书签/笔记/监控），失败时保留空结果
-              try {
-                const sres = await fetch(`${baseUrl}/api/v1/search?q=${encodeURIComponent(val.trim())}`, { headers });
-                if (sres.ok) {
-                  const results: unknown = await sres.json();
-                  const globals: SuggestionItem[] = (Array.isArray(results) ? results : [])
-                    .filter((r): r is Record<string, unknown> => !!r && typeof r === "object" && "title" in r)
-                    .map((r) => ({ kind: "global" as const, title: String(r.title), url: typeof r.url === "string" ? r.url : undefined, type: typeof r.type === "string" ? r.type : "", icon: typeof r.icon === "string" ? r.icon : undefined }));
-                  setGlobalResults(globals);
-                  hasGlobalResults = globals.length > 0;
-                } else {
-                  setGlobalResults([]);
-                }
-              } catch {
+              const search = await request<unknown>(baseUrl, `/api/v1/search?q=${encodeURIComponent(val.trim())}`, { headers });
+              if (search.ok) {
+                const results = search.data;
+                const globals: SuggestionItem[] = (Array.isArray(results) ? results : [])
+                  .filter((r): r is Record<string, unknown> => !!r && typeof r === "object" && "title" in r)
+                  .map((r) => ({ kind: "global" as const, title: String(r.title), url: typeof r.url === "string" ? r.url : undefined, type: typeof r.type === "string" ? r.type : "", icon: typeof r.icon === "string" ? r.icon : undefined }));
+                setGlobalResults(globals);
+                hasGlobalResults = globals.length > 0;
+              } else {
                 setGlobalResults([]);
               }
             } else {

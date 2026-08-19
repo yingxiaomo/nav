@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"net/http"
 
 	"github.com/YingXiaoMo/nav/internal/db/queries"
@@ -19,7 +18,7 @@ func (h *Handler) ListTodos() http.HandlerFunc {
 func (h *Handler) CreateTodo() http.HandlerFunc {
 	return h.handleCreate("待办", func(r *http.Request, ctx context.Context, db *sql.DB) (any, string, bool) {
 		var input model.TodoInput
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		if !model.DecodeJSON(r, &input) {
 			return nil, "请求体格式错误", false
 		}
 		if input.Text == "" {
@@ -36,7 +35,7 @@ func (h *Handler) CreateTodo() http.HandlerFunc {
 func (h *Handler) UpdateTodo() http.HandlerFunc {
 	return h.handleUpdate("待办", func(r *http.Request, ctx context.Context, db *sql.DB, id string) (any, string, bool) {
 		var input model.TodoInput
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		if !model.DecodeJSON(r, &input) {
 			return nil, "请求体格式错误", false
 		}
 

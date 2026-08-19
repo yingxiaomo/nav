@@ -1,5 +1,6 @@
 // /docker 命令 — 容器管理
 import type { CommandHandler } from "./registry";
+import { apiGet, apiWrite, request } from "@/lib/utils/api";
 
 export const handler: CommandHandler = async (args, ctx) => {
   const argsStr = args.join(" ");
@@ -7,15 +8,13 @@ export const handler: CommandHandler = async (args, ctx) => {
 
   if (!argsStr) {
     try {
-      const [contsRes, statsRes] = await Promise.all([
-        fetch("/api/v1/admin/docker/containers"),
-        fetch("/api/v1/admin/docker/stats"),
+      const [conts, stats] = await Promise.all([
+        apiGet<{ containers?: { id: string; name: string; image?: string; state?: string }[] }>(null, "/api/v1/admin/docker/containers"),
+        apiGet<{ name: string; cpuPercent?: number; memUsage?: number }[]>(null, "/api/v1/admin/docker/stats"),
       ]);
-      const conts = (await contsRes.json())?.containers || [];
-      const stats = (await statsRes.json()) || [];
-      const statsMap: Record<string, any> = {};
-      for (const s of stats) statsMap[s.name] = s;
-      const items = conts.map((c: any) => {
+      const statsMap: Record<string, { cpuPercent?: number; memUsage?: number }> = {};
+      for (const s of stats || []) statsMap[s.name] = s;
+      const items = (conts?.containers || []).map((c) => {
         const name = c.name.replace(/^\//, "");
         const st = statsMap[name];
         const info = st
@@ -24,7 +23,7 @@ export const handler: CommandHandler = async (args, ctx) => {
         const desc = `${c.image?.split("/").pop()?.split(":")[0] || c.image} · ${c.state}${info}`;
         return { id: c.id, title: name, dockerName: name, description: desc };
       });
-      ctx.setGroups([{ label: `Docker 容器 (${conts.length})`, items }]);
+      ctx.setGroups([{ label: `Docker 容器 (${items.length})`, items }]);
     } catch {
       toast.error("获取容器列表失败");
     }
@@ -51,21 +50,16 @@ export const handler: CommandHandler = async (args, ctx) => {
 
   const validActions = ["start", "stop", "restart"];
   if (validActions.includes(action)) {
-    try {
-      await fetch(`/api/v1/admin/docker/${encodeURIComponent(containerName)}/${action}`, { method: "POST" });
+    if (await apiWrite(null, `/api/v1/admin/docker/${encodeURIComponent(containerName)}/${action}`, { method: "POST" })) {
       toast.success(`Docker ${action} ${containerName} ✅`);
-      ctx.closePalette();
-    } catch {
+    } else {
       toast.error(`Docker ${action} 失败`);
     }
+    ctx.closePalette();
   } else if (action === "logs") {
-    try {
-      const res = await fetch(`/api/v1/admin/docker/logs/${encodeURIComponent(containerName)}`);
-      const logs = await res.text();
-      ctx.setGroups([{ label: `日志: ${containerName}`, items: [{ id: "logs", title: logs.slice(0, 2000) || "(空)", description: "" }] }]);
-    } catch {
-      toast.error("获取日志失败");
-    }
+    const res = await request<string>(null, `/api/v1/admin/docker/logs/${encodeURIComponent(containerName)}`, { responseType: "text" });
+    const logs = res.ok ? res.data : "";
+    ctx.setGroups([{ label: `日志: ${containerName}`, items: [{ id: "logs", title: logs.slice(0, 2000) || "(空)", description: "" }] }]);
   } else {
     toast.error(`未知操作: ${action}，支持 start/stop/restart/logs`);
   }

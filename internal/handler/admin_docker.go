@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -10,6 +9,7 @@ import (
 	"time"
 
 	"github.com/YingXiaoMo/nav/internal/model"
+	"github.com/YingXiaoMo/nav/internal/service"
 )
 
 // knownDockerDomains maps well-known Docker image names to their official domains.
@@ -210,7 +210,7 @@ func FetchDockerIcon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		type request struct{ Image string `json:"image"` }
 		var req request
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Image == "" {
+		if !model.DecodeJSON(r, &req) || req.Image == "" {
 			model.RespondJSON(w, http.StatusOK, map[string]any{"icon": nil})
 			return
 		}
@@ -229,7 +229,9 @@ func FetchDockerIcon() http.HandlerFunc {
 			domain = name + ".org"
 		}
 
-		client := &http.Client{Timeout: 3 * time.Second}
+		// SSRF 防护：复用 service 的安全 Transport（拒绝内网建连），
+		// 与 ParseURL/FetchFavicon 策略一致，避免镜像名驱动的外联逃逸
+		client := &http.Client{Timeout: 3 * time.Second, Transport: service.NewSafeTransport()}
 
 		ddgURL := "https://icons.duckduckgo.com/ip3/" + domain + ".ico"
 		resp, err := client.Head(ddgURL)
@@ -273,7 +275,7 @@ func (h *Handler) SetDockerMetadata() http.HandlerFunc {
 
 		type request struct{ Icon string `json:"icon,omitempty"`; Label string `json:"label,omitempty"`; URL string `json:"url,omitempty"` }
 		var req request
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if !model.DecodeJSON(r, &req) {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return
 		}
@@ -293,7 +295,7 @@ func (h *Handler) SetDockerMetadata() http.HandlerFunc {
 func (h *Handler) ReorderContainers() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct{ Order []string `json:"order"` }
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if !model.DecodeJSON(r, &req) {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return
 		}

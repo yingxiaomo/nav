@@ -11,6 +11,7 @@ import { FaviconImage } from "@/lib/utils/favicon";
 import { convertToWebP } from "@/lib/utils/image-utils";
 import { isValidImageFile, isValidFileSize } from "@/lib/utils/validation";
 import { openExternalUrl } from "@/lib/utils/url";
+import { request } from "@/lib/utils/api";
 import { useUIStore } from "@/lib/stores";
 
 interface LinkItemCardProps {
@@ -207,11 +208,11 @@ export function PinnedLinkCard({
         // 后端模式：上传到 /api/v1/upload，返回图片 URL
         const formData = new FormData();
         formData.append('file', file);
-        const res = await fetch(`${origin}/api/v1/upload`, { method: 'POST', body: formData });
-        if (res.ok) { const d = await res.json(); if (d.url) { setEditIcon(d.url); setUploading(false); return; } }
+        const res = await request<{ url?: string }>(origin, '/api/v1/upload', { method: 'POST', body: formData });
+        if (res.ok && res.data.url) { setEditIcon(res.data.url); setUploading(false); return; }
       }
 
-      // 静态部署：转为 base64 data URL
+      // 静态部署：转为 base64 data URL（后端不可用或上传失败时降级）
       const webp = await convertToWebP(file);
       const reader = new FileReader();
       reader.onload = () => { setEditIcon(reader.result as string); setUploading(false); };
@@ -225,11 +226,11 @@ export function PinnedLinkCard({
     setDetecting(true);
     try {
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      const res = await fetch(`${origin}/api/v1/admin/monitor/fetch-icon`, {
+      const res = await request<{ icon?: string }>(origin, '/api/v1/admin/monitor/fetch-icon', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: targetUrl }),
+        body: { url: targetUrl },
       });
-      if (res.ok) { const d = await res.json(); if (d.icon) setEditIcon(d.icon); }
+      if (res.ok && res.data.icon) setEditIcon(res.data.icon);
     } catch { /* ignore */ }
     setDetecting(false);
   };

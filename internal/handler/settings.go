@@ -60,7 +60,7 @@ func (h *Handler) UpdateSettings() http.HandlerFunc {
 		db := h.DB
 
 		var body map[string]string
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !model.DecodeJSON(r, &body) {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return
 		}
@@ -141,7 +141,7 @@ func (h *Handler) UpdateSetting() http.HandlerFunc {
 		var body struct {
 			Value string `json:"value"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !model.DecodeJSON(r, &body) {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return
 		}

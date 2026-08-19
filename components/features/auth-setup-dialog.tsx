@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Loader2, Lock, Eye, EyeOff, KeyRound } from "lucide-react";
+import { request, apiWrite } from "@/lib/utils/api";
 
 interface Props {
   baseUrl: string;
@@ -17,9 +18,8 @@ export function AuthSetupDialog({ baseUrl }: Props) {
   const [showPw, setShowPw] = useState(false);
 
   useEffect(() => {
-    fetch(`${baseUrl}/api/v1/auth/status`)
-      .then(r => r.json())
-      .then(d => setState(d.setupRequired ? 'uninitialized' : 'ready'))
+    request<{ setupRequired?: boolean }>(baseUrl, "/api/v1/auth/status")
+      .then(d => setState(d.ok && d.data.setupRequired ? 'uninitialized' : 'ready'))
       .catch(() => setState('ready'));
   }, [baseUrl]);
 
@@ -31,28 +31,18 @@ export function AuthSetupDialog({ baseUrl }: Props) {
     setError('');
     try {
       // 1. 设置管理员账号（后端 setup 成功即自动签发会话，无需再单独登录）
-      const sr = await fetch(`${baseUrl}/api/v1/auth/setup`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), password }),
+      const sr = await request<{ error?: string }>(baseUrl, '/api/v1/auth/setup', {
+        method: 'POST', body: { username: username.trim(), password },
       });
       if (!sr.ok) {
-        const sd = await sr.json().catch(() => ({}));
-        setError((sd as { error?: string })?.error || '设置失败');
+        setError(sr.data?.error || '设置失败');
         setBusy(false);
         return;
       }
       // 2. 把前端数据同步到后端（避免刷新后红点）
-      try {
-        const localRaw = localStorage.getItem('clean-nav-local-data');
-        if (localRaw) {
-          await fetch(`${baseUrl}/api/v1/data`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: localRaw,
-          });
-        }
-      } catch {
-        // 静默忽略 — 刷新后合并逻辑会兜底
+      const localRaw = localStorage.getItem('clean-nav-local-data');
+      if (localRaw) {
+        await apiWrite(baseUrl, '/api/v1/data', { method: 'PUT', body: JSON.parse(localRaw) });
       }
 
       // 4. 刷新页面

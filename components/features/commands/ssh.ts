@@ -1,27 +1,22 @@
 // /ssh 命令 — 远程连接设备 + 快速执行
 import type { CommandHandler, DeviceAlias } from "./registry";
+import { request, apiGet } from "@/lib/utils/api";
 
 export async function loadDeviceAliases(): Promise<DeviceAlias[]> {
   const results: DeviceAlias[] = [];
-  try {
-    const res = await fetch("/api/v1/admin/monitor/checks");
-    const d = await res.json();
-    const targets = (d?.targets || []).map((t: any) => ({
-      name: t.name, host: t.url, type: "monitor" as const, user: t.sshUser, pass: t.sshPass,
-    }));
-    results.push(...targets);
-  } catch {}
-  try {
-    const res = await fetch("/api/v1/settings/device_config");
-    const d = await res.json();
-    if (d?.value) {
-      const devices = JSON.parse(d.value);
-      const aliases = (devices.devices || []).map((dv: any) => ({
-        name: dv.name, host: dv.host, type: "device" as const, user: dv.username, pass: dv.password,
-      }));
-      results.push(...aliases);
-    }
-  } catch {}
+  const checks = await apiGet<{ targets?: { name: string; url?: string; sshUser?: string; sshPass?: string }[] }>(null, "/api/v1/admin/monitor/checks");
+  for (const t of checks?.targets || []) {
+    results.push({ name: t.name, host: t.url, type: "monitor" as const, user: t.sshUser, pass: t.sshPass });
+  }
+  const cfg = await apiGet<{ value?: string }>(null, "/api/v1/settings/device_config");
+  if (cfg?.value) {
+    try {
+      const devices = JSON.parse(cfg.value);
+      for (const dv of (devices.devices || [])) {
+        results.push({ name: dv.name, host: dv.host, type: "device" as const, user: dv.username, pass: dv.password });
+      }
+    } catch { /* 配置损坏忽略 */ }
+  }
   return results;
 }
 
@@ -85,23 +80,16 @@ export const handler: CommandHandler = async (args, ctx) => {
   }
 
   // 有命令 → 快速执行
-  try {
-    const res = await fetch("/api/v1/ssh/exec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ host: sshHost, user: alias.user || "root", pass: alias.pass || "", command: cmdStr }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      const { toast } = await import("sonner");
-      toast.error("SSH 失败: " + (data.error || data.message || "未知错误"));
-      ctx.setLoading(false);
-      return;
-    }
-    ctx.setGroups([{ label: `SSH ${alias.name}: ${cmdStr}`, items: [{ id: "output", title: data.output || "(无输出)", description: "" }] }]);
-  } catch {
+  const res = await request<{ output?: string; error?: string; message?: string }>(null, "/api/v1/ssh/exec", {
+    method: "POST",
+    body: { host: sshHost, user: alias.user || "root", pass: alias.pass || "", command: cmdStr },
+  });
+  if (!res.ok) {
     const { toast } = await import("sonner");
-    toast.error("SSH 执行失败");
+    toast.error("SSH 失败: " + (res.data?.error || res.data?.message || "未知错误"));
+    ctx.setLoading(false);
+    return;
   }
+  ctx.setGroups([{ label: `SSH ${alias.name}: ${cmdStr}`, items: [{ id: "output", title: res.data?.output || "(无输出)", description: "" }] }]);
   ctx.setLoading(false);
 };

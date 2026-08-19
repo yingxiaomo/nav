@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Container, Server, Globe, Monitor, Wifi, HardDrive, Database, Cloud, Terminal, Shield, Activity, Settings, Box, MemoryStick, Cpu, Zap, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { MonitorEditTarget } from "@/lib/types/monitor";
+import { apiWrite, request } from "@/lib/utils/api";
 
 const QUICK_ICONS = ['Container', 'Server', 'Globe', 'Monitor', 'Wifi', 'HardDrive', 'Database', 'Cloud', 'Terminal', 'Shield', 'Activity', 'Settings', 'Box', 'MemoryStick', 'Cpu', 'Zap'];
 const lucideIconMap: Record<string, React.FC<{className?: string}>> = { Container, Server, Globe, Monitor, Wifi, HardDrive, Database, Cloud, Terminal, Shield, Activity, Settings, Box, MemoryStick, Cpu, Zap };
@@ -41,29 +42,23 @@ const [saving, setSaving] = useState(false);
       if (!target.id) {
         // 添加模式
         if (!url.trim()) { setSaving(false); return; }
-        const res = await fetch(`${baseUrl}/api/v1/admin/monitor/checks`, {
-          method: 'POST',
-          headers: { ...authHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim(), url: url.trim(), icon: icon || undefined }),
+        ok = await apiWrite(baseUrl, '/api/v1/admin/monitor/checks', {
+          method: 'POST', headers: authHeaders,
+          body: { name: name.trim(), url: url.trim(), icon: icon || undefined },
         });
-        ok = res.ok;
       } else if (isDocker) {
         // 编辑模式（Docker 容器）— 存备注名、图标、自定义地址
         const containerName = target.id.replace('docker:', '');
-        const res = await fetch(`${baseUrl}/api/v1/admin/docker/metadata/${encodeURIComponent(containerName)}`, {
-          method: 'PUT',
-          headers: { ...authHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ icon: icon || undefined, url: url.trim() || undefined, label: name.trim() !== containerName ? name.trim() : undefined }),
+        ok = await apiWrite(baseUrl, `/api/v1/admin/docker/metadata/${encodeURIComponent(containerName)}`, {
+          method: 'PUT', headers: authHeaders,
+          body: { icon: icon || undefined, url: url.trim() || undefined, label: name.trim() !== containerName ? name.trim() : undefined },
         });
-        ok = res.ok;
       } else {
         // 编辑模式（内网巡检）
-        const res = await fetch(`${baseUrl}/api/v1/admin/monitor/checks/${target.id}`, {
-          method: 'PUT',
-          headers: { ...authHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim(), url: url.trim() || undefined, icon: icon || undefined, mac: mac.trim() || undefined, sshUser: sshUser.trim() || undefined, sshPass: sshPass.trim() || undefined }),
+        ok = await apiWrite(baseUrl, `/api/v1/admin/monitor/checks/${target.id}`, {
+          method: 'PUT', headers: authHeaders,
+          body: { name: name.trim(), url: url.trim() || undefined, icon: icon || undefined, mac: mac.trim() || undefined, sshUser: sshUser.trim() || undefined, sshPass: sshPass.trim() || undefined },
         });
-        ok = res.ok;
       }
       if (!ok) { toast.error('保存失败，请确认登录状态'); setSaving(false); return; }
     } catch (err) { console.warn('[Monitor] save target failed:', err); toast.error('网络错误，保存失败'); setSaving(false); return; }
@@ -78,8 +73,8 @@ const [saving, setSaving] = useState(false);
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch(`${baseUrl}/api/v1/upload`, { method: 'POST', body: formData });
-      if (res.ok) { const d = await res.json(); if (d.url) setIcon(d.url); }
+      const res = await request<{ url?: string }>(baseUrl, '/api/v1/upload', { method: 'POST', body: formData });
+      if (res.ok && res.data.url) setIcon(res.data.url);
     } catch (err) { console.warn('[Monitor] upload failed:', err); }
     setUploading(false);
     if (fileRef.current) fileRef.current.value = '';
@@ -90,20 +85,18 @@ const [saving, setSaving] = useState(false);
     try {
       const detectUrl = url || target.url;
       if (detectUrl) {
-        const res = await fetch(`${baseUrl}/api/v1/admin/monitor/fetch-icon`, {
-          method: 'POST',
-          headers: { ...authHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: detectUrl }),
+        const res = await request<{ icon?: string }>(baseUrl, '/api/v1/admin/monitor/fetch-icon', {
+          method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' },
+          body: { url: detectUrl },
         });
-        if (res.ok) { const d = await res.json(); if (d.icon) { setIcon(d.icon); setDetecting(false); return; } }
+        if (res.ok && res.data.icon) { setIcon(res.data.icon); setDetecting(false); return; }
       }
       if (target.id.startsWith('docker:')) {
-        const res = await fetch(`${baseUrl}/api/v1/admin/docker/fetch-icon`, {
-          method: 'POST',
-          headers: { ...authHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: target.id.replace('docker:', '') }),
+        const res = await request<{ icon?: string }>(baseUrl, '/api/v1/admin/docker/fetch-icon', {
+          method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' },
+          body: { image: target.id.replace('docker:', '') },
         });
-        if (res.ok) { const d = await res.json(); if (d.icon) { setIcon(d.icon); } }
+        if (res.ok && res.data.icon) { setIcon(res.data.icon); }
       }
     } catch (err) { console.warn('[Monitor] icon detection failed:', err); }
     setDetecting(false);

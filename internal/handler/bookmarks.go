@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -29,7 +28,7 @@ func (h *Handler) GetBookmark() http.HandlerFunc {
 func (h *Handler) CreateBookmark() http.HandlerFunc {
 	return h.handleCreate("书签", func(r *http.Request, ctx context.Context, db *sql.DB) (any, string, bool) {
 		var input model.BookmarkInput
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		if !model.DecodeJSON(r, &input) {
 			return nil, "请求体格式错误", false
 		}
 		if input.CategoryID == "" {
@@ -62,7 +61,7 @@ func (h *Handler) CreateBookmark() http.HandlerFunc {
 func (h *Handler) UpdateBookmark() http.HandlerFunc {
 	return h.handleUpdate("书签", func(r *http.Request, ctx context.Context, db *sql.DB, id string) (any, string, bool) {
 		var input model.BookmarkInput
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		if !model.DecodeJSON(r, &input) {
 			return nil, "请求体格式错误", false
 		}
 
@@ -119,7 +118,7 @@ func (h *Handler) DeleteBookmark() http.HandlerFunc {
 func (h *Handler) ReorderBookmarks() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req reorderRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if !model.DecodeJSON(r, &req) {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return
 		}

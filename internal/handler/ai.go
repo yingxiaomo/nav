@@ -20,7 +20,7 @@ func (h *Handler) AIChat() http.HandlerFunc {
 		var body struct {
 			Message string `json:"message"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Message == "" {
+		if !model.DecodeJSON(r, &body) || body.Message == "" {
 			model.RespondError(w, http.StatusBadRequest, "请输入消息内容")
 			return
 		}
@@ -56,7 +56,7 @@ func (h *Handler) AIConversation() http.HandlerFunc {
 		var body struct {
 			Message string `json:"message"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Message == "" {
+		if !model.DecodeJSON(r, &body) || body.Message == "" {
 			model.RespondError(w, http.StatusBadRequest, "请输入消息内容")
 			return
 		}

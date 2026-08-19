@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"net/http"
 
 	"github.com/YingXiaoMo/nav/internal/db/queries"
@@ -24,7 +23,7 @@ func (h *Handler) GetNote() http.HandlerFunc {
 func (h *Handler) CreateNote() http.HandlerFunc {
 	return h.handleCreate("笔记", func(r *http.Request, ctx context.Context, db *sql.DB) (any, string, bool) {
 		var input model.NoteInput
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		if !model.DecodeJSON(r, &input) {
 			return nil, "请求体格式错误", false
 		}
 		note, err := queries.CreateNote(ctx, db, input.Title, input.Content)
@@ -38,7 +37,7 @@ func (h *Handler) CreateNote() http.HandlerFunc {
 func (h *Handler) UpdateNote() http.HandlerFunc {
 	return h.handleUpdate("笔记", func(r *http.Request, ctx context.Context, db *sql.DB, id string) (any, string, bool) {
 		var input model.NoteInput
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		if !model.DecodeJSON(r, &input) {
 			return nil, "请求体格式错误", false
 		}
 

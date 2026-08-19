@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Brain, Trash2, Plus, MessageSquare, Minus, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import { request } from "@/lib/utils/api";
 
 interface Message {
   role: "user" | "assistant";
@@ -116,16 +117,14 @@ export function AIPanel() {
     setBusy(true);
 
     try {
-      const res = await fetch("/api/v1/ai/conversation", {
+      const res = await request<{ reply?: string; error?: string }>(null, "/api/v1/ai/conversation", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, conversation_id: activeId }),
+        body: { message: text, conversation_id: activeId },
       });
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `请求失败 (${res.status})`);
+        throw new Error(res.data?.error || `请求失败 (${res.status})`);
       }
-      const { reply } = await res.json();
+      const reply = res.data.reply ?? "";
       setConversations(prev => prev.map(c => c.id === activeId ? { ...c, messages: [...c.messages, { role: "assistant", content: reply }] } : c));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

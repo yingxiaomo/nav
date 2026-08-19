@@ -61,7 +61,7 @@ func (h *Handler) ListChecks() http.HandlerFunc {
 func (h *Handler) CreateCheck() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var input model.MonitorTargetInput
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		if !model.DecodeJSON(r, &input) {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return
 		}
@@ -88,7 +88,7 @@ func (h *Handler) UpdateCheck() http.HandlerFunc {
 		id := r.PathValue("id")
 
 		var input model.MonitorTargetInput
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		if !model.DecodeJSON(r, &input) {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return
 		}
@@ -135,7 +135,7 @@ func FetchMonitorIcon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		type request struct{ URL string `json:"url"` }
 		var req request
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.URL == "" {
+		if !model.DecodeJSON(r, &req) || req.URL == "" {
 			model.RespondError(w, http.StatusBadRequest, "请输入有效 URL")
 			return
 		}
@@ -176,7 +176,7 @@ func WOLDirect() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		type request struct{ MAC string `json:"mac"` }
 		var req request
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.MAC == "" {
+		if !model.DecodeJSON(r, &req) || req.MAC == "" {
 			model.RespondError(w, http.StatusBadRequest, "请输入 MAC 地址")
 			return
 		}

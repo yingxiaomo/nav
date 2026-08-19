@@ -9,6 +9,7 @@ import {
 import type { Category, LinkItem, Todo, Note } from '@/lib/types';
 import type { SystemInfo, CheckResult, MonitorData, LogData, ConfirmState } from '@/lib/types/monitor';
 import { Card, CardContent } from '@/components/ui/card';
+import { request } from '@/lib/utils/api';
 
 export type TabId = 'overview' | 'cats' | 'bms' | 'todos' | 'notes' | 'monitor' | 'docker' | 'backup' | 'settings' | 'logs' | 'gallery';
 
@@ -28,18 +29,11 @@ export type { SystemInfo, CheckResult, MonitorData, LogData, ConfirmState };
 export const API = '/api/v1';
 
 export async function req<T = Record<string, unknown>>(method: string, path: string, body?: unknown): Promise<{ ok: boolean; status: number; data: T }> {
-  try {
-    const opts: RequestInit = { method };
-    if (body) {
-      opts.headers = { 'Content-Type': 'application/json' };
-      opts.body = JSON.stringify(body);
-    }
-    const res = await fetch(path, opts);
-    const data = await res.json().catch(() => ({}));
-    return { ok: res.ok, status: res.status, data };
-  } catch {
-    return { ok: false, status: 0, data: { error: '无法连接后端' } as T };
-  }
+  const res = await request<T>(null, path, { method, body });
+  if (res.ok) return { ok: true, status: res.status, data: res.data };
+  const errBody = res.data as { error?: string } | undefined;
+  const fallback = ((errBody?.error ? errBody : { error: '无法连接后端' }) ?? { error: '无法连接后端' }) as T;
+  return { ok: false, status: res.status, data: fallback };
 }
 
 // ── Tab config ──

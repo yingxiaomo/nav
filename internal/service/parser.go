@@ -137,13 +137,32 @@ func safeDialControl(network, address string, _ syscall.RawConn) error {
 	return nil
 }
 
-// newSafeTransport 返回一个拒绝向内网地址建连的 HTTP Transport（SSRF 防护）。
-func newSafeTransport() *http.Transport {
+// NewSafeTransport 返回一个拒绝向内网地址建连的 HTTP Transport（SSRF 防护）。
+// 供本包及 handler 等外部包复用，避免各调用方各自裸建 http.Client。
+func NewSafeTransport() *http.Transport {
 	return &http.Transport{
 		DialContext: (&net.Dialer{
 			Timeout: 5 * time.Second,
 			Control: safeDialControl,
 		}).DialContext,
+	}
+}
+
+// NewSafeClient 返回一个带 SSRF 防护 + 重定向上限的 http.Client。
+func NewSafeClient(timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout:   timeout,
+		Transport: NewSafeTransport(),
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return fmt.Errorf("重定向次数过多")
+			}
+			// 重定向目标同样校验内网，防 DNS rebinding 绕过
+			if IsPrivateHost(req.URL.Hostname()) {
+				return fmt.Errorf("不允许访问内网地址")
+			}
+			return nil
+		},
 	}
 }
 
@@ -185,20 +204,7 @@ func ParseURL(rawURL string) (*ParseResult, error) {
 	}
 
 	// 3. Fetch the page（Transport 层按解析 IP 拦截内网，覆盖重定向与 DNS 绕过）
-	client := &http.Client{
-		Timeout:   5 * time.Second,
-		Transport: newSafeTransport(),
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 10 {
-				return fmt.Errorf("重定向次数过多")
-			}
-			// Re-check SSRF on redirect target
-			if IsPrivateHost(req.URL.Hostname()) {
-				return fmt.Errorf("不允许访问内网地址")
-			}
-			return nil
-		},
-	}
+	client := NewSafeClient(5 * time.Second)
 
 	req, err := http.NewRequest("GET", parsedURL.String(), nil)
 	if err != nil {
@@ -551,7 +557,7 @@ func FetchFavicon(targetURL string) (string, error) {
 
 	client := &http.Client{
 		Timeout:   5 * time.Second,
-		Transport: newSafeTransport(),
+		Transport: NewSafeTransport(),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
 				return fmt.Errorf("重定向次数过多")

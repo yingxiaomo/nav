@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"log/slog"
 	"net"
 	"net/http"
@@ -159,7 +158,7 @@ func (h *Handler) Login() http.HandlerFunc {
 			Username string `json:"username"`
 			Password string `json:"password"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !model.DecodeJSON(r, &body) {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return
 		}
@@ -250,7 +249,7 @@ func (h *Handler) Setup() http.HandlerFunc {
 			Username string `json:"username"`
 			Password string `json:"password"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !model.DecodeJSON(r, &body) {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return
 		}
@@ -333,7 +332,7 @@ func (h *Handler) ChangePassword() http.HandlerFunc {
 			CurrentPassword string `json:"currentPassword"`
 			NewPassword     string `json:"newPassword"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !model.DecodeJSON(r, &body) {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return
 		}

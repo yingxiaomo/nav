@@ -14,6 +14,7 @@ import { useMonitorData } from "@/lib/hooks/use-monitor-data";
 import type { MonitorEditTarget } from "@/lib/types/monitor";
 import { useMonitorConfig } from "@/lib/hooks/use-monitor-config";
 import { useUIStore } from "@/lib/stores";
+import { apiWrite } from "@/lib/utils/api";
 
 export function SystemStatusFloater() {
   const [expanded, setExpanded] = useState(false);
@@ -44,13 +45,13 @@ export function SystemStatusFloater() {
   const handleWake = async (id: string) => {
     const mac = getMac(id);
     if (!mac) return;
-    try { await fetch(`${baseUrl}/api/v1/admin/monitor/wol/${id}`, { method: "POST", headers: authHeaders }); } catch {}
+    await apiWrite(baseUrl, `/api/v1/admin/monitor/wol/${id}`, { method: "POST", headers: authHeaders });
     setContextMenu(null);
   };
 
   const handleDelete = async (id: string) => {
     try {
-      await fetch(`${baseUrl}/api/v1/admin/monitor/checks/${id}`, { method: "DELETE", headers: authHeaders });
+      await apiWrite(baseUrl, `/api/v1/admin/monitor/checks/${id}`, { method: "DELETE", headers: authHeaders });
       setContextMenu(null);
       setTimeout(refresh, 500);
     } catch {}
@@ -58,15 +59,15 @@ export function SystemStatusFloater() {
 
   const handleDockerReorder = async (names: string[]) => {
     try {
-      await fetch(`${baseUrl}/api/v1/admin/docker/reorder`, {
-        method: "PUT", headers: { ...authHeaders, "Content-Type": "application/json" }, body: JSON.stringify({ order: names }),
+      await apiWrite(baseUrl, "/api/v1/admin/docker/reorder", {
+        method: "PUT", headers: authHeaders, body: { order: names },
       });
     } catch {}
   };
 
   const handleDockerAction = async (name: string, action: "start" | "stop" | "restart") => {
     try {
-      await fetch(`${baseUrl}/api/v1/admin/docker/${encodeURIComponent(name)}/${action}`, { method: "POST", headers: authHeaders });
+      await apiWrite(baseUrl, `/api/v1/admin/docker/${encodeURIComponent(name)}/${action}`, { method: "POST", headers: authHeaders });
       setTimeout(refresh, 1000);
     } catch {}
     setContextMenu(null);

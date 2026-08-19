@@ -273,7 +273,7 @@ func (h *Handler) PutData() http.HandlerFunc {
 		db := h.DB
 
 		var body dataImport
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !model.DecodeJSON(r, &body) {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return
 		}

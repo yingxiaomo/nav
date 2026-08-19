@@ -17,6 +17,7 @@ import {
 import { STORAGE_CONFIG_KEY, StorageConfig } from "@/lib/adapters/storage";
 import { BookmarkImport } from "./bookmark-import";
 import { IconUploader } from "@/components/ui/icon-uploader";
+import { apiGet } from "@/lib/utils/api";
 
 interface AddLinkTabProps {
   localData: DataSchema;
@@ -70,9 +71,8 @@ export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTa
             const headers: Record<string, string> = {};
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const res = await fetch(`${baseUrl}/api/v1/parse?url=${encodeURIComponent(processedUrl)}`, { headers });
-            if (res.ok) {
-              const meta = await res.json();
+            const meta = await apiGet<{ title?: string; icon?: string }>(baseUrl, `/api/v1/parse?url=${encodeURIComponent(processedUrl)}`, headers);
+            if (meta) {
               if (meta.title) setNewTitle(meta.title);
               if (meta.icon) setNewIcon(meta.icon);
               if (!isAuto) toast.success("已从网页获取标题和图标", { description: meta.title || processedUrl });

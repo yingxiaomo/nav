@@ -12,7 +12,8 @@ interface CardContentProps {
   category: Category;
 }
 
-export const CardContent = ({ category }: CardContentProps) => (
+// 仅在 SortableCard 内部使用，无外部 import（knip 报 unused exports）
+const CardContent = ({ category }: CardContentProps) => (
   <motion.div layoutId={category.id} className="flex flex-col items-center justify-center text-center gap-1">
     <div className="mb-1 transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-0.5">
       <IconRender name={category.icon || "FolderOpen"} className="h-8 w-8 text-yellow-200/90 drop-shadow-[0_4px_4px_rgba(0,0,0,0.3)]" />

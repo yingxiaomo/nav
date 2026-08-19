@@ -42,7 +42,7 @@ export function IconUploader({ storageConfig, onIconReady, className }: IconUplo
 
       if (storageConfig && storageConfig.type !== 'gist') {
         try {
-          const adapter = createAdapter(storageConfig);
+          const adapter = await createAdapter(storageConfig);
           if (adapter?.uploadFile) {
             const url = await adapter.uploadFile(webpFile, `icon-${Date.now()}.webp`);
             iconUrl = url;

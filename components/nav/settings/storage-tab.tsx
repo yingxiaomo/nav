@@ -2,7 +2,6 @@
 
 import { useRef, useEffect, useState } from "react";
 import { StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, DropboxSettings, GoogleDriveSettings, createAdapter } from "@/lib/adapters/storage";
-import { GistAdapter } from "@/lib/adapters";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -87,21 +86,12 @@ export function StorageTab({ config, setConfig, localData, setLocalData, onSave 
   const handleTestConnection = async () => {
     setIsTesting(true);
     try {
-      let adapter: { testConnection?: () => Promise<void> } | null = null;
-      let typeLabel = '';
-
-      if (config.type === 'gist') {
-        const settings = config.gist || DEFAULT_GIST;
-        adapter = new GistAdapter(settings);
-        typeLabel = 'GitHub Gist';
-      } else {
-        adapter = createAdapter(config);
-        const labelMap: Record<string, string> = {
-          github: 'GitHub 仓库', s3: 'S3/R2 存储', webdav: 'WebDAV 服务器',
-          dropbox: 'Dropbox', googledrive: 'Google Drive', 'api-server': '后端'
-        };
-        typeLabel = labelMap[config.type] || config.type;
-      }
+      const adapter = await createAdapter(config);
+      const labelMap: Record<string, string> = {
+        github: 'GitHub 仓库', gist: 'GitHub Gist', s3: 'S3/R2 存储', webdav: 'WebDAV 服务器',
+        dropbox: 'Dropbox', googledrive: 'Google Drive', 'api-server': '后端'
+      };
+      const typeLabel = labelMap[config.type] || config.type;
 
       if (!adapter) {
         toast.error(`${typeLabel} 配置不完整`, { description: "请填写必要的配置信息" });

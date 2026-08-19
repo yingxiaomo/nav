@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { GithubRepoAdapter, WebDavAdapter, GistAdapter, DropboxAdapter, GoogleDriveAdapter, ApiServerAdapter, STORAGE_CONFIG_KEY, type StorageConfig, type StorageAdapter } from '../adapters';
+import { STORAGE_CONFIG_KEY, createAdapter, type StorageConfig, type StorageAdapter } from '../adapters/storage';
 import { GITHUB_CONFIG_KEY } from '../adapters/github';
 import { isPrivateHost } from '../utils/common';
 
@@ -73,17 +73,9 @@ export function useStorageConfig() {
     return null;
   }, []);
 
-  const getAdapter = useCallback(async (config: StorageConfig): Promise<StorageAdapter | null> => {
-    switch (config.type) {
-      case 'github': return config.github ? new GithubRepoAdapter(config.github) : null;
-      case 's3': return config.s3 ? new (await import('../adapters/s3-adapter')).S3Adapter(config.s3) : null;
-      case 'webdav': return config.webdav ? new WebDavAdapter(config.webdav) : null;
-      case 'gist': return config.gist ? new GistAdapter(config.gist) : null;
-      case 'dropbox': return config.dropbox ? new DropboxAdapter(config.dropbox) : null;
-      case 'googledrive': return config.googledrive ? new GoogleDriveAdapter(config.googledrive) : null;
-      case 'api-server': return config.apiServer ? new ApiServerAdapter(config.apiServer) : null;
-      default: return null;
-    }
+  // 懒加载工厂：adapter 按需动态导入，避免云同步 SDK 撑起首屏 bundle
+  const getAdapter = useCallback((config: StorageConfig): Promise<StorageAdapter | null> => {
+    return createAdapter(config);
   }, []);
 
   return { getEffectiveConfig, getAdapter };

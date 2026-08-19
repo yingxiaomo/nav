@@ -72,11 +72,3 @@ export function parseContainerUrl(ports: string): string | null {
   if (m) return `http://${window.location.hostname}:${m[1]}`;
   return null;
 }
-
-/** 各服务 CPU/RAM 静态估算（基于 id 做种子） */
-export function mockResource(id: string): { cpu: number; ram: number } {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = ((hash << 5) - hash) + id.charCodeAt(i);
-  const base = Math.abs(hash % 30);
-  return { cpu: base, ram: 40 + base };
-}

@@ -1,9 +1,3 @@
-import { ApiServerAdapter } from './api-server-adapter';
-import { GithubRepoAdapter } from './github-repo-adapter';
-import { S3Adapter } from './s3-adapter';
-import { WebDavAdapter } from './webdav-adapter';
-import { DropboxAdapter } from './dropbox-adapter';
-import { GoogleDriveAdapter } from './google-drive-adapter';
 import type { StorageAdapter, ApiServerSettings } from './types';
 
 export type { StorageAdapter, ApiServerSettings } from './types';
@@ -63,21 +57,27 @@ export interface GoogleDriveSettings {
   filename: string;
 }
 
-/** 根据配置创建对应的存储适配器实例 */
-export function createAdapter(config: StorageConfig): StorageAdapter | null {
+/**
+ * 根据配置创建对应的存储适配器实例。
+ * 全部使用动态导入：云同步 adapter（GitHub/S3/WebDAV/...）体积大且仅在
+ * 用户主动配置/操作时才需要，静态导入会撑起首屏 bundle（曾达 1.2MB）。
+ */
+export async function createAdapter(config: StorageConfig): Promise<StorageAdapter | null> {
   switch (config.type) {
     case 'api-server':
-      return config.apiServer?.baseUrl ? new ApiServerAdapter(config.apiServer) : null;
+      return config.apiServer?.baseUrl ? new (await import('./api-server-adapter')).ApiServerAdapter(config.apiServer) : null;
     case 'github':
-      return config.github?.token ? new GithubRepoAdapter(config.github) : null;
+      return config.github?.token ? new (await import('./github-repo-adapter')).GithubRepoAdapter(config.github) : null;
+    case 'gist':
+      return config.gist?.token ? new (await import('./gist-adapter')).GistAdapter(config.gist) : null;
     case 's3':
-      return config.s3?.accessKeyId ? new S3Adapter(config.s3) : null;
+      return config.s3?.accessKeyId ? new (await import('./s3-adapter')).S3Adapter(config.s3) : null;
     case 'webdav':
-      return config.webdav?.url ? new WebDavAdapter(config.webdav) : null;
+      return config.webdav?.url ? new (await import('./webdav-adapter')).WebDavAdapter(config.webdav) : null;
     case 'dropbox':
-      return config.dropbox?.token ? new DropboxAdapter(config.dropbox) : null;
+      return config.dropbox?.token ? new (await import('./dropbox-adapter')).DropboxAdapter(config.dropbox) : null;
     case 'googledrive':
-      return config.googledrive?.token ? new GoogleDriveAdapter(config.googledrive) : null;
+      return config.googledrive?.token ? new (await import('./google-drive-adapter')).GoogleDriveAdapter(config.googledrive) : null;
     default:
       return null;
   }

@@ -94,6 +94,7 @@ export default function GalleryTab() {
           {files.map(f => (
             <div key={f.name} className="rounded-xl border border-border bg-card overflow-hidden group">
               <div className="aspect-square bg-muted/30 flex items-center justify-center p-3 relative">
+                {/* 动态图片列表用原生 img：静态导出模式 unoptimized，next/image 无收益 */}
                 <img src={`/uploads/${f.name}`} alt={f.name}
                   className="max-w-full max-h-full object-contain"
                   onError={e => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>'; }}

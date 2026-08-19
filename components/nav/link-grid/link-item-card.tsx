@@ -335,6 +335,7 @@ export function PinnedLinkCard({
               </button>
             </div>
             {editIcon && !editIcon.startsWith(':') && (
+              // 图标预览用原生 img：动态 src + onError 隐藏占位，静态导出模式 next/image 无收益
               <img src={editIcon} alt="" className="w-8 h-8 rounded-lg mb-2" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             )}
             <div className="flex gap-2">

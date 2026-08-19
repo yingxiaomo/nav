@@ -205,7 +205,7 @@ func (h *Handler) dockerRestartContainer(name string, w http.ResponseWriter, r *
 }
 
 // FetchDockerIcon handles POST /api/v1/admin/docker/fetch-icon.
-// It guesses an icon URL from the Docker image name.
+// 探测逻辑在 service.FetchDockerIcon（含 SSRF 防护），此处只做参数解析。
 func FetchDockerIcon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		type request struct{ Image string `json:"image"` }
@@ -215,49 +215,8 @@ func FetchDockerIcon() http.HandlerFunc {
 			return
 		}
 
-		parts := strings.Split(req.Image, ":")
-		name := parts[0]
-		parts = strings.Split(name, "/")
-		name = parts[len(parts)-1]
-		if name == "" {
-			model.RespondJSON(w, http.StatusOK, map[string]any{"icon": nil})
-			return
-		}
-
-		domain, ok := knownDockerDomains[name]
-		if !ok {
-			domain = name + ".org"
-		}
-
-		// SSRF 防护：复用 service 的安全 Transport（拒绝内网建连），
-		// 与 ParseURL/FetchFavicon 策略一致，避免镜像名驱动的外联逃逸
-		client := &http.Client{Timeout: 3 * time.Second, Transport: service.NewSafeTransport()}
-
-		ddgURL := "https://icons.duckduckgo.com/ip3/" + domain + ".ico"
-		resp, err := client.Head(ddgURL)
-		if err == nil {
-			resp.Body.Close()
-			if resp.StatusCode == http.StatusOK {
-				model.RespondJSON(w, http.StatusOK, map[string]any{"icon": ddgURL})
-				return
-			}
-		} else if resp != nil {
-			resp.Body.Close()
-		}
-
-		favURL := "https://" + domain + "/favicon.ico"
-		resp, err = client.Head(favURL)
-		if err == nil {
-			resp.Body.Close()
-			if resp.StatusCode == http.StatusOK {
-				model.RespondJSON(w, http.StatusOK, map[string]any{"icon": favURL})
-				return
-			}
-		} else if resp != nil {
-			resp.Body.Close()
-		}
-
-		model.RespondJSON(w, http.StatusOK, map[string]any{"icon": nil})
+		icon := service.FetchDockerIcon(req.Image)
+		model.RespondJSON(w, http.StatusOK, map[string]any{"icon": icon})
 	}
 }
 

@@ -171,6 +171,7 @@ placeholder="MAC 地址（可选，用于局域网唤醒）"
           </button>
         </div>
         {icon && !icon.startsWith(':') && (
+          // 图标预览用原生 img：动态 src + onError 隐藏占位，静态导出模式 next/image 无收益
           <img src={icon} alt="" className="w-8 h-8 rounded-lg mb-2" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
         )}
         <div className="flex gap-2">

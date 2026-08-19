@@ -1,10 +1,12 @@
-import { DataSchema } from "../types/types";
 import { ApiServerAdapter } from './api-server-adapter';
 import { GithubRepoAdapter } from './github-repo-adapter';
 import { S3Adapter } from './s3-adapter';
 import { WebDavAdapter } from './webdav-adapter';
 import { DropboxAdapter } from './dropbox-adapter';
 import { GoogleDriveAdapter } from './google-drive-adapter';
+import type { StorageAdapter, ApiServerSettings } from './types';
+
+export type { StorageAdapter, ApiServerSettings } from './types';
 
 export const STORAGE_CONFIG_KEY = "clean-nav-storage-config";
 
@@ -17,13 +19,6 @@ export interface StorageConfig {
   dropbox?: DropboxSettings;
   googledrive?: GoogleDriveSettings;
   apiServer?: ApiServerSettings;
-}
-
-export interface StorageAdapter {
-  load(): Promise<DataSchema | null>;
-  save(data: DataSchema): Promise<boolean>;
-  testConnection?(): Promise<void>;
-  uploadFile?(file: File, filename: string, onProgress?: (progress: number) => void): Promise<string>;
 }
 
 export interface GithubRepoSettings {
@@ -66,11 +61,6 @@ export interface GoogleDriveSettings {
   token: string;
   fileId: string;
   filename: string;
-}
-
-export interface ApiServerSettings {
-  baseUrl: string;
-  token?: string;
 }
 
 /** 根据配置创建对应的存储适配器实例 */

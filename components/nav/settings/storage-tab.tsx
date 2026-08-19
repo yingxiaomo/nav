@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, DropboxSettings, GoogleDriveSettings, ApiServerSettings, createAdapter } from "@/lib/adapters/storage";
+import { StorageConfig, GithubRepoSettings, S3Settings, WebDavSettings, GistSettings, DropboxSettings, GoogleDriveSettings, createAdapter } from "@/lib/adapters/storage";
 import { GistAdapter } from "@/lib/adapters";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertCircle, Wifi, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { isPrivateHost } from "@/lib/utils";
 import { useUIStore } from "@/lib/stores";
 import type { DataSchema } from "@/lib/types";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -28,7 +27,6 @@ const DEFAULT_WEBDAV: WebDavSettings = { url: "", username: "", password: "", pa
 const DEFAULT_GIST: GistSettings = { token: "", gistId: "", filename: "nav-data.json" };
 const DEFAULT_DROPBOX: DropboxSettings = { token: "", path: "/nav-data.json" };
 const DEFAULT_GOOGLE_DRIVE: GoogleDriveSettings = { token: "", fileId: "", filename: "nav-data.json" };
-const DEFAULT_APISERVER: ApiServerSettings = { baseUrl: "", token: "" };
 
 export function StorageTab({ config, setConfig, localData, setLocalData, onSave }: StorageTabProps) {
   const [isTesting, setIsTesting] = useState(false);

@@ -89,8 +89,9 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
       for (const h of filteredHistory) list.push({ kind: "history", query: h });
       for (const r of bookmarkMatches) list.push({ kind: "bookmark", item: r.item });
       for (const w of webSuggestions) list.push({ kind: "web", text: w });
+      for (const g of globalResults) list.push(g);
       return list;
-    }, [filteredHistory, bookmarkMatches, webSuggestions]);
+    }, [filteredHistory, bookmarkMatches, webSuggestions, globalResults]);
 
     // 输入框内的灰色联想预览（仅在首条为历史且前缀匹配时）
     const completionText =
@@ -151,6 +152,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
 
       // 获取网络搜索建议（后端已配置时）
       let hasWebResults = false;
+      let hasGlobalResults = false;
       if (val.trim().length >= 2) {
         try {
           const configRaw = localStorage.getItem(STORAGE_CONFIG_KEY);
@@ -169,17 +171,37 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
               } else {
                 setWebSuggestions([]);
               }
+              // 后端聚合搜索（书签/笔记/监控），失败时保留空结果
+              try {
+                const sres = await fetch(`${baseUrl}/api/v1/search?q=${encodeURIComponent(val.trim())}`, { headers });
+                if (sres.ok) {
+                  const results: unknown = await sres.json();
+                  const globals: SuggestionItem[] = (Array.isArray(results) ? results : [])
+                    .filter((r): r is Record<string, unknown> => !!r && typeof r === "object" && "title" in r)
+                    .map((r) => ({ kind: "global" as const, title: String(r.title), url: typeof r.url === "string" ? r.url : undefined, type: typeof r.type === "string" ? r.type : "", icon: typeof r.icon === "string" ? r.icon : undefined }));
+                  setGlobalResults(globals);
+                  hasGlobalResults = globals.length > 0;
+                } else {
+                  setGlobalResults([]);
+                }
+              } catch {
+                setGlobalResults([]);
+              }
             } else {
               setWebSuggestions([]);
+              setGlobalResults([]);
             }
           } else {
             setWebSuggestions([]);
+            setGlobalResults([]);
           }
         } catch {
           setWebSuggestions([]);
+          setGlobalResults([]);
         }
       } else {
         setWebSuggestions([]);
+        setGlobalResults([]);
       }
 
       if (val.trim()) {
@@ -188,7 +210,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
         );
         const hasLocal = matches.length > 0 || fuse.search(val.trim()).length > 0;
         // 有本地匹配或网络建议时都显示下拉
-        if (hasLocal || hasWebResults) {
+        if (hasLocal || hasWebResults || hasGlobalResults) {
           setShowDropdown(true);
           setSelectedIdx(0);
         } else {

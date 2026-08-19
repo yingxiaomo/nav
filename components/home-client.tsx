@@ -77,8 +77,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const folderNavRef = useRef<FolderModalHandle>(null);
-  const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels, isCheatSheetOpen, setCheatSheetOpen, setBackendAvailable, setCommandPaletteOpen, isCommandPaletteOpen, togglePanel, setActivePanel } = useUIStore();
-  const { sidebarCollapsed } = useUIStore();
+  const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels, isCheatSheetOpen, setCheatSheetOpen, setCommandPaletteOpen, isCommandPaletteOpen, togglePanel, setActivePanel } = useUIStore();
 
   // 检测后端是否可用（静态部署时禁用后端功能），定期重试
   useBackendCheck();
@@ -324,11 +323,8 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
         <AuthSetupDialog baseUrl={typeof window !== 'undefined' ? window.location.origin : ''} />
         {isCommandPaletteOpen && (
           <CommandPalette
-            data={data}
             allBookmarks={allBookmarks}
             onOpenLink={(url) => openExternalUrl(url)}
-            onToggleAI={() => togglePanel('ai')}
-            onToggleSSH={() => togglePanel('ssh')}
           />
         )}
         <ErrorBoundary name="ai-panel" fallback={null}>

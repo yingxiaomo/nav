@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
-import { ChevronDown, Cpu, HardDrive, XCircle, Box, MemoryStick, Container, ExternalLink, FileText, Plus, Trash2 } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { ChevronDown, Cpu, HardDrive, XCircle, Box, MemoryStick, Container, FileText, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  SystemInfo, CheckResult, ContainerInfo, ContainerStats,
-  uptimeStr, serverName, parseContainerUrl, mockResource,
+  uptimeStr, serverName, parseContainerUrl,
 } from "@/lib/types/monitor";
 import { formatFileSize } from "@/lib/utils/format";
 import { CircleProgress } from "@/components/features/circle-progress";
@@ -24,7 +23,7 @@ export function SystemStatusFloater() {
   const menuRef = useRef<HTMLDivElement>(null);
   const dragSrc = useRef<string | null>(null);
 
-  const { sys, checks, targets, containers, containerStats, dockerMeta, uptime, refresh } = useMonitorData();
+  const { sys, checks, targets, containers, dockerMeta, refresh } = useMonitorData();
   const { baseUrl, authHeaders, isActive } = useMonitorConfig();
 
   // Close context menu on outside click
@@ -38,9 +37,7 @@ export function SystemStatusFloater() {
 
   if (!isActive) return null;
 
-  const getIcon = (id: string): string | undefined => targets.find((t) => t.id === id)?.icon;
   const getMac = (id: string): string | undefined => targets.find((t) => t.id === id)?.mac;
-  const getDockerIcon = (name: string): string | undefined => dockerMeta[name]?.icon;
   const getDockerLabel = (name: string): string => dockerMeta[name]?.label || name;
   const getDockerUrl = (name: string): string | undefined => dockerMeta[name]?.url;
 

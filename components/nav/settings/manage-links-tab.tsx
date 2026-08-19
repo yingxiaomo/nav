@@ -55,7 +55,9 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   useEffect(() => { setPortalTarget(document.body); }, []);
 
   const toggleSelect = (id: string) => setSelectedIds(prev => {
-    const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
+    const next = new Set(prev);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    return next;
   });
   const deselectAll = () => setSelectedIds(new Set());
 
@@ -297,7 +299,9 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   }, [confirmDeleteCategory, setLocalData]);
 
   const toggleCollapse = useCallback((catId: string) => setCollapsedCats(prev => {
-    const n = new Set(prev); n.has(catId) ? n.delete(catId) : n.add(catId); return n;
+    const n = new Set(prev);
+    if (n.has(catId)) { n.delete(catId); } else { n.add(catId); }
+    return n;
   }), []);
 
   const dropAnimation: DropAnimation = { sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.5' } } }) };

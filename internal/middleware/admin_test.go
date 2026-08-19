@@ -67,6 +67,10 @@ func TestSessionAuth_SecretsRequireAuth(t *testing.T) {
 		{"GET", "/api/v1/admin/logs"},
 		{"PUT", "/api/v1/settings"},
 		{"POST", "/api/v1/data"},
+		// SSH 端点必须受会话保护 —— 曾因加入 publicPaths 白名单导致
+		// 未认证 SSH 跳板/SSRF 回归（a581ac9），此处锁定。
+		{"GET", "/api/v1/ws/ssh"},
+		{"POST", "/api/v1/ssh/exec"},
 	}
 	for _, c := range cases {
 		if code := do(t, handler, c.method, c.path, ""); code != http.StatusUnauthorized {

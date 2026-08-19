@@ -94,10 +94,10 @@ export function SSHTerminalPanel() {
   // 主题切换时同步已打开终端配色
   useEffect(() => {
     const termTheme = isDark ? DARK_TERM_THEME : LIGHT_TERM_THEME;
-    for (const inst of instancesRef.current) {
-      if (inst.term) {
-        inst.term.options.theme = termTheme;
-      }
+    // 拷贝出 term 引用再修改，避免直接在 instancesRef 持有的对象上写（immutability 规则）
+    const liveTerms = instancesRef.current.map((i) => i.term).filter((t): t is Terminal => t !== null);
+    for (const term of liveTerms) {
+      term.options.theme = termTheme;
     }
   }, [isDark]);
 
@@ -192,16 +192,16 @@ export function SSHTerminalPanel() {
   const closeInstance = (id: string) => {
     cleanupRef.current.get(id)?.();
     cleanupRef.current.delete(id);
-    setInstances((prev) => {
-      const inst = prev.find((i) => i.id === id);
-      inst?.ws?.close();
-      inst?.term?.dispose();
-      const rest = prev.filter((i) => i.id !== id);
-      if (activeTab === id) {
-        setActiveTab(rest.length > 0 ? rest[rest.length - 1].id : null);
-      }
-      return rest;
-    });
+    // 基于当前 state 快照先计算，避免在 setState 的 updater 内调用
+    // 另一个 setState（违反纯函数约束，React 严格模式下会告警/重复执行）
+    const inst = instances.find((i) => i.id === id);
+    inst?.ws?.close();
+    inst?.term?.dispose();
+    const rest = instances.filter((i) => i.id !== id);
+    setInstances(rest);
+    if (activeTab === id) {
+      setActiveTab(rest.length > 0 ? rest[rest.length - 1].id : null);
+    }
   };
 
   if (activePanel !== "ssh") return null;

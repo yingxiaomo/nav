@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { req, API } from '../admin-tabs';
-import { Lock, Eye, EyeOff, Loader2, Bot, Brain, Bell, MessageCircle, RefreshCw } from 'lucide-react';
+import { Lock, Eye, EyeOff, Loader2, Brain, Bell, MessageCircle } from 'lucide-react';
 
 export default function SettingsTab() {
   // 密码

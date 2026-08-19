@@ -1,5 +1,5 @@
 // /ai 命令 — AI 快速问答
-import type { CommandHandler, ExecutionContext } from "./registry";
+import type { CommandHandler } from "./registry";
 
 export const handler: CommandHandler = async (args, ctx) => {
   const argsStr = args.join(" ");
@@ -24,3 +24,4 @@ export const handler: CommandHandler = async (args, ctx) => {
   }
   ctx.setLoading(false);
 };
+

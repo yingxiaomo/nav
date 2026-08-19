@@ -1,6 +1,5 @@
 "use client";
 
-import { useRef } from "react";
 import { Upload } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -14,7 +13,6 @@ interface BookmarkImportProps {
 }
 
 export function BookmarkImport({ existingCategories, onImport }: BookmarkImportProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

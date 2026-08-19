@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo, useEffect } from "react";
 import { Category, LinkItem } from "@/lib/types";
@@ -93,7 +93,7 @@ export function BookmarkSidebar({ categories, pinnedLinks, onPinLink, onUnpinLin
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [sidebarCollapsed, tree]);
+  }, [sidebarCollapsed, tree, setSidebarCollapsed, setNavHistory, setNavTitles]);
 
   const handleNodeClick = (node: TreeNode) => {
     if (node.type === "link" && node.url) {

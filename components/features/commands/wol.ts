@@ -1,5 +1,5 @@
 // /wol 命令 — Wake-on-LAN 唤醒设备
-import type { CommandHandler, ExecutionContext } from "./registry";
+import type { CommandHandler } from "./registry";
 import { loadDeviceAliases } from "./ssh";
 
 export const handler: CommandHandler = async (args, ctx) => {
@@ -20,3 +20,4 @@ export const handler: CommandHandler = async (args, ctx) => {
   ctx.closePalette();
   ctx.setLoading(false);
 };
+

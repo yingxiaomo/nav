@@ -1,5 +1,5 @@
 import { DataSchema } from "../types/types";
-import type { ApiServerSettings, StorageAdapter } from "./storage";
+import type { ApiServerSettings, StorageAdapter } from "./types";
 
 export class ApiServerAdapter implements StorageAdapter {
   private baseUrl: string;

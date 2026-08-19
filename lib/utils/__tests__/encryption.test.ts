@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { encryptData, decryptData, safeLocalStorageSet, safeLocalStorageGet } from "../encryption";
+import { encryptData, decryptData, safeLocalStorageGet } from "../encryption";
 
 describe("encryptData / decryptData", () => {
   it("应正确编码解码普通字符串", () => {

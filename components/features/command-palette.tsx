@@ -2,21 +2,18 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useUIStore } from "@/lib/stores";
-import { DataSchema, LinkItem } from "@/lib/types";
+import { LinkItem } from "@/lib/types";
 import { getFrequentBookmarks, recordClick } from "@/lib/utils/bookmark-stats";
 import { toast } from "sonner";
 import { getAllCommands, getMatching, getCommand, type GroupItem } from "./commands/registry";
 import "./commands/index"; // 触发命令注册
 
 interface CommandPaletteProps {
-  data: DataSchema;
-  onOpenLink: (url: string) => void;
   allBookmarks: LinkItem[];
-  onToggleAI: () => void;
-  onToggleSSH: () => void;
+  onOpenLink: (url: string) => void;
 }
 
-export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onToggleSSH }: CommandPaletteProps) {
+export function CommandPalette({ allBookmarks, onOpenLink }: CommandPaletteProps) {
   const { isCommandPaletteOpen, setCommandPaletteOpen } = useUIStore();
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -80,17 +77,21 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
     setGroups(searchGroups);
   }, [searchGroups]);
 
-  // 输入触发命令自动执行
-  useEffect(() => {
-    if (!isCommandPaletteOpen || !query.startsWith("/")) return;
+  // 输入触发命令自动执行：仅当 Enter 确认且唯一匹配时才执行，
+  // 避免击键过程中参数未输完即触发、以及每次击键重复执行（原实现在
+  // query 变化的 effect 里直接执行，/docker nginx r 就会触发 restart）。
+  const tryAutoExecute = () => {
+    if (!query.startsWith("/")) return false;
     const parts = query.slice(1).split(/\s+/);
     const cmd = parts[0]?.toLowerCase() || "";
-    const args = parts.slice(1);
+    const args = parts.slice(1).map(a => a.trim()).filter(Boolean);
     const matched = getMatching(cmd);
     if (matched.length === 1 && cmd && args.length > 0) {
       executeCommand(matched[0].prefix, args);
+      return true;
     }
-  }, [query]);
+    return false;
+  };
 
   useEffect(() => { setActiveIndex(0); }, [searchGroups]);
 
@@ -126,7 +127,11 @@ export function CommandPalette({ data, allBookmarks, onOpenLink, onToggleAI, onT
     if (e.key === "Escape") { setCommandPaletteOpen(false); return; }
     if (e.key === "ArrowDown") { e.preventDefault(); setActiveIndex(i => Math.min(i + 1, flatItems.length - 1)); }
     if (e.key === "ArrowUp") { e.preventDefault(); setActiveIndex(i => Math.max(i - 1, 0)); }
-    if (e.key === "Enter" && flatItems[activeIndex]) { selectItem(flatItems[activeIndex]); }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (tryAutoExecute()) return;
+      if (flatItems[activeIndex]) { selectItem(flatItems[activeIndex]); }
+    }
   };
 
   if (!isCommandPaletteOpen) return null;

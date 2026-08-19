@@ -40,6 +40,10 @@ function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+function createFreshConversation(): Conversation {
+  return { id: genId(), title: "新对话", messages: [], createdAt: Date.now() };
+}
+
 export function AIPanel() {
   const { activePanel, setActivePanel } = useUIStore();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -52,10 +56,9 @@ export function AIPanel() {
   const loadedRef = useRef(false);
 
   const newConversation = () => {
-    const id = genId();
-    const conv: Conversation = { id, title: "新对话", messages: [], createdAt: Date.now() };
+    const conv = createFreshConversation();
     setConversations(prev => [conv, ...prev]);
-    setActiveId(id);
+    setActiveId(conv.id);
   };
 
   // 加载保存的对话（仅首次打开时）
@@ -69,7 +72,7 @@ export function AIPanel() {
     } else {
       newConversation();
     }
-  }, [activePanel]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activePanel]);
 
   // 自动保存
   useEffect(() => {
@@ -78,7 +81,7 @@ export function AIPanel() {
 
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
-  }, [conversations]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [conversations]);
 
   useEffect(() => {
     if (activePanel === "ai") setTimeout(() => inputRef.current?.focus(), 100);
@@ -87,22 +90,21 @@ export function AIPanel() {
   const activeConv = useMemo(() => conversations.find(c => c.id === activeId), [conversations, activeId]);
 
   const deleteConversation = (id: string) => {
-    setConversations(prev => {
-      const rest = prev.filter(c => c.id !== id);
-      if (activeId === id) {
-        setActiveId(rest.length > 0 ? rest[0].id : null);
-        if (rest.length === 0) {
-          const fresh: Conversation = { id: genId(), title: "新对话", messages: [], createdAt: Date.now() };
-          setActiveId(fresh.id);
-          return [fresh];
-        }
-      }
-      return rest;
-    });
-  };
-
-  const updateTitle = (id: string, firstMsg: string) => {
-    setConversations(prev => prev.map(c => c.id === id ? { ...c, title: firstMsg.slice(0, 30) + (firstMsg.length > 30 ? "…" : "") } : c));
+    if (id !== activeId) {
+      setConversations(prev => prev.filter(c => c.id !== id));
+      return;
+    }
+    // 删除的是当前会话：先基于快照算好下一个 active，再更新列表
+    // （避免在 setState 的 updater 内调用另一个 setState —— 违反纯函数约束）
+    const rest = conversations.filter(c => c.id !== id);
+    if (rest.length > 0) {
+      setConversations(prev => prev.filter(c => c.id !== id));
+      setActiveId(rest[0].id);
+      return;
+    }
+    const fresh = createFreshConversation();
+    setConversations([fresh]);
+    setActiveId(fresh.id);
   };
 
   const send = async () => {

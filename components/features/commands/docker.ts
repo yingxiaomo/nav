@@ -1,5 +1,5 @@
 // /docker 命令 — 容器管理
-import type { CommandHandler, ExecutionContext } from "./registry";
+import type { CommandHandler } from "./registry";
 
 export const handler: CommandHandler = async (args, ctx) => {
   const argsStr = args.join(" ");
@@ -71,3 +71,4 @@ export const handler: CommandHandler = async (args, ctx) => {
   }
   ctx.setLoading(false);
 };
+

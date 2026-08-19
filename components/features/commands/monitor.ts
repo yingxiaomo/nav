@@ -1,5 +1,5 @@
 // /monitor 命令 — 内网检测状态
-import type { CommandHandler, ExecutionContext } from "./registry";
+import type { CommandHandler } from "./registry";
 
 export const handler: CommandHandler = async (_args, ctx) => {
   const { toast } = await import("sonner");
@@ -20,3 +20,4 @@ export const handler: CommandHandler = async (_args, ctx) => {
   }
   ctx.setLoading(false);
 };
+

@@ -1,5 +1,5 @@
 // /ssh 命令 — 远程连接设备 + 快速执行
-import type { CommandHandler, ExecutionContext, DeviceAlias } from "./registry";
+import type { CommandHandler, DeviceAlias } from "./registry";
 
 export async function loadDeviceAliases(): Promise<DeviceAlias[]> {
   const results: DeviceAlias[] = [];

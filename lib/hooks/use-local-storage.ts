@@ -18,8 +18,8 @@ export function useLocalStorage<T>(
     if (typeof window === 'undefined') {
       return initialValue instanceof Function ? initialValue() : initialValue;
     }
-    // 同步解密读取
-    const decrypted = safeLocalStorageGet<T>(key, sensitiveFields);
+    // 同步解密读取（读取无需字段列表：解码是确定性的）
+    const decrypted = safeLocalStorageGet<T>(key);
     if (decrypted !== null) return decrypted;
     // 降级：尝试直接 JSON 解析（旧版未加密数据）
     try {

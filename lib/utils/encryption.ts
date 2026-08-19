@@ -54,7 +54,6 @@ export function safeLocalStorageSet<T>(
  */
 export function safeLocalStorageGet<T>(
   key: string,
-  _sensitiveFields: string[] = []
 ): T | null {
   try {
     if (typeof window === 'undefined') return null;

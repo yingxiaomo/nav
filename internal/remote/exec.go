@@ -4,26 +4,21 @@ import (
 	"bytes"
 	"fmt"
 	"net"
-	"net/http"
 	"strings"
 	"time"
 
 	"golang.org/x/crypto/ssh"
 )
 
-// SSHExec 实现 Executor 接口的 SSH/HTTP 执行器
+// SSHExec 实现 Executor 接口的 SSH 执行器
 type SSHExec struct {
-	client   *http.Client
 	hostKeys *HostKeyManager
 }
 
 // NewSSHExec 创建执行器。hostKeys 用于 TOFU 主机密钥校验；为 nil 时退回到
 // 不校验主机密钥（仅用于测试）。
 func NewSSHExec(hostKeys *HostKeyManager) *SSHExec {
-	return &SSHExec{
-		client:   &http.Client{Timeout: 30 * time.Second},
-		hostKeys: hostKeys,
-	}
+	return &SSHExec{hostKeys: hostKeys}
 }
 
 func (e *SSHExec) hostKeyCallback() ssh.HostKeyCallback {

@@ -14,8 +14,8 @@ import (
 
 var chatHistory struct {
 	sync.Mutex
-	data      map[string][]chatMessage
-	lastSeen  map[string]time.Time
+	data     map[string][]chatMessage
+	lastSeen map[string]time.Time
 }
 
 var chatHistoryInit sync.Once
@@ -69,11 +69,14 @@ type chatResponse struct {
 	} `json:"choices"`
 }
 
-
 // CallLLM 单次 AI 调用（无上下文，供 handleOrganize 使用）
 func CallLLM(cfg LLMConfig, prompt string) (string, error) {
-	if cfg.APIKey == "" { return "", fmt.Errorf("AI 未配置") }
-	if cfg.Model == "" { cfg.Model = defaultLLMConfig.Model }
+	if cfg.APIKey == "" {
+		return "", fmt.Errorf("AI 未配置")
+	}
+	if cfg.Model == "" {
+		cfg.Model = defaultLLMConfig.Model
+	}
 	baseURL := strings.TrimRight(cfg.BaseURL, "/")
 	msgs := []chatMessage{
 		{Role: "system", Content: "你是一个智能助手，理解并返回 JSON 格式数据。"},
@@ -82,17 +85,25 @@ func CallLLM(cfg LLMConfig, prompt string) (string, error) {
 	body := chatRequest{Model: cfg.Model, Messages: msgs, MaxTokens: 1000}
 	payload, _ := json.Marshal(body)
 	req, err := http.NewRequest("POST", baseURL+"/chat/completions", bytes.NewReader(payload))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
-	if err != nil { return "", fmt.Errorf("请求失败: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("请求失败: %w", err)
+	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 { return "", fmt.Errorf("返回 %d", resp.StatusCode) }
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("返回 %d", resp.StatusCode)
+	}
 	var result chatResponse
 	json.NewDecoder(resp.Body).Decode(&result)
-	if len(result.Choices) == 0 { return "", fmt.Errorf("AI 返回为空") }
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("AI 返回为空")
+	}
 	return strings.TrimSpace(result.Choices[0].Message.Content), nil
 }
 

@@ -20,35 +20,77 @@ type CmdHandler struct {
 	Devices *DeviceManager
 	LLM     LLMConfig
 	DB      *sql.DB
+
+	// /ask（AI 诊断 + 提议命令确认执行）的运行时状态
+	aiops aiopsState
 }
 
+// HandleTG /command 入口
 func (h *CmdHandler) HandleTG(fromID, cmd string, args []string) string {
 	switch cmd {
 	case "/start", "/help":
-		return "Nav Bot\n/ai [消息] - AI 对话\n/status - 监控状态\n/wake - WOL 唤醒\n/docker - Docker 管理\n/device - 远程设备\n/organize - AI 整理书签\n/uptime - 运行时间\n/help - 帮助"
-	case "/status": return h.handleStatus(args)
-	case "/wake": return h.handleWake(args)
-	case "/docker": return h.handleDocker(args)
-	case "/organize": return h.handleOrganize()
-	case "/device": return h.handleDevice(args)
-	case "/ai": return h.handleAI(fromID, args)
-	case "/uptime": return fmt.Sprintf("运行 %d 秒", service.GetSystemInfo().Uptime)
-	default: return "未知命令，发送 /help 查看"
+		return "Nav Bot\n/ai [消息] - AI 对话\n/ask [问题] - AI 诊断内网（可提议命令，需确认）\n/status - 监控状态\n/wake - WOL 唤醒\n/docker - Docker 管理\n/device - 远程设备\n/organize - AI 整理书签\n/uptime - 运行时间\n/cancel - 取消待确认的操作\n/help - 帮助"
+	case "/status":
+		return h.handleStatus(args)
+	case "/wake":
+		return h.handleWake(args)
+	case "/docker":
+		return h.handleDocker(args)
+	case "/organize":
+		return h.handleOrganize()
+	case "/device":
+		return h.handleDevice(args)
+	case "/ai":
+		return h.handleAI(fromID, args)
+	case "/ask":
+		text, _ := h.handleAsk(fromID, args)
+		return text
+	case "/cancel":
+		h.aiops.takePending(fromID)
+		return "已取消待确认的操作"
+	case "/uptime":
+		return fmt.Sprintf("运行 %d 秒", service.GetSystemInfo().Uptime)
+	default:
+		return "未知命令，发送 /help 查看"
 	}
 }
 
+// HandleTGKeyboard 可选接口（KeyboardResponder）：/ask 需要携带确认按钮。
+// 返回 ok=false 时 Bot 回退到普通 HandleTG 路径。
+func (h *CmdHandler) HandleTGKeyboard(fromID, cmd string, args []string) (text string, buttons []InlineButton, ok bool) {
+	if cmd != "/ask" {
+		return "", nil, false
+	}
+	text, withButtons := h.handleAsk(fromID, args)
+	if !withButtons {
+		return text, nil, true
+	}
+	return text, []InlineButton{
+		{Text: "✅ 执行", Data: cbConfirm},
+		{Text: "❌ 取消", Data: cbCancel},
+	}, true
+}
+
 func (h *CmdHandler) handleAI(fromID string, args []string) string {
-	if h.LLM.APIKey == "" { return "AI 未配置，请在设置中填写 API Key" }
+	if h.LLM.APIKey == "" {
+		return "AI 未配置，请在设置中填写 API Key"
+	}
 	text := strings.Join(args, " ")
-	if text == "" { return "用法: /ai 你想说的话" }
+	if text == "" {
+		return "用法: /ai 你想说的话"
+	}
 	resp := callLLM(h.LLM, fromID, text)
 	return resp
 }
 
 func (h *CmdHandler) handleStatus(args []string) string {
-	if h.Health == nil { return "健康检查未启动" }
+	if h.Health == nil {
+		return "健康检查未启动"
+	}
 	targets := h.Health.GetTargets()
-	if len(targets) == 0 { return "暂无监控目标" }
+	if len(targets) == 0 {
+		return "暂无监控目标"
+	}
 	if len(args) > 0 {
 		name := strings.Join(args, " ")
 		for _, t := range targets {
@@ -57,7 +99,10 @@ func (h *CmdHandler) handleStatus(args []string) string {
 				for _, r := range results {
 					if r.ID == t.ID {
 						icon := map[string]string{"ok": "✅", "error": "⚠️", "timeout": "❌"}[r.Status]
-						lat := ""; if r.Latency != nil { lat = fmt.Sprintf("%dms", *r.Latency) }
+						lat := ""
+						if r.Latency != nil {
+							lat = fmt.Sprintf("%dms", *r.Latency)
+						}
 						return fmt.Sprintf("%s %s - %s 延迟:%s", icon, t.Name, r.Status, lat)
 					}
 				}
@@ -72,7 +117,10 @@ func (h *CmdHandler) handleStatus(args []string) string {
 		for _, r := range results {
 			if r.ID == t.ID {
 				icon := map[string]string{"ok": "✅", "error": "⚠️", "timeout": "❌"}[r.Status]
-				lat := "-"; if r.Latency != nil { lat = fmt.Sprintf("%dms", *r.Latency) }
+				lat := "-"
+				if r.Latency != nil {
+					lat = fmt.Sprintf("%dms", *r.Latency)
+				}
 				b.WriteString(fmt.Sprintf("\n%s %s (%s)", icon, t.Name, lat))
 				break
 			}
@@ -82,12 +130,18 @@ func (h *CmdHandler) handleStatus(args []string) string {
 }
 
 func (h *CmdHandler) handleWake(args []string) string {
-	if len(args) == 0 { return "用法: /wake [名称]" }
+	if len(args) == 0 {
+		return "用法: /wake [名称]"
+	}
 	name := strings.Join(args, " ")
 	for _, t := range h.Health.GetTargets() {
 		if strings.Contains(t.Name, name) || strings.Contains(t.URL, name) {
-			if t.MAC == "" { return fmt.Sprintf("%s 未配置 MAC", t.Name) }
-			if err := service.WakeOnLAN(t.MAC); err != nil { return fmt.Sprintf("唤醒失败: %v", err) }
+			if t.MAC == "" {
+				return fmt.Sprintf("%s 未配置 MAC", t.Name)
+			}
+			if err := service.WakeOnLAN(t.MAC); err != nil {
+				return fmt.Sprintf("唤醒失败: %v", err)
+			}
 			return fmt.Sprintf("已发送 WOL 到 %s", t.Name)
 		}
 	}
@@ -95,67 +149,109 @@ func (h *CmdHandler) handleWake(args []string) string {
 }
 
 func (h *CmdHandler) handleDocker(args []string) string {
-	if h.Docker == nil { return "Docker 不可用" }
-	if len(args) == 0 { return "用法: /docker ps|start|stop|restart [name]" }
+	if h.Docker == nil {
+		return "Docker 不可用"
+	}
+	if len(args) == 0 {
+		return "用法: /docker ps|start|stop|restart [name]"
+	}
 	switch args[0] {
 	case "ps":
 		containers, err := h.Docker.ListContainers(context.Background())
-		if err != nil { return fmt.Sprintf("获取失败: %v", err) }
-		if len(containers) == 0 { return "无容器" }
-		var b strings.Builder; b.WriteString("容器\n")
+		if err != nil {
+			return fmt.Sprintf("获取失败: %v", err)
+		}
+		if len(containers) == 0 {
+			return "无容器"
+		}
+		var b strings.Builder
+		b.WriteString("容器\n")
 		for _, c := range containers {
 			icon := map[string]string{"running": "🟢", "exited": "🔴", "paused": "🟡"}[c.State]
 			b.WriteString(fmt.Sprintf("\n%s %s - %s", icon, c.Name, c.State))
 		}
 		return b.String()
 	case "start", "stop", "restart":
-		if len(args) < 2 { return fmt.Sprintf("用法: /docker %s [名称]", args[0]) }
+		if len(args) < 2 {
+			return fmt.Sprintf("用法: /docker %s [名称]", args[0])
+		}
 		name, ctx := args[1], context.Background()
 		var err error
 		switch args[0] {
-		case "start": err = h.Docker.StartContainer(ctx, name)
-		case "stop": err = h.Docker.StopContainer(ctx, name)
-		case "restart": err = h.Docker.RestartContainer(ctx, name)
+		case "start":
+			err = h.Docker.StartContainer(ctx, name)
+		case "stop":
+			err = h.Docker.StopContainer(ctx, name)
+		case "restart":
+			err = h.Docker.RestartContainer(ctx, name)
 		}
-		if err != nil { return fmt.Sprintf("失败: %v", err) }
+		if err != nil {
+			return fmt.Sprintf("失败: %v", err)
+		}
 		return fmt.Sprintf("%s %s 成功", args[0], name)
-	default: return "未知 docker 命令"
+	default:
+		return "未知 docker 命令"
 	}
 }
 
 func (h *CmdHandler) handleOrganize() string {
-	if h.DB == nil || h.LLM.APIKey == "" { return "需要 AI Key" }
+	if h.DB == nil || h.LLM.APIKey == "" {
+		return "需要 AI Key"
+	}
 	rows, err := h.DB.Query("SELECT id, title, url, COALESCE(icon,'') FROM bookmarks")
-	if err != nil { return "读取书签失败" }
+	if err != nil {
+		return "读取书签失败"
+	}
 	type bk struct{ id, title, url, icon string }
 	var bks []bk
 	for rows.Next() {
 		var b bk
-		if err := rows.Scan(&b.id, &b.title, &b.url, &b.icon); err == nil { bks = append(bks, b) }
+		if err := rows.Scan(&b.id, &b.title, &b.url, &b.icon); err == nil {
+			bks = append(bks, b)
+		}
 	}
 	rows.Close()
-	if len(bks) == 0 { return "暂无书签" }
+	if len(bks) == 0 {
+		return "暂无书签"
+	}
 	var sb strings.Builder
 	sb.WriteString("将以下书签归类到合适的分类中，返回JSON数组，每个元素包含category和bookmarks字段。只返回JSON：")
-	for _, b := range bks { sb.WriteString(fmt.Sprintf("\n%s - %s", b.title, b.url)) }
-	resp, err := CallLLM(h.LLM, sb.String())
-	if err != nil { return "AI 失败: " + err.Error() }
-	var cats []struct {
-		Category  string `json:"category"`
-		Bookmarks []struct { Title, URL string } `json:"bookmarks"`
+	for _, b := range bks {
+		sb.WriteString(fmt.Sprintf("\n%s - %s", b.title, b.url))
 	}
-	if err := json.Unmarshal([]byte(resp), &cats); err != nil { return "AI 格式有误:\n" + resp }
-	var result strings.Builder; result.WriteString("整理完成：")
+	resp, err := CallLLM(h.LLM, sb.String())
+	if err != nil {
+		return "AI 失败: " + err.Error()
+	}
+	var cats []struct {
+		Category  string                        `json:"category"`
+		Bookmarks []struct{ Title, URL string } `json:"bookmarks"`
+	}
+	if err := json.Unmarshal([]byte(resp), &cats); err != nil {
+		return "AI 格式有误:\n" + resp
+	}
+	var result strings.Builder
+	result.WriteString("整理完成：")
 	for _, cat := range cats {
-		if cat.Category == "" || len(cat.Bookmarks) == 0 { continue }
-		catID := model.NewID(); now := model.Now()
+		if cat.Category == "" || len(cat.Bookmarks) == 0 {
+			continue
+		}
+		catID := model.NewID()
+		now := model.Now()
 		var existing string
-		if err := h.DB.QueryRow("SELECT id FROM categories WHERE title=?", cat.Category).Scan(&existing); err == nil { catID = existing
-		} else { h.DB.Exec("INSERT INTO categories (id,title,icon,\"order\",created_at) VALUES (?,?,?,?,?)", catID, cat.Category, "Folder", 0, now) }
+		if err := h.DB.QueryRow("SELECT id FROM categories WHERE title=?", cat.Category).Scan(&existing); err == nil {
+			catID = existing
+		} else {
+			h.DB.Exec("INSERT INTO categories (id,title,icon,\"order\",created_at) VALUES (?,?,?,?,?)", catID, cat.Category, "Folder", 0, now)
+		}
 		matched := 0
 		for _, bm := range cat.Bookmarks {
 			for _, b := range bks {
-				if b.url == bm.URL { h.DB.Exec("UPDATE bookmarks SET category_id=? WHERE id=?", catID, b.id); matched++; break }
+				if b.url == bm.URL {
+					h.DB.Exec("UPDATE bookmarks SET category_id=? WHERE id=?", catID, b.id)
+					matched++
+					break
+				}
 			}
 		}
 		result.WriteString(fmt.Sprintf("\n %s (%d个)", cat.Category, matched))
@@ -164,18 +260,30 @@ func (h *CmdHandler) handleOrganize() string {
 }
 
 func (h *CmdHandler) handleDevice(args []string) string {
-	if h.Devices == nil { return "设备管理未启用" }
-	if len(args) == 0 { return h.Devices.FormatList() }
+	if h.Devices == nil {
+		return "设备管理未启用"
+	}
+	if len(args) == 0 {
+		return h.Devices.FormatList()
+	}
 	switch args[0] {
 	case "ssh":
-		if len(args) < 3 { return "用法: /device ssh [名] [命令]" }
+		if len(args) < 3 {
+			return "用法: /device ssh [名] [命令]"
+		}
 		out, err := h.Devices.Exec(args[1], strings.Join(args[2:], " "))
-		if err != nil { return fmt.Sprintf("失败: %v", err) }
+		if err != nil {
+			return fmt.Sprintf("失败: %v", err)
+		}
 		return fmt.Sprintf("$ %s\n%s", strings.Join(args[2:], " "), out)
 	case "ping":
-		if len(args) < 2 { return "用法: /device ping [名]" }
+		if len(args) < 2 {
+			return "用法: /device ping [名]"
+		}
 		out, err := h.Devices.Exec(args[1], "echo pong")
-		if err != nil { return fmt.Sprintf("不可达: %v", err) }
+		if err != nil {
+			return fmt.Sprintf("不可达: %v", err)
+		}
 		return fmt.Sprintf("可达: %s", out)
 	default:
 		return h.Devices.FormatList()

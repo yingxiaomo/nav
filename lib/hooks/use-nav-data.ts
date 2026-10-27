@@ -210,7 +210,9 @@ export function useNavData(initialWallpapers: string[]) {
       const { newData, config, onWallpaperUpdate } = params;
       if (typeof window !== 'undefined') {
         localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(newData));
-        localStorage.setItem(LAST_SYNC_KEY, JSON.stringify(newData));
+        // 注意：LAST_SYNC_KEY（三方合并基线）不能在这里写——上传失败时会把
+        // "未同步"误标为"已同步"，导致之后合并时云端删除被误判为本地新增。
+        // 基线只在 onSuccess 确认保存成功后写入。
       }
       if (onWallpaperUpdate) onWallpaperUpdate(newData);
       return saveData({ data: newData, config, getAdapter });
@@ -277,10 +279,30 @@ export function useNavData(initialWallpapers: string[]) {
   }, [getEffectiveConfig, saveMutateAsync, updateLocalAndState]);
 
   // ── 公共 API：链接拖拽排序 ──
-  const handleLinkReorder = useCallback((categoryId: string, links: LinkItem[]) => {
-    const newCategories = data.categories.map(cat =>
-      cat.id === categoryId ? { ...cat, links, updatedAt: Date.now() } : cat
-    );
+  // folderPath 为空表示顶层 links；非空时沿文件夹 id 链定位目标层，只替换该层，避免覆盖顶层数据
+  const handleLinkReorder = useCallback((categoryId: string, links: LinkItem[], folderPath: string[] = []) => {
+    const newCategories = data.categories.map(cat => {
+      if (cat.id !== categoryId) return cat;
+      if (folderPath.length === 0) {
+        return { ...cat, links, updatedAt: Date.now() };
+      }
+      const replaceAt = (items: LinkItem[], depth: number): LinkItem[] | null => {
+        const idx = items.findIndex(i => i.id === folderPath[depth] && i.type === 'folder');
+        if (idx === -1) return null;
+        const folder = items[idx];
+        const children = depth === folderPath.length - 1
+          ? links
+          : replaceAt(folder.children || [], depth + 1);
+        if (children === null) return null;
+        const next = items.slice();
+        next[idx] = { ...folder, children };
+        return next;
+      };
+      const updatedLinks = replaceAt(cat.links, 0);
+      // 路径失效（文件夹已被删除/合并）时放弃本次排序，不做任何写入
+      if (updatedLinks === null) return cat;
+      return { ...cat, links: updatedLinks, updatedAt: Date.now() };
+    });
     updateLocalAndState({ ...data, categories: newCategories });
   }, [data, updateLocalAndState]);
 
@@ -329,7 +351,8 @@ export function useNavData(initialWallpapers: string[]) {
     }
 
     onProgress?.(5);
-    const webpFile = await convertToWebP(file);
+    // 壁纸是全屏背景，不能复用图标的 128px 默认值
+    const webpFile = await convertToWebP(file, 80, 1920);
     onProgress?.(15);
 
     return await adapter.uploadFile(webpFile, webpFile.name, (progress) => {

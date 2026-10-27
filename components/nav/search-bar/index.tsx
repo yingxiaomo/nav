@@ -250,7 +250,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
         closeDropdown();
         addSearch(text);
         if (engine.url !== "local") {
-          window.open(`${engine.url}${encodeURIComponent(text)}`, "_blank");
+          openExternalUrl(`${engine.url}${encodeURIComponent(text)}`);
         }
         return;
       }
@@ -269,7 +269,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
         onLocalSearch?.(searchQuery);
       } else {
         setQuery(searchQuery);
-        window.open(`${engine.url}${encodeURIComponent(searchQuery)}`, "_blank");
+        openExternalUrl(`${engine.url}${encodeURIComponent(searchQuery)}`);
       }
       closeDropdown();
     };
@@ -282,7 +282,7 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
       } else if (item.kind === "web") {
         addSearch(item.text);
         if (engine.url !== "local") {
-          window.open(`${engine.url}${encodeURIComponent(item.text)}`, "_blank");
+          openExternalUrl(`${engine.url}${encodeURIComponent(item.text)}`);
         }
       } else if (item.kind === "global") {
         if (item.url) {

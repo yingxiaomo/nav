@@ -15,6 +15,7 @@ import type { MonitorEditTarget } from "@/lib/types/monitor";
 import { useMonitorConfig } from "@/lib/hooks/use-monitor-config";
 import { useUIStore } from "@/lib/stores";
 import { apiWrite } from "@/lib/utils/api";
+import { openExternalUrl } from "@/lib/utils/url";
 
 export function SystemStatusFloater() {
   const [expanded, setExpanded] = useState(false);
@@ -138,7 +139,7 @@ export function SystemStatusFloater() {
             ) : (
               <div className="space-y-1 max-h-[200px] overflow-y-auto">
                 {checks.map((c) => (
-                  <div key={c.id} className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-muted/30 hover:bg-accent/50 transition-colors cursor-pointer" onContextMenu={(e) => { e.preventDefault(); setContextMenu({ id: c.id, x: e.clientX, y: e.clientY }); }} onClick={() => window.open(c.url, "_blank")}>
+                  <div key={c.id} className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-muted/30 hover:bg-accent/50 transition-colors cursor-pointer" onContextMenu={(e) => { e.preventDefault(); setContextMenu({ id: c.id, x: e.clientX, y: e.clientY }); }} onClick={() => openExternalUrl(c.url)}>
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.status === "ok" ? "bg-green-400" : "bg-red-400"}`} />
                       <span className="text-xs truncate text-foreground/80">{c.name}</span>
@@ -174,7 +175,7 @@ export function SystemStatusFloater() {
                       handleDockerReorder(cur);
                     }}
                     onContextMenu={(e) => { e.preventDefault(); setContextMenu({ id: "docker:" + c.name, x: e.clientX, y: e.clientY }); }}
-                    onClick={() => { const url = getDockerUrl(c.name) || parseContainerUrl(c.ports); if (url) window.open(url, "_blank"); }}
+                    onClick={() => { const url = getDockerUrl(c.name) || parseContainerUrl(c.ports); if (url) openExternalUrl(url); }}
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.state === "running" ? "bg-green-400" : "bg-red-400"}`} />

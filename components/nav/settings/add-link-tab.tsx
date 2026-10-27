@@ -149,24 +149,27 @@ export function AddLinkTab({ localData, setLocalData, storageConfig }: AddLinkTa
       });
     }
     
-    const newData = { ...localData };
+    // categories 必须换新数组：直接 push/下标赋值会变异 localData 的共享引用，
+    // 导致 home-client 里依赖 [data.categories] 的 useMemo（搜索索引/常用书签）不重算
+    const newData = { ...localData, categories: [...localData.categories] };
     let categoryIndex = newData.categories.findIndex(c => c.title === sanitizedCategory);
     if (categoryIndex === -1) {
       newData.categories.push({ id: `c-${generateId()}`, title: sanitizedCategory, icon: "FolderOpen", links: [] });
       categoryIndex = newData.categories.length - 1;
+    } else {
+      newData.categories[categoryIndex] = {
+        ...newData.categories[categoryIndex],
+        links: [...newData.categories[categoryIndex].links],
+      };
     }
-    newData.categories[categoryIndex] = {
-      ...newData.categories[categoryIndex],
-      links: [...newData.categories[categoryIndex].links],
-    };
-    
-      newData.categories[categoryIndex].links.push({ 
-        id: `l-${generateId()}`, 
-        title: sanitizedTitle, 
-        url: finalUrl, 
-        icon: newIcon, 
-        updatedAt: Date.now() 
-      });
+
+    newData.categories[categoryIndex].links.push({
+      id: `l-${generateId()}`,
+      title: sanitizedTitle,
+      url: finalUrl,
+      icon: newIcon,
+      updatedAt: Date.now()
+    });
     
     setLocalData(newData);
     setNewUrl(""); 

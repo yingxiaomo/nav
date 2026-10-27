@@ -65,7 +65,8 @@ export interface GoogleDriveSettings {
 export async function createAdapter(config: StorageConfig): Promise<StorageAdapter | null> {
   switch (config.type) {
     case 'api-server':
-      return config.apiServer?.baseUrl ? new (await import('./api-server-adapter')).ApiServerAdapter(config.apiServer) : null;
+      // baseUrl 为空表示同源模式（内网自动检测的零配置场景），ApiServerAdapter 自身支持
+      return config.apiServer ? new (await import('./api-server-adapter')).ApiServerAdapter(config.apiServer) : null;
     case 'github':
       return config.github?.token ? new (await import('./github-repo-adapter')).GithubRepoAdapter(config.github) : null;
     case 'gist':

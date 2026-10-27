@@ -91,6 +91,22 @@ export function SSHTerminalPanel() {
     instancesRef.current = instances;
   }, [instances]);
 
+  // 组件卸载（面板被条件渲染关闭）时释放全部会话资源：
+  // 不清理会让 SSH 连接在后台保持，xterm 实例与 resize 监听持续泄漏
+  useEffect(() => {
+    const cleanups = cleanupRef.current;
+    const terminals = terminalsRef.current;
+    return () => {
+      for (const inst of instancesRef.current) {
+        inst.ws?.close();
+        inst.term?.dispose();
+      }
+      for (const cleanup of cleanups.values()) cleanup();
+      cleanups.clear();
+      terminals.clear();
+    };
+  }, []);
+
   // 主题切换时同步已打开终端配色
   useEffect(() => {
     const termTheme = isDark ? DARK_TERM_THEME : LIGHT_TERM_THEME;

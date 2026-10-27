@@ -56,10 +56,14 @@ export function useStorageConfig() {
     // 最旧版 GitHub 配置迁移
     const githubConfigStr = localStorage.getItem(GITHUB_CONFIG_KEY);
     if (githubConfigStr) {
-      const githubSettings = JSON.parse(githubConfigStr);
-      const migrated: StorageConfig = { type: 'github', github: githubSettings };
-      localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(migrated));
-      return migrated;
+      try {
+        const githubSettings = JSON.parse(githubConfigStr);
+        const migrated: StorageConfig = { type: 'github', github: githubSettings };
+        localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(migrated));
+        return migrated;
+      } catch (e) {
+        console.error("Error parsing legacy github config", e);
+      }
     }
 
     // 同源/内网环境自动启用 API Server（无需手动配置）

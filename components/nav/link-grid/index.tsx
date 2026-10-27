@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useEffect, useId, forwardRef, useImperativeHandle, useCallback } from "react";
+import { useState, useEffect, useId, forwardRef, useImperativeHandle, useCallback, useMemo } from "react";
 import { Category, LinkItem } from "@/lib/types";
 import { X, ChevronLeft, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -66,7 +66,7 @@ interface LinkGridProps {
   onReorder?: (categories: Category[]) => void;
   onOpenChange?: (open: boolean) => void;
   displayMode?: 'folder' | 'list' | 'sidebar';
-  onLinkReorder?: (categoryId: string, links: LinkItem[]) => void;
+  onLinkReorder?: (categoryId: string, links: LinkItem[], folderPath?: string[]) => void;
   pinnedLinks?: LinkItem[];
   onPinLink?: (link: LinkItem) => void;
   onUnpinLink?: (linkId: string) => void;
@@ -182,9 +182,18 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
   
 
 
-  const modalCurrentItems = navStack.length > 0 
-    ? navStack[navStack.length - 1].children || [] 
-    : selectedCategory?.links || [];
+  // 从实时数据沿 navStack 派生当前容器内容：
+  // ① 子文件夹拖拽排序要作用于正确的层级；② 避免使用点击文件夹时的过期快照
+  const modalCurrentItems = useMemo(() => {
+    if (!selectedCategory) return [];
+    let items = selectedCategory.links || [];
+    for (const folder of navStack) {
+      const next = items.find(i => i.id === folder.id && i.type === 'folder');
+      if (!next) break; // 路径失效（数据已被同步/合并改变），停留在能解析的最深层
+      items = next.children || [];
+    }
+    return items;
+  }, [selectedCategory, navStack]);
 
   const modalCurrentTitle = navStack.length > 0
     ? navStack[navStack.length - 1].title
@@ -226,7 +235,8 @@ export const LinkGrid = forwardRef<FolderModalHandle, LinkGridProps>(function Li
 
     const reordered = arrayMove(modalCurrentItems, oldIndex, newIndex);
 
-    onLinkReorder(selectedId, reordered);
+    // folderPath 定位被排序的容器层级（顶层为空数组），防止子文件夹内容覆盖顶层数据
+    onLinkReorder(selectedId, reordered, navStack.map(f => f.id));
   };
 
   const toggleFolder = (id: string) => {

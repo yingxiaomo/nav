@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -16,7 +17,8 @@ import (
 
 // DockerService 封装了轻量 Docker HTTP 客户端，用于容器管理。
 type DockerService struct {
-	cli *http.Client
+	cli       *http.Client
+	streamCli *http.Client
 }
 
 // NewDockerService 创建 Docker 客户端。
@@ -26,13 +28,40 @@ func NewDockerService() (*DockerService, error) {
 	if err != nil {
 		return nil, fmt.Errorf("创建 Docker 客户端失败: %w", err)
 	}
-	return &DockerService{cli: cli}, nil
+	streamCli, err := newDockerStreamClient()
+	if err != nil {
+		return nil, fmt.Errorf("创建 Docker 流客户端失败: %w", err)
+	}
+	return &DockerService{cli: cli, streamCli: streamCli}, nil
 }
 
 // Close 释放空闲连接。
 func (s *DockerService) Close() error {
-	if tr, ok := s.cli.Transport.(*http.Transport); ok {
-		tr.CloseIdleConnections()
+	for _, c := range []*http.Client{s.cli, s.streamCli} {
+		if tr, ok := c.Transport.(*http.Transport); ok {
+			tr.CloseIdleConnections()
+		}
+	}
+	return nil
+}
+
+// shortID 安全截取容器 ID 前 12 位——Docker 返回异常数据（空 ID）时
+// 直接切片会 panic，而后台快照 goroutine 的 panic 会杀死整个进程。
+func shortID(id string) string {
+	if len(id) > 12 {
+		return id[:12]
+	}
+	return id
+}
+
+// containerRefRe 合法的容器名/短 ID 格式（Docker 命名规则）。
+// 服务端统一校验后再拼进 API 路径，防止 ?/#/../% 等字符改变请求目标。
+var containerRefRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$`)
+
+// validateContainerRef 校验容器名/ID
+func validateContainerRef(ref string) error {
+	if !containerRefRe.MatchString(ref) {
+		return fmt.Errorf("非法的容器名或 ID: %q", ref)
 	}
 	return nil
 }
@@ -51,7 +80,7 @@ func (s *DockerService) ListContainers(ctx context.Context) ([]model.DockerConta
 			name = strings.TrimPrefix(c.Names[0], "/")
 		}
 		result = append(result, model.DockerContainer{
-			ID:      c.ID[:12],
+			ID:      shortID(c.ID),
 			Name:    name,
 			Image:   c.Image,
 			State:   c.State,
@@ -94,7 +123,7 @@ func (s *DockerService) ContainerStats(ctx context.Context) ([]model.DockerStat,
 		sData, err := dockerGet[dockerStatsJSON](statsCtx, s.cli, "/containers/"+c.ID+"/stats?stream=false")
 		cancel()
 		if err != nil {
-			slog.Warn("获取容器统计失败", "container", c.ID[:12], "error", err)
+			slog.Warn("获取容器统计失败", "container", shortID(c.ID), "error", err)
 			continue
 		}
 
@@ -138,23 +167,36 @@ func calcCPUPercent(s *dockerStatsJSON) float64 {
 
 // StartContainer 启动已停止的容器。
 func (s *DockerService) StartContainer(ctx context.Context, id string) error {
+	if err := validateContainerRef(id); err != nil {
+		return err
+	}
 	return dockerPost(ctx, s.cli, "/containers/"+id+"/start", 204)
 }
 
 // StopContainer 停止运行中的容器。
 func (s *DockerService) StopContainer(ctx context.Context, id string) error {
+	if err := validateContainerRef(id); err != nil {
+		return err
+	}
 	return dockerPost(ctx, s.cli, "/containers/"+id+"/stop", 204)
 }
 
 // RestartContainer 重启容器。
 func (s *DockerService) RestartContainer(ctx context.Context, id string) error {
+	if err := validateContainerRef(id); err != nil {
+		return err
+	}
 	return dockerPost(ctx, s.cli, "/containers/"+id+"/restart", 204)
 }
 
 // StreamLogs 将容器日志流式传输到指定 channel。
 // 当 context 被取消或日志流结束时，channel 会被关闭。
 func (s *DockerService) StreamLogs(ctx context.Context, containerID string, lines chan<- string) error {
-	reader, err := dockerGetRaw(ctx, s.cli,
+	if err := validateContainerRef(containerID); err != nil {
+		return err
+	}
+	// 用不带 Timeout 的流客户端：30s Timeout 会掐断 follow 长连接
+	reader, err := dockerGetRaw(ctx, s.streamCli,
 		"/containers/"+containerID+"/logs?stdout=true&stderr=true&follow=true&tail=100")
 	if err != nil {
 		return fmt.Errorf("获取容器日志失败: %w", err)
@@ -183,6 +225,10 @@ func (s *DockerService) StreamLogs(ctx context.Context, containerID string, line
 		size := binary.BigEndian.Uint32(hdr[4:8])
 		if size == 0 {
 			continue
+		}
+		// 防御异常帧头导致的超大分配（Docker 实际帧 ≤16KB）
+		if size > 1<<20 {
+			return fmt.Errorf("日志帧过大: %d bytes", size)
 		}
 
 		buf := make([]byte, size)
@@ -249,6 +295,12 @@ func (s *DockerSnapshotter) Snapshot() ([]model.DockerStat, bool, time.Time) {
 }
 
 func (s *DockerSnapshotter) refresh(ctx context.Context) {
+	// 后台 goroutine 不受 HTTP recovery 中间件保护，任何 panic 都会杀死整个进程
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("Docker 快照刷新 panic（已恢复）", "panic", r)
+		}
+	}()
 	stats, err := s.svc.ContainerStats(ctx)
 	if err != nil {
 		slog.Warn("Docker stats 快照刷新失败", "error", err)

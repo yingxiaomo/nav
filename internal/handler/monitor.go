@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -12,7 +11,6 @@ import (
 	"github.com/YingXiaoMo/nav/internal/model"
 	"github.com/YingXiaoMo/nav/internal/notify"
 	"github.com/YingXiaoMo/nav/internal/service"
-	"github.com/YingXiaoMo/nav/internal/session"
 )
 
 // ===== Handlers =====
@@ -133,7 +131,9 @@ func (h *Handler) DeleteCheck() http.HandlerFunc {
 // FetchMonitorIcon handles POST /api/v1/admin/monitor/fetch-icon.
 func FetchMonitorIcon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		type request struct{ URL string `json:"url"` }
+		type request struct {
+			URL string `json:"url"`
+		}
 		var req request
 		if !model.DecodeJSON(r, &req) || req.URL == "" {
 			model.RespondError(w, http.StatusBadRequest, "请输入有效 URL")
@@ -174,7 +174,9 @@ func (h *Handler) WOLById() http.HandlerFunc {
 // WOLDirect handles POST /api/v1/admin/monitor/wol.
 func WOLDirect() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		type request struct{ MAC string `json:"mac"` }
+		type request struct {
+			MAC string `json:"mac"`
+		}
 		var req request
 		if !model.DecodeJSON(r, &req) || req.MAC == "" {
 			model.RespondError(w, http.StatusBadRequest, "请输入 MAC 地址")
@@ -194,19 +196,25 @@ func WOLDirect() http.HandlerFunc {
 
 // MonitorAllResponse 包含监控面板全部数据
 type MonitorAllResponse struct {
-	System     model.SystemInfo                `json:"system"`
-	Targets    []model.MonitorTarget           `json:"targets"`
-	Results    []model.CheckResult             `json:"results"`
-	Containers []model.DockerContainer         `json:"containers"`
-	Stats      []model.DockerStat              `json:"stats"`
-	Metadata   map[string]model.DockerMetadata `json:"metadata"`
-	Uptime     map[string]float64               `json:"uptime,omitempty"`
-	Initializing bool                          `json:"initializing,omitempty"`
+	System       model.SystemInfo                `json:"system"`
+	Targets      []model.MonitorTarget           `json:"targets"`
+	Results      []model.CheckResult             `json:"results"`
+	Containers   []model.DockerContainer         `json:"containers"`
+	Stats        []model.DockerStat              `json:"stats"`
+	Metadata     map[string]model.DockerMetadata `json:"metadata"`
+	Uptime       map[string]float64              `json:"uptime,omitempty"`
+	Initializing bool                            `json:"initializing,omitempty"`
 }
 
 // MonitorAll handles GET /api/v1/admin/monitor/all.
 func (h *Handler) MonitorAll() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// 该端点对未登录用户公开（首页状态浮层）。匿名响应剥离敏感字段：
+		// SSH 凭证（右键连接终端需要）、MAC 地址与容器端口映射（内网拓扑信息，
+		// 可被用于定向攻击内网服务）。监控目标 URL 与公开书签同类，保持下发。
+		_, hasSession := checkSession(r, h.Secrets)
+		anon := !hasSession
+
 		resp := MonitorAllResponse{
 			System:   service.GetSystemInfo(),
 			Targets:  h.HealthChecker.GetTargets(),
@@ -215,13 +223,11 @@ func (h *Handler) MonitorAll() http.HandlerFunc {
 			Uptime:   h.HealthChecker.GetUptimeAll(),
 		}
 
-		// 该端点对未登录用户公开（首页状态浮层），
-		// 有有效会话时保留 SSH 凭证供右键菜单连接终端；
-		// 无会话时剥离避免泄露。
-		if !hasValidSession(r, h.DB) {
+		if anon {
 			for i := range resp.Targets {
 				resp.Targets[i].SSHUser = ""
 				resp.Targets[i].SSHPass = ""
+				resp.Targets[i].MAC = ""
 			}
 		}
 
@@ -246,20 +252,15 @@ func (h *Handler) MonitorAll() http.HandlerFunc {
 			}
 		}
 
+		if anon {
+			for i := range resp.Containers {
+				resp.Containers[i].Ports = ""
+			}
+		}
+
 		model.RespondJSON(w, http.StatusOK, resp)
 	}
 }
 
-// hasValidSession checks whether the request carries a valid admin session cookie.
-// Used by MonitorAll to decide whether to include SSH credentials in the response.
-func hasValidSession(r *http.Request, db *sql.DB) bool {
-	cookie, err := r.Cookie(session.CookieName)
-	if err != nil {
-		return false
-	}
-	secret, _ := queries.GetSetting(r.Context(), db, "session_secret")
-	if secret == "" {
-		return false
-	}
-	return session.Verify(cookie.Value, secret) != ""
-}
+// hasValidSession 已移除：统一复用 auth.go 的 checkSession（原先三处实现重复，
+// 且每请求都直查 session_secret，拖慢单连接 SQLite 下的所有认证请求）。

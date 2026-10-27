@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/hex"
 	"log/slog"
 	"net"
@@ -85,12 +84,15 @@ func isSecureRequest(r *http.Request) bool {
 	return r.TLS != nil
 }
 
-func checkSession(r *http.Request, db *sql.DB) (string, bool) {
+func checkSession(r *http.Request, secrets *session.SecretProvider) (string, bool) {
+	if secrets == nil {
+		return "", false
+	}
 	cookie, err := r.Cookie(session.CookieName)
 	if err != nil {
 		return "", false
 	}
-	sessionSecret, _ := queries.GetSetting(r.Context(), db, "session_secret")
+	sessionSecret := secrets.Get(r.Context())
 	if sessionSecret == "" {
 		return "", false
 	}
@@ -113,32 +115,32 @@ var (
 const maxAttempts = 5
 const blockDuration = 15 * time.Minute
 
-func checkRateLimit(ip string) bool {
+func checkRateLimit(key string) bool {
 	loginAttemptsMu.Lock()
 	defer loginAttemptsMu.Unlock()
 	now := time.Now().UnixMilli()
-	entry, exists := loginAttempts[ip]
+	entry, exists := loginAttempts[key]
 	if exists && entry.until > now {
 		return false
 	}
 	if exists && entry.until <= now {
-		delete(loginAttempts, ip)
+		delete(loginAttempts, key)
 	}
 	return true
 }
 
-func recordLoginAttempt(ip string, success bool) {
+func recordLoginAttempt(key string, success bool) {
 	loginAttemptsMu.Lock()
 	defer loginAttemptsMu.Unlock()
 	now := time.Now().UnixMilli()
 	if success {
-		delete(loginAttempts, ip)
+		delete(loginAttempts, key)
 		return
 	}
-	entry, exists := loginAttempts[ip]
+	entry, exists := loginAttempts[key]
 	if !exists {
 		entry = &loginAttempt{until: now}
-		loginAttempts[ip] = entry
+		loginAttempts[key] = entry
 	}
 	entry.count++
 	if entry.count >= maxAttempts {
@@ -146,6 +148,13 @@ func recordLoginAttempt(ip string, success bool) {
 		entry.count = 0
 	}
 }
+
+// dummyHash 用于"用户不存在"分支的耗时对齐：用户存在时走 bcrypt（约 100ms），
+// 不存在时直接返回的话，响应时间差可被用来枚举有效用户名。
+var dummyHash = func() []byte {
+	h, _ := bcrypt.GenerateFromPassword([]byte("timing-alignment-dummy"), bcrypt.DefaultCost)
+	return h
+}()
 
 // ===== Handlers =====
 
@@ -169,7 +178,11 @@ func (h *Handler) Login() http.HandlerFunc {
 
 		ip := ipFromRemote(r.RemoteAddr)
 
-		if !checkRateLimit(ip) {
+		// 限流键为 IP+用户名：反代/NAT 后所有访客共享出口 IP，
+		// 纯 IP 键会让攻击者用 5 次错误密码锁死全部用户（登录 DoS）
+		limitKey := ip + "|" + body.Username
+
+		if !checkRateLimit(limitKey) {
 			slog.Warn("登录限流", "ip", ip)
 			model.RespondError(w, http.StatusTooManyRequests, "登录尝试过于频繁，请 15 分钟后再试")
 			return
@@ -182,20 +195,22 @@ func (h *Handler) Login() http.HandlerFunc {
 			return
 		}
 		if user == nil {
-			recordLoginAttempt(ip, false)
+			// 跑一次 dummy bcrypt，让响应耗时与"用户存在但密码错误"一致
+			_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(body.Password))
+			recordLoginAttempt(limitKey, false)
 			slog.Warn("登录失败 - 用户不存在", "ip", ip, "username", body.Username)
 			model.RespondError(w, http.StatusUnauthorized, "用户名或密码错误")
 			return
 		}
 
 		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(body.Password)); err != nil {
-			recordLoginAttempt(ip, false)
+			recordLoginAttempt(limitKey, false)
 			slog.Warn("登录失败 - 密码错误", "ip", ip, "username", body.Username)
 			model.RespondError(w, http.StatusUnauthorized, "用户名或密码错误")
 			return
 		}
 
-		recordLoginAttempt(ip, true)
+		recordLoginAttempt(limitKey, true)
 
 		secret, _ := queries.GetSetting(r.Context(), db, "session_secret")
 		if secret == "" {
@@ -205,6 +220,7 @@ func (h *Handler) Login() http.HandlerFunc {
 				model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 				return
 			}
+			h.Secrets.Invalidate()
 		}
 
 		cookieValue := session.Sign(user.ID, secret)
@@ -224,15 +240,22 @@ func (h *Handler) Logout() http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
+		h.Secrets.Invalidate()
 		clearSessionCookie(w)
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 	}
 }
 
+// setupMu 串行化初始化请求：GetUserCount 检查与 CreateUser 非原子，
+// 并发两个 setup 请求可各用不同用户名建出两个管理员（TOCTOU）
+var setupMu sync.Mutex
+
 // Setup handles POST /api/v1/auth/setup — initial admin account creation
 func (h *Handler) Setup() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		db := h.DB
+		setupMu.Lock()
+		defer setupMu.Unlock()
 
 		count, err := queries.GetUserCount(r.Context(), db)
 		if err != nil {
@@ -288,6 +311,7 @@ func (h *Handler) Setup() http.HandlerFunc {
 				model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 				return
 			}
+			h.Secrets.Invalidate()
 		}
 		setSessionCookie(w, session.Sign(userID, secret), isSecureRequest(r))
 
@@ -300,7 +324,7 @@ func (h *Handler) Setup() http.HandlerFunc {
 func (h *Handler) AuthStatus() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		count, _ := queries.GetUserCount(r.Context(), h.DB)
-		_, loggedIn := checkSession(r, h.DB)
+		_, loggedIn := checkSession(r, h.Secrets)
 
 		model.RespondJSON(w, http.StatusOK, map[string]any{
 			"setupRequired": count == 0,
@@ -322,7 +346,7 @@ func (h *Handler) ChangePassword() http.HandlerFunc {
 			return
 		}
 
-		uid, loggedIn := checkSession(r, db)
+		uid, loggedIn := checkSession(r, h.Secrets)
 		if !loggedIn || uid == "" {
 			model.RespondError(w, http.StatusUnauthorized, "请先登录")
 			return
@@ -381,6 +405,7 @@ func (h *Handler) ChangePassword() http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
+		h.Secrets.Invalidate()
 
 		slog.Info("密码修改成功", "uid", uid)
 		model.RespondJSON(w, http.StatusOK, map[string]any{

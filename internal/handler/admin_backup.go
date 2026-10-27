@@ -6,6 +6,8 @@ import (
 
 	"github.com/YingXiaoMo/nav/internal/db/queries"
 	"github.com/YingXiaoMo/nav/internal/model"
+	"github.com/YingXiaoMo/nav/internal/remote"
+	"github.com/YingXiaoMo/nav/internal/secret"
 )
 
 // ===== Backup export types (match TypeScript FullBackup structure) =====
@@ -201,6 +203,15 @@ func (h *Handler) ImportBackup() http.HandlerFunc {
 		}
 
 		for key, value := range body.Settings {
+			// 备份文件不可覆盖会话密钥；设备配置密码按入库要求静态加密。
+			// （session_secret 由下方"保留现有设置"循环原样恢复）
+			if protectedSettings[key] {
+				slog.Warn("备份导入: 跳过受保护设置键", "key", key)
+				continue
+			}
+			if key == "device_config" {
+				value = remote.EncryptDeviceConfigJSON(value)
+			}
 			if _, err := tx.ExecContext(r.Context(),
 				"INSERT INTO settings (key, value) VALUES (?, ?)", key, value); err != nil {
 				slog.Error("备份导入: 恢复设置失败", "error", err, "key", key)
@@ -257,18 +268,10 @@ func (h *Handler) ImportBackup() http.HandlerFunc {
 			}
 		}
 
-		// 恢复 Docker 元数据
-		if body.DockerMetadata != nil {
-			for name, meta := range body.DockerMetadata {
-				meta.Name = name
-				h.DockerMeta.Set(name, meta)
-			}
-		}
-
 		for _, mt := range body.MonitorTargets {
 			if _, err := tx.ExecContext(r.Context(),
 				"INSERT INTO monitor_targets (id, name, url, icon, mac, timeout, created_at, ssh_user, ssh_pass, check_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-				mt.ID, mt.Name, mt.URL, mt.Icon, mt.MAC, mt.Timeout, mt.CreatedAt, mt.SSHUser, mt.SSHPass, mt.CheckType); err != nil {
+				mt.ID, mt.Name, mt.URL, mt.Icon, mt.MAC, mt.Timeout, mt.CreatedAt, mt.SSHUser, secret.Encrypt(mt.SSHPass), mt.CheckType); err != nil {
 				slog.Error("备份导入: 恢复监控目标失败", "error", err)
 				model.RespondError(w, http.StatusInternalServerError, "恢复失败")
 				return
@@ -293,6 +296,19 @@ func (h *Handler) ImportBackup() http.HandlerFunc {
 			slog.Error("备份导入: 提交事务失败", "error", err)
 			model.RespondError(w, http.StatusInternalServerError, "恢复失败")
 			return
+		}
+
+		// Docker 元数据不走 DB 事务：放到 Commit 成功之后写盘，
+		// 避免 DB 回滚而元数据已被覆盖；错误至少要暴露给用户
+		if body.DockerMetadata != nil {
+			for name, meta := range body.DockerMetadata {
+				meta.Name = name
+				if err := h.DockerMeta.Set(name, meta); err != nil {
+					slog.Error("备份导入: 恢复 Docker 元数据失败", "error", err)
+					model.RespondJSON(w, http.StatusOK, map[string]any{"success": true, "warning": "Docker 元数据恢复失败"})
+					return
+				}
+			}
 		}
 
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})

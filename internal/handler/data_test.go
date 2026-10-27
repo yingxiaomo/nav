@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -9,7 +10,9 @@ import (
 	"testing"
 
 	"github.com/YingXiaoMo/nav/internal/db"
+	"github.com/YingXiaoMo/nav/internal/db/queries"
 	"github.com/YingXiaoMo/nav/internal/model"
+	"github.com/YingXiaoMo/nav/internal/session"
 )
 
 func setupTestDB(t *testing.T) *sql.DB {
@@ -27,7 +30,13 @@ func setupTestDB(t *testing.T) *sql.DB {
 
 func setupHandler(t *testing.T) *Handler {
 	t.Helper()
-	return &Handler{DB: setupTestDB(t)}
+	database := setupTestDB(t)
+	return &Handler{
+		DB: database,
+		Secrets: session.NewSecretProvider(func(ctx context.Context) (string, error) {
+			return queries.GetSetting(ctx, database, "session_secret")
+		}),
+	}
 }
 
 func TestGetData_EmptyDatabase(t *testing.T) {

@@ -1,11 +1,9 @@
 package middleware
 
 import (
-	"database/sql"
 	"net/http"
 	"strings"
 
-	"github.com/YingXiaoMo/nav/internal/db/queries"
 	"github.com/YingXiaoMo/nav/internal/model"
 	"github.com/YingXiaoMo/nav/internal/session"
 )
@@ -77,7 +75,7 @@ func isPublicRead(path string) bool {
 // This closes the previous "all GET requests are public" hole, which exposed
 // secret settings (session_secret, bot/ai/device configs) and the unauthenticated
 // SSH WebSocket / SSRF endpoints to anyone who could reach the server.
-func SessionAuth(database *sql.DB) func(http.Handler) http.Handler {
+func SessionAuth(secrets *session.SecretProvider) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			path := r.URL.Path
@@ -110,7 +108,7 @@ func SessionAuth(database *sql.DB) func(http.Handler) http.Handler {
 				return
 			}
 
-			sessionSecret, _ := queries.GetSetting(r.Context(), database, "session_secret")
+			sessionSecret := secrets.Get(r.Context())
 			if sessionSecret == "" || session.Verify(cookie.Value, sessionSecret) == "" {
 				model.RespondError(w, http.StatusUnauthorized, "会话已过期，请重新登录")
 				return

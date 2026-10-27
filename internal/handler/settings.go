@@ -1,14 +1,12 @@
 package handler
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 
 	"github.com/YingXiaoMo/nav/internal/db/queries"
 	"github.com/YingXiaoMo/nav/internal/model"
 	"github.com/YingXiaoMo/nav/internal/remote"
-	"github.com/YingXiaoMo/nav/internal/tgbot"
 )
 
 var protectedSettings = map[string]bool{
@@ -23,6 +21,11 @@ func (h *Handler) ListSettings() http.HandlerFunc {
 			model.RespondError(w, http.StatusInternalServerError, "服务器内部错误")
 			return
 		}
+		// 保护键（session_secret 等）设为 write-only：拿到它就能离线伪造任意会话，
+		// 不应随设置列表下发（前端无任何读取该键的场景）
+		for key := range protectedSettings {
+			delete(settings, key)
+		}
 		model.RespondJSON(w, http.StatusOK, settings)
 	}
 }
@@ -31,6 +34,12 @@ func (h *Handler) GetSetting() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		db := h.DB
 		key := r.PathValue("key")
+
+		// 保护键 write-only：只回显键存在、值为空
+		if protectedSettings[key] {
+			model.RespondJSON(w, http.StatusOK, map[string]string{"key": key, "value": ""})
+			return
+		}
 
 		value, err := queries.GetSetting(r.Context(), db, key)
 		if err != nil {
@@ -104,26 +113,10 @@ func (h *Handler) UpdateSettings() http.HandlerFunc {
 			return
 		}
 
-		// 如果更新了 Bot 配置，热重载
-		if botCfg, hasBot := body["bot_config"]; hasBot && h.TGBot != nil {
-			h.TGBot.Stop()
-			var bc tgbot.BotConfig
-			if json.Unmarshal([]byte(botCfg), &bc) == nil && bc.Token != "" {
-				newBot := tgbot.NewBot(bc)
-				cmdHandler := &tgbot.CmdHandler{
-					Devices: h.DeviceMgr,
-					DB:      h.DB,
-				}
-				// 读取 AI 配置
-				var aiCfg tgbot.LLMConfig
-				if aiRaw, ok := body["ai_config"]; ok && aiRaw != "" {
-					json.Unmarshal([]byte(aiRaw), &aiCfg)
-					cmdHandler.LLM = aiCfg
-				}
-				newBot.Start(cmdHandler)
-				h.TGBot = newBot
-				slog.Info("TG Bot 已热重载")
-			}
+		// Bot/AI 配置变更需重启进程生效（启动时读取；TG Bot 不做热重载，
+		// 避免为一次性场景维护 goroutine 生命周期）
+		if _, hasBot := body["bot_config"]; hasBot {
+			slog.Info("TG Bot 配置已更新，重启后生效")
 		}
 		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
 	}

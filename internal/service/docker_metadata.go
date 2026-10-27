@@ -52,6 +52,8 @@ func (s *DockerMetadataStore) load() {
 }
 
 // save writes all metadata to the JSON file.
+// 使用 tmp+rename 原子写：直接 WriteFile 在写入中途崩溃会让文件损坏，
+// 下次启动时 load 会把用户全部容器图标/排序/标签静默清空。
 func (s *DockerMetadataStore) save() error {
 	dir := filepath.Dir(s.filePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -63,7 +65,11 @@ func (s *DockerMetadataStore) save() error {
 		return err
 	}
 
-	return os.WriteFile(s.filePath, data, 0644)
+	tmp := s.filePath + ".tmp"
+	if err := os.WriteFile(tmp, data, 0644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, s.filePath)
 }
 
 // Get returns metadata for a specific container by name.

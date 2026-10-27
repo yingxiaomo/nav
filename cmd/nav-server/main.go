@@ -20,6 +20,7 @@ import (
 	"github.com/YingXiaoMo/nav/internal/notify"
 	"github.com/YingXiaoMo/nav/internal/remote"
 	"github.com/YingXiaoMo/nav/internal/service"
+	"github.com/YingXiaoMo/nav/internal/session"
 	"github.com/YingXiaoMo/nav/internal/tgbot"
 )
 
@@ -70,7 +71,7 @@ func loadConfig() Config {
 	}
 }
 
-	// recoveryMiddleware 捕获 handler panic，防止服务崩溃
+// recoveryMiddleware 捕获 handler panic，防止服务崩溃
 func recoveryMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
@@ -79,6 +80,22 @@ func recoveryMiddleware(next http.Handler) http.Handler {
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			}
 		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
+// securityHeadersMiddleware 注入基础安全响应头。
+// Docker 合一模式走静态导出（next.config 的 headers() 不生效），必须由 Go 侧兜底。
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		// /_next/static 内容寻址，可长期缓存
+		if strings.HasPrefix(r.URL.Path, "/_next/static/") {
+			h.Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
 		next.ServeHTTP(w, r)
 	})
 }
@@ -95,6 +112,11 @@ func run(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("数据库迁移失败: %w", err)
 	}
 	slog.Info("数据库初始化完成", "path", cfg.DBPath)
+
+	// session_secret 缓存：避免每个认证请求都查一次库（单连接 SQLite 下会串行排队）
+	secrets := session.NewSecretProvider(func(ctx context.Context) (string, error) {
+		return queries.GetSetting(ctx, database, "session_secret")
+	})
 
 	if err := os.MkdirAll(cfg.UploadDir, 0755); err != nil {
 		return fmt.Errorf("创建上传目录失败: %w", err)
@@ -168,6 +190,7 @@ func run(ctx context.Context, cfg Config) error {
 	mux := http.NewServeMux()
 	app := &handler.Handler{
 		DB:            database,
+		Secrets:       secrets,
 		HealthChecker: healthChecker,
 		DockerSvc:     dockerSvc,
 		DockerMeta:    dockerMetaStore,
@@ -177,10 +200,7 @@ func run(ctx context.Context, cfg Config) error {
 		DataDir:       cfg.DataDir,
 	}
 
-		app.RegisterRoutes(mux)
-
-	// Wrap with session auth (protects all POST/PUT/DELETE/PATCH)
-	muxWithAuth := middleware.SessionAuth(database)(mux)
+	app.RegisterRoutes(mux)
 
 	// Uploads
 	mux.Handle("GET /uploads/", http.StripPrefix("/uploads/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -200,11 +220,14 @@ func run(ctx context.Context, cfg Config) error {
 		mux.Handle("GET /", http.FileServer(http.Dir(cfg.StaticDir)))
 	}
 
-	handler := recoveryMiddleware(muxWithAuth)
+	// 所有路由注册完毕后再包认证与安全中间件
+	muxWithAuth := middleware.SessionAuth(secrets)(mux)
+	muxWithAuth = securityHeadersMiddleware(muxWithAuth)
+	rootHandler := recoveryMiddleware(muxWithAuth)
 
 	srv := &http.Server{
 		Addr:         ":" + strconv.Itoa(cfg.Port),
-		Handler:      handler,
+		Handler:      rootHandler,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,
@@ -258,8 +281,13 @@ func healthcheckMain() {
 	if p := os.Getenv("PORT"); p != "" {
 		port = p
 	}
-	resp, err := http.Get("http://127.0.0.1:" + port + "/api/v1/health")
-	if err != nil || resp.StatusCode != 200 {
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get("http://127.0.0.1:" + port + "/api/v1/health")
+	if err != nil {
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
 		os.Exit(1)
 	}
 	os.Exit(0)

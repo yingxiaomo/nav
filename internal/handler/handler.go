@@ -7,18 +7,17 @@ import (
 	"github.com/YingXiaoMo/nav/internal/model"
 	"github.com/YingXiaoMo/nav/internal/remote"
 	"github.com/YingXiaoMo/nav/internal/service"
-	"github.com/YingXiaoMo/nav/internal/tgbot"
+	"github.com/YingXiaoMo/nav/internal/session"
 )
 
 // Handler holds all dependencies for HTTP handlers.
 type Handler struct {
 	DB            *sql.DB
+	Secrets       *session.SecretProvider
 	HealthChecker *service.HealthChecker
 	DockerSvc     *service.DockerService
 	DockerMeta    *service.DockerMetadataStore
 	DockerSnap    *service.DockerSnapshotter
-	TGBot         *tgbot.Bot
-	DeviceMgr     *remote.Manager
 	HostKeys      *remote.HostKeyManager
 	UploadDir     string
 	DataDir       string

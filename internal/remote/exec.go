@@ -68,12 +68,22 @@ func (e *SSHExec) ExecSSH(host, username, password, cmd string) (string, error) 
 	session.Stdout = &stdout
 	session.Stderr = &stderr
 
-	if err := session.Run(cmd); err != nil {
-		errMsg := strings.TrimSpace(stderr.String())
-		if errMsg != "" {
-			return "", fmt.Errorf("命令执行失败: %s", errMsg)
+	// 命令级超时：一条 sleep 999999 之类的命令不应把 HTTP 请求或 TG pollLoop 永久挂住。
+	// Close 会使 Run 立即失败，goroutine 经带缓冲 channel 退出，不会泄漏。
+	done := make(chan error, 1)
+	go func() { done <- session.Run(cmd) }()
+	select {
+	case err := <-done:
+		if err != nil {
+			errMsg := strings.TrimSpace(stderr.String())
+			if errMsg != "" {
+				return "", fmt.Errorf("命令执行失败: %s", errMsg)
+			}
+			return "", fmt.Errorf("命令执行失败: %w", err)
 		}
-		return "", fmt.Errorf("命令执行失败: %w", err)
+	case <-time.After(30 * time.Second):
+		_ = session.Close()
+		return "", fmt.Errorf("命令执行超时（30 秒），已中断")
 	}
 
 	out := strings.TrimSpace(stdout.String())

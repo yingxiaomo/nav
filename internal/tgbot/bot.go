@@ -44,8 +44,10 @@ func NewBot(cfg BotConfig) *Bot {
 		}
 	}
 	return &Bot{
-		cfg:    cfg,
-		client: &http.Client{Timeout: 10 * time.Second, Transport: transport},
+		cfg: cfg,
+		// 长轮询服务器侧超时为 10s，client 超时必须留出余量，
+		// 否则无更新时每次都恰好撞上 client 超时 + 3s 退避
+		client: &http.Client{Timeout: 20 * time.Second, Transport: transport},
 		stopCh: make(chan struct{}),
 	}
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/YingXiaoMo/nav/internal/db/queries"
 	"github.com/YingXiaoMo/nav/internal/model"
+	"github.com/YingXiaoMo/nav/internal/remote"
 )
 
 // ===== 导出类型（精确匹配 TypeScript 导出格式）=====
@@ -413,6 +414,12 @@ func (h *Handler) PutData() http.HandlerFunc {
 					if value == nil {
 						continue
 					}
+					// 与 UpdateSettings 相同的保护：云同步/导入链路不得覆盖会话密钥，
+					// 设备配置的 SSH 密码必须经静态加密落库
+					if protectedSettings[key] {
+						slog.Warn("跳过受保护设置键（数据导入）", "key", key)
+						continue
+					}
 					var valStr string
 					switch v := value.(type) {
 					case string:
@@ -420,6 +427,9 @@ func (h *Handler) PutData() http.HandlerFunc {
 					default:
 						valBytes, _ := json.Marshal(v)
 						valStr = string(valBytes)
+					}
+					if key == "device_config" {
+						valStr = remote.EncryptDeviceConfigJSON(valStr)
 					}
 
 					if _, err := tx.ExecContext(r.Context(),

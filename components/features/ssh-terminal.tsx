@@ -134,18 +134,22 @@ export function SSHTerminalPanel() {
     term.open(termDiv);
     setTimeout(() => fitAddon.fit(), 50);
 
-    const params = new URLSearchParams({
-      host: cfg.host,
-      user: cfg.user,
-      pass: cfg.pass,
-      port: String(cfg.port || 22),
-    });
+    // 凭据通过 WS 首条消息传递，不进 URL 查询串（避免落入反代访问日志）
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${protocol}//${window.location.host}/api/v1/ws/ssh?${params}`);
+    const ws = new WebSocket(`${protocol}//${window.location.host}/api/v1/ws/ssh`);
 
     term.writeln(`\x1b[90m正在连接 ${cfg.user}@${cfg.host}:${cfg.port || 22} ...\x1b[0m`);
 
-    ws.onopen = () => term.writeln("\x1b[32mWebSocket 已建立，等待 SSH 握手...\x1b[0m");
+    ws.onopen = () => {
+      term.writeln("\x1b[32mWebSocket 已建立，等待 SSH 握手...\x1b[0m");
+      ws.send(JSON.stringify({
+        type: "auth",
+        host: cfg.host,
+        user: cfg.user,
+        pass: cfg.pass,
+        port: cfg.port || 22,
+      }));
+    };
     ws.onmessage = (e) => {
       if (e.data instanceof Blob) {
         e.data.arrayBuffer().then((buf) => term.write(new Uint8Array(buf)));

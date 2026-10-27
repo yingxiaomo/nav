@@ -59,9 +59,8 @@ type dockerMemoryStats struct {
 	MemoryLimit uint64 `json:"limit"`
 }
 
-// newDockerClient 创建连接到 Docker 守护进程的 http.Client。
-// 优先读取 DOCKER_HOST 环境变量，否则默认连接 Unix socket。
-func newDockerClient() (*http.Client, error) {
+// newDockerTransport 构建 Docker socket（unix/tcp）的 Transport。
+func newDockerTransport() (*http.Transport, error) {
 	dockerHost := os.Getenv("DOCKER_HOST")
 	if dockerHost == "" {
 		// 尝试默认 socket 路径
@@ -104,12 +103,31 @@ func newDockerClient() (*http.Client, error) {
 		return nil, fmt.Errorf("不支持的 Docker host 协议: %s", parsed.Scheme)
 	}
 
+	return &http.Transport{DialContext: dialFn}, nil
+}
+
+// newDockerClient 创建连接到 Docker 守护进程的 http.Client（常规短请求）。
+// 优先读取 DOCKER_HOST 环境变量，否则默认连接 Unix socket。
+func newDockerClient() (*http.Client, error) {
+	tr, err := newDockerTransport()
+	if err != nil {
+		return nil, err
+	}
 	return &http.Client{
-		Transport: &http.Transport{
-			DialContext: dialFn,
-		},
-		Timeout: 30 * time.Second,
+		Transport: tr,
+		Timeout:   30 * time.Second,
 	}, nil
+}
+
+// newDockerStreamClient 创建用于流式响应（日志 follow）的 http.Client。
+// 不设 Timeout：http.Client.Timeout 覆盖"读响应体全过程"，会掐断长连接流；
+// 流的生命周期由请求方 context 控制。
+func newDockerStreamClient() (*http.Client, error) {
+	tr, err := newDockerTransport()
+	if err != nil {
+		return nil, err
+	}
+	return &http.Client{Transport: tr}, nil
 }
 
 // dockerGet 向 Docker API 发送 GET 请求并将 JSON 响应解码为目标类型。

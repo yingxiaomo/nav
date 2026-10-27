@@ -26,13 +26,22 @@ func SearchHandler(db *sql.DB) http.HandlerFunc {
 		}
 		qLower := strings.ToLower(q)
 
+		// 转义 LIKE 通配符：否则 q=% 等于全表扫描，匿名可批量枚举内容
+		escapeLike := func(s string) string {
+			s = strings.ReplaceAll(s, `\`, `\\`)
+			s = strings.ReplaceAll(s, `%`, `\%`)
+			s = strings.ReplaceAll(s, `_`, `\_`)
+			return s
+		}
+		pattern := "%" + escapeLike(qLower) + "%"
+
 		results := make([]SearchResult, 0, 10)
 		seen := make(map[string]bool)
 
 		// 搜索书签（标题和 URL）
 		rows, err := db.QueryContext(r.Context(),
-			"SELECT title, url, COALESCE(icon,'') FROM bookmarks WHERE LOWER(title) LIKE ? OR LOWER(url) LIKE ? LIMIT 10",
-			"%"+qLower+"%", "%"+qLower+"%",
+			"SELECT title, url, COALESCE(icon,'') FROM bookmarks WHERE LOWER(title) LIKE ? ESCAPE '\\' OR LOWER(url) LIKE ? ESCAPE '\\' LIMIT 10",
+			pattern, pattern,
 		)
 		if err == nil {
 			defer rows.Close()
@@ -47,8 +56,8 @@ func SearchHandler(db *sql.DB) http.HandlerFunc {
 
 		// 搜索笔记
 		noteRows, err := db.QueryContext(r.Context(),
-			"SELECT title, content FROM notes WHERE LOWER(title) LIKE ? OR LOWER(content) LIKE ? LIMIT 5",
-			"%"+qLower+"%", "%"+qLower+"%",
+			"SELECT title, content FROM notes WHERE LOWER(title) LIKE ? ESCAPE '\\' OR LOWER(content) LIKE ? ESCAPE '\\' LIMIT 5",
+			pattern, pattern,
 		)
 		if err == nil {
 			defer noteRows.Close()
@@ -66,8 +75,8 @@ func SearchHandler(db *sql.DB) http.HandlerFunc {
 
 		// 搜索监控目标
 		monRows, err := db.QueryContext(r.Context(),
-			"SELECT name, url, COALESCE(icon,'') FROM monitor_targets WHERE LOWER(name) LIKE ? OR LOWER(url) LIKE ? LIMIT 5",
-			"%"+qLower+"%", "%"+qLower+"%",
+			"SELECT name, url, COALESCE(icon,'') FROM monitor_targets WHERE LOWER(name) LIKE ? ESCAPE '\\' OR LOWER(url) LIKE ? ESCAPE '\\' LIMIT 5",
+			pattern, pattern,
 		)
 		if err == nil {
 			defer monRows.Close()

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
@@ -33,7 +34,10 @@ func setupAuthTest(t *testing.T) (http.Handler, string) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("reached"))
 	})
-	handler := SessionAuth(database)(next)
+	secrets := session.NewSecretProvider(func(ctx context.Context) (string, error) {
+		return queries.GetSetting(ctx, database, "session_secret")
+	})
+	handler := SessionAuth(secrets)(next)
 
 	validCookie := session.Sign("user-1", secret)
 	return handler, validCookie

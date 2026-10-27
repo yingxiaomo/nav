@@ -13,8 +13,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/ssh"
-
-	"github.com/YingXiaoMo/nav/internal/model"
 )
 
 var upgrader = websocket.Upgrader{
@@ -36,6 +34,19 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+// wsWriter 对 WebSocket 写操作加互斥：gorilla/websocket 要求同一时刻
+// 只有一个 goroutine 调用写方法，并发写会导致 panic 或帧损坏
+type wsWriter struct {
+	mu   sync.Mutex
+	conn *websocket.Conn
+}
+
+func (ww *wsWriter) writeMessage(msgType int, data []byte) error {
+	ww.mu.Lock()
+	defer ww.mu.Unlock()
+	return ww.conn.WriteMessage(msgType, data)
+}
+
 // hostKeyCallback 返回 TOFU 主机密钥校验回调；未注入 HostKeys 时退回不校验。
 func (h *Handler) hostKeyCallback() ssh.HostKeyCallback {
 	if h.HostKeys != nil {
@@ -45,21 +56,44 @@ func (h *Handler) hostKeyCallback() ssh.HostKeyCallback {
 }
 
 // SSHWebSocket handles GET /api/v1/ws/ssh — WebSocket SSH 代理
+//
+// SSH 凭据通过 WS 建立后的首条 JSON 消息（type=auth）传递，
+// 不走 URL 查询串——查询串会落入反向代理访问日志。
 func (h *Handler) SSHWebSocket() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		host := r.URL.Query().Get("host")
-		user := r.URL.Query().Get("user")
-		pass := r.URL.Query().Get("pass")
-		portStr := r.URL.Query().Get("port")
-		if host == "" || user == "" {
-			model.RespondError(w, http.StatusBadRequest, "缺少 SSH 连接参数")
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			slog.Error("WebSocket upgrade 失败", "error", err)
 			return
 		}
-		port := 22
-		if portStr != "" {
-			if p, err := strconv.Atoi(portStr); err == nil {
-				port = p
-			}
+		defer conn.Close()
+
+		ww := &wsWriter{conn: conn}
+
+		// 等待首条认证消息，10s 内未收到则断开
+		_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			_ = ww.writeMessage(websocket.TextMessage, []byte("\r\n未收到 SSH 认证消息: "+err.Error()+"\r\n"))
+			return
+		}
+		_ = conn.SetReadDeadline(time.Time{})
+
+		var auth struct {
+			Type string `json:"type"`
+			Host string `json:"host"`
+			User string `json:"user"`
+			Pass string `json:"pass"`
+			Port int    `json:"port"`
+		}
+		if err := json.Unmarshal(msg, &auth); err != nil || auth.Type != "auth" || auth.Host == "" || auth.User == "" {
+			_ = ww.writeMessage(websocket.TextMessage, []byte("\r\nSSH 认证消息无效\r\n"))
+			return
+		}
+		host, user, pass := auth.Host, auth.User, auth.Pass
+		port := auth.Port
+		if port == 0 {
+			port = 22
 		}
 
 		// 兼容 host 已带端口、或是完整 URL
@@ -70,13 +104,6 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 		if _, _, err := net.SplitHostPort(addr); err != nil {
 			addr = net.JoinHostPort(addr, strconv.Itoa(port))
 		}
-
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			slog.Error("WebSocket upgrade 失败", "error", err)
-			return
-		}
-		defer conn.Close()
 
 		sshConfig := &ssh.ClientConfig{
 			User: user,
@@ -96,14 +123,14 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 
 		client, err := ssh.Dial("tcp", addr, sshConfig)
 		if err != nil {
-			_ = conn.WriteMessage(websocket.TextMessage, []byte("\r\nSSH 连接失败: "+err.Error()+"\r\n"))
+			_ = ww.writeMessage(websocket.TextMessage, []byte("\r\nSSH 连接失败: "+err.Error()+"\r\n"))
 			return
 		}
 		defer client.Close()
 
 		session, err := client.NewSession()
 		if err != nil {
-			_ = conn.WriteMessage(websocket.TextMessage, []byte("\r\nSSH 会话创建失败: "+err.Error()+"\r\n"))
+			_ = ww.writeMessage(websocket.TextMessage, []byte("\r\nSSH 会话创建失败: "+err.Error()+"\r\n"))
 			return
 		}
 		defer session.Close()
@@ -114,32 +141,32 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 			ssh.TTY_OP_OSPEED: 14400,
 		}
 		if err := session.RequestPty("xterm-256color", 24, 80, modes); err != nil {
-			_ = conn.WriteMessage(websocket.TextMessage, []byte("\r\nPTY 分配失败: "+err.Error()+"\r\n"))
+			_ = ww.writeMessage(websocket.TextMessage, []byte("\r\nPTY 分配失败: "+err.Error()+"\r\n"))
 			return
 		}
 
 		stdout, err := session.StdoutPipe()
 		if err != nil {
-			_ = conn.WriteMessage(websocket.TextMessage, []byte("\r\nSSH 管道初始化失败: "+err.Error()+"\r\n"))
+			_ = ww.writeMessage(websocket.TextMessage, []byte("\r\nSSH 管道初始化失败: "+err.Error()+"\r\n"))
 			return
 		}
 		stderr, err := session.StderrPipe()
 		if err != nil {
-			_ = conn.WriteMessage(websocket.TextMessage, []byte("\r\nSSH 管道初始化失败: "+err.Error()+"\r\n"))
+			_ = ww.writeMessage(websocket.TextMessage, []byte("\r\nSSH 管道初始化失败: "+err.Error()+"\r\n"))
 			return
 		}
 		stdin, err := session.StdinPipe()
 		if err != nil {
-			_ = conn.WriteMessage(websocket.TextMessage, []byte("\r\nSSH 管道初始化失败: "+err.Error()+"\r\n"))
+			_ = ww.writeMessage(websocket.TextMessage, []byte("\r\nSSH 管道初始化失败: "+err.Error()+"\r\n"))
 			return
 		}
 
 		if err := session.Shell(); err != nil {
-			_ = conn.WriteMessage(websocket.TextMessage, []byte("\r\nShell 启动失败: "+err.Error()+"\r\n"))
+			_ = ww.writeMessage(websocket.TextMessage, []byte("\r\nShell 启动失败: "+err.Error()+"\r\n"))
 			return
 		}
 
-		_ = conn.WriteMessage(websocket.TextMessage, []byte("\x1b[32mSSH 已连接 "+user+"@"+addr+"\x1b[0m\r\n"))
+		_ = ww.writeMessage(websocket.TextMessage, []byte("\x1b[32mSSH 已连接 "+user+"@"+addr+"\x1b[0m\r\n"))
 
 		var wg sync.WaitGroup
 		wg.Add(2)
@@ -151,7 +178,7 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 			for {
 				n, err := stdout.Read(buf)
 				if n > 0 {
-					_ = conn.WriteMessage(websocket.BinaryMessage, buf[:n])
+					_ = ww.writeMessage(websocket.BinaryMessage, buf[:n])
 				}
 				if err != nil {
 					return
@@ -166,7 +193,7 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 			for {
 				n, err := stderr.Read(buf)
 				if n > 0 {
-					_ = conn.WriteMessage(websocket.BinaryMessage, buf[:n])
+					_ = ww.writeMessage(websocket.BinaryMessage, buf[:n])
 				}
 				if err != nil {
 					return

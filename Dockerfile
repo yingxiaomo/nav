@@ -1,5 +1,5 @@
-# Stage 1: Build frontend static files
-FROM node:20-alpine AS frontend
+# Stage 1: Build frontend static files（Node 24 与 CI/本地一致，自带 npm 11）
+FROM node:24-alpine AS frontend
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 ENV NEXT_TELEMETRY_DISABLED=1

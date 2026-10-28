@@ -22,7 +22,10 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          # 与 Dockerfile、本地开发保持同一 Node 大版本（自带 npm 11）：
+          # 不提交 lockfile 的策略下，依赖树每次全新解析，npm 10.x 的
+          # arborist 存在 edgesOut 崩溃 bug（CI 曾因此全红）
+          node-version: 24
       - run: npm install
       - run: npm run lint
       - run: npm test

@@ -120,10 +120,16 @@ func checkRateLimit(key string) bool {
 	defer loginAttemptsMu.Unlock()
 	now := time.Now().UnixMilli()
 	entry, exists := loginAttempts[key]
-	if exists && entry.until > now {
-		return false
+	if !exists {
+		return true
 	}
-	if exists && entry.until <= now {
+	if entry.until > now {
+		return false // 仍在封禁期
+	}
+	if entry.until != 0 {
+		// 曾被封禁且已到期，清除记录重新计数。
+		// 注意不能对"尚未封禁"的条目（until==0）做删除——
+		// 否则失败计数每次被重置，限流永远无法生效（历史 bug）。
 		delete(loginAttempts, key)
 	}
 	return true
@@ -139,7 +145,7 @@ func recordLoginAttempt(key string, success bool) {
 	}
 	entry, exists := loginAttempts[key]
 	if !exists {
-		entry = &loginAttempt{until: now}
+		entry = &loginAttempt{}
 		loginAttempts[key] = entry
 	}
 	entry.count++

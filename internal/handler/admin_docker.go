@@ -80,6 +80,13 @@ func (h *Handler) DockerStats() http.HandlerFunc {
 			model.RespondError(w, http.StatusServiceUnavailable, "Docker 不可用，需要挂载 Docker socket")
 			return
 		}
+		// 优先读后台快照（每 10s 刷新，毫秒级返回）：实时拉取是逐容器串行
+		// 且每个最长 5s，真实环境（如 fnOS 十余个系统容器）会把本端点挂起数十秒
+		if h.DockerSnap != nil {
+			stats, _, _ := h.DockerSnap.Snapshot()
+			model.RespondJSON(w, http.StatusOK, map[string]any{"stats": stats})
+			return
+		}
 		stats, err := svc.ContainerStats(r.Context())
 		if err != nil {
 			slog.Warn("获取 Docker 容器统计失败", "error", err)

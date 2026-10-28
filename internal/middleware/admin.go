@@ -20,22 +20,20 @@ var publicPaths = []string{
 // navigation homepage renders for anonymous visitors. Everything not listed
 // here (or in publicReadPrefixes) requires a valid session, regardless of
 // HTTP method — i.e. the policy is default-deny.
+//
+// 笔记/待办/监控面板属敏感个人与内网数据，一律登录后可见（不再匿名公开）。
 var publicReadExact = map[string]bool{
-	"/api/v1/data":              true, // 首页聚合数据（仅展示字段，无密钥）
-	"/api/v1/suggest":           true, // 搜索建议
-	"/api/v1/search":            true, // 聚合搜索
-	"/api/v1/categories":        true,
-	"/api/v1/bookmarks":         true,
-	"/api/v1/todos":             true,
-	"/api/v1/notes":             true,
-	"/api/v1/admin/monitor/all": true, // 状态浮层（公开状态页；SSH 凭证已在处理器剥离）
+	"/api/v1/data":       true, // 首页聚合数据（匿名仅书签/展示字段；笔记/待办在处理器剥离）
+	"/api/v1/suggest":    true, // 搜索建议
+	"/api/v1/search":     true, // 聚合搜索（匿名仅书签；笔记/监控结果需登录）
+	"/api/v1/categories": true,
+	"/api/v1/bookmarks":  true,
 }
 
 // publicReadPrefixes covers the per-resource GET endpoints (…/{id}).
 var publicReadPrefixes = []string{
 	"/api/v1/categories/",
 	"/api/v1/bookmarks/",
-	"/api/v1/notes/",
 }
 
 // isPublicPath checks whether the given path is always public.

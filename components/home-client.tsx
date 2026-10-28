@@ -22,6 +22,7 @@ import { Brain, TerminalSquare } from "lucide-react";
 import { useWallpaper, useNavData, useKeyboardShortcuts, useBackendCheck } from "@/lib";
 import { openExternalUrl } from "@/lib/utils/url";
 import { useUIStore } from "@/lib/stores";
+import { useAuthStatus } from "@/lib/hooks/use-auth-status";
 import { CommandPalette } from "@/components/features/command-palette";
 import { AIPanel } from "@/components/features/ai-panel";
 import { SSHTerminalPanel } from "@/components/features/ssh-terminal";
@@ -78,6 +79,9 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const folderNavRef = useRef<FolderModalHandle>(null);
   const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels, isCheatSheetOpen, setCheatSheetOpen, setCommandPaletteOpen, isCommandPaletteOpen, togglePanel, setActivePanel } = useUIStore();
+  const auth = useAuthStatus();
+  // 监控浮层展示内网拓扑，仅登录后渲染；静态模式（无后端）不涉及
+  const showMonitorFloater = data.settings.showMonitor !== false && (!auth.backendAvailable || auth.loggedIn);
 
   // 检测后端是否可用（静态部署时禁用后端功能），定期重试
   useBackendCheck();
@@ -246,7 +250,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
               />
             </ErrorBoundary>
           </Suspense>
-          {data.settings.showMonitor !== false && <div className="max-md:hidden"><SystemStatusFloater /></div>}
+          {showMonitorFloater && <div className="max-md:hidden"><SystemStatusFloater /></div>}
         </div>
 
         {/* Floating feature icons - top left */}

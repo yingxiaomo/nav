@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"database/sql"
 	"net/http"
 	"strings"
 
@@ -17,7 +16,8 @@ type SearchResult struct {
 }
 
 // SearchHandler handles GET /api/v1/search?q=xxx.
-func SearchHandler(db *sql.DB) http.HandlerFunc {
+// 匿名仅搜书签；笔记与监控目标（内网拓扑）需登录。
+func (h *Handler) SearchHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := strings.TrimSpace(r.URL.Query().Get("q"))
 		if q == "" {
@@ -25,6 +25,7 @@ func SearchHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		qLower := strings.ToLower(q)
+		_, hasSession := checkSession(r, h.Secrets)
 
 		// 转义 LIKE 通配符：否则 q=% 等于全表扫描，匿名可批量枚举内容
 		escapeLike := func(s string) string {
@@ -37,6 +38,7 @@ func SearchHandler(db *sql.DB) http.HandlerFunc {
 
 		results := make([]SearchResult, 0, 10)
 		seen := make(map[string]bool)
+		db := h.DB
 
 		// 搜索书签（标题和 URL）
 		rows, err := db.QueryContext(r.Context(),
@@ -54,37 +56,40 @@ func SearchHandler(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		// 搜索笔记
-		noteRows, err := db.QueryContext(r.Context(),
-			"SELECT title, content FROM notes WHERE LOWER(title) LIKE ? ESCAPE '\\' OR LOWER(content) LIKE ? ESCAPE '\\' LIMIT 5",
-			pattern, pattern,
-		)
-		if err == nil {
-			defer noteRows.Close()
-			for noteRows.Next() {
-				var title, content string
-				if err := noteRows.Scan(&title, &content); err == nil {
-					key := "note:" + title
-					if !seen[key] {
-						seen[key] = true
-						results = append(results, SearchResult{Title: title, Type: "note"})
+		// 笔记与监控目标（内网拓扑）仅登录后可搜
+		if hasSession {
+			// 搜索笔记
+			noteRows, err := db.QueryContext(r.Context(),
+				"SELECT title, content FROM notes WHERE LOWER(title) LIKE ? ESCAPE '\\' OR LOWER(content) LIKE ? ESCAPE '\\' LIMIT 5",
+				pattern, pattern,
+			)
+			if err == nil {
+				defer noteRows.Close()
+				for noteRows.Next() {
+					var title, content string
+					if err := noteRows.Scan(&title, &content); err == nil {
+						key := "note:" + title
+						if !seen[key] {
+							seen[key] = true
+							results = append(results, SearchResult{Title: title, Type: "note"})
+						}
 					}
 				}
 			}
-		}
 
-		// 搜索监控目标
-		monRows, err := db.QueryContext(r.Context(),
-			"SELECT name, url, COALESCE(icon,'') FROM monitor_targets WHERE LOWER(name) LIKE ? ESCAPE '\\' OR LOWER(url) LIKE ? ESCAPE '\\' LIMIT 5",
-			pattern, pattern,
-		)
-		if err == nil {
-			defer monRows.Close()
-			for monRows.Next() {
-				var name, url, icon string
-				if err := monRows.Scan(&name, &url, &icon); err == nil && !seen[url] {
-					seen[url] = true
-					results = append(results, SearchResult{Title: name, URL: url, Type: "monitor", Icon: icon})
+			// 搜索监控目标
+			monRows, err := db.QueryContext(r.Context(),
+				"SELECT name, url, COALESCE(icon,'') FROM monitor_targets WHERE LOWER(name) LIKE ? ESCAPE '\\' OR LOWER(url) LIKE ? ESCAPE '\\' LIMIT 5",
+				pattern, pattern,
+			)
+			if err == nil {
+				defer monRows.Close()
+				for monRows.Next() {
+					var name, url, icon string
+					if err := monRows.Scan(&name, &url, &icon); err == nil && !seen[url] {
+						seen[url] = true
+						results = append(results, SearchResult{Title: name, URL: url, Type: "monitor", Icon: icon})
+					}
 				}
 			}
 		}

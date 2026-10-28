@@ -3,6 +3,7 @@ package handler
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/YingXiaoMo/nav/internal/db/queries"
 	"github.com/YingXiaoMo/nav/internal/model"
@@ -47,25 +48,25 @@ type backupMonitorTarget struct {
 }
 
 type adminBackupExport struct {
-	Version        int                            `json:"version"`
-	ExportedAt     int64                          `json:"exportedAt"`
-	Settings       map[string]string              `json:"settings"`
-	Categories     []backupCategory               `json:"categories"`
-	Bookmarks      []backupBookmark               `json:"bookmarks"`
-	Todos          []model.Todo                   `json:"todos"`
-	Notes          []model.Note                   `json:"notes"`
-	MonitorTargets []backupMonitorTarget          `json:"monitorTargets"`
+	Version        int                             `json:"version"`
+	ExportedAt     int64                           `json:"exportedAt"`
+	Settings       map[string]string               `json:"settings"`
+	Categories     []backupCategory                `json:"categories"`
+	Bookmarks      []backupBookmark                `json:"bookmarks"`
+	Todos          []model.Todo                    `json:"todos"`
+	Notes          []model.Note                    `json:"notes"`
+	MonitorTargets []backupMonitorTarget           `json:"monitorTargets"`
 	DockerMetadata map[string]model.DockerMetadata `json:"dockerMetadata,omitempty"`
 }
 
 type adminBackupImport struct {
-	Version        int                            `json:"version"`
-	Settings       map[string]string              `json:"settings"`
-	Categories     []backupCategory               `json:"categories"`
-	Bookmarks      []backupBookmark               `json:"bookmarks"`
-	Todos          []model.Todo                   `json:"todos"`
-	Notes          []model.Note                   `json:"notes"`
-	MonitorTargets []backupMonitorTarget          `json:"monitorTargets"`
+	Version        int                             `json:"version"`
+	Settings       map[string]string               `json:"settings"`
+	Categories     []backupCategory                `json:"categories"`
+	Bookmarks      []backupBookmark                `json:"bookmarks"`
+	Todos          []model.Todo                    `json:"todos"`
+	Notes          []model.Note                    `json:"notes"`
+	MonitorTargets []backupMonitorTarget           `json:"monitorTargets"`
 	DockerMetadata map[string]model.DockerMetadata `json:"dockerMetadata,omitempty"`
 }
 
@@ -143,6 +144,10 @@ func (h *Handler) ExportBackup() http.HandlerFunc {
 				}
 			}
 		}
+
+		// 会话签名密钥绝不出现在备份文件里：拿到它即可离线伪造任意管理员会话。
+		// 导入侧对保护键"以导入前现值恢复"，剥离后不影响恢复流程。
+		delete(settingsMap, "session_secret")
 
 		backup := adminBackupExport{
 			Version: 1, ExportedAt: model.Now(),
@@ -310,6 +315,25 @@ func (h *Handler) ImportBackup() http.HandlerFunc {
 			return
 		}
 
+		// 跨机恢复提示：备份带加密凭据但本机未配置 NAV_SECRET_KEY 时，
+		// SSH 密码解密会失败（fail-closed 不泄露明文，但用户应知道原因）
+		var warning string
+		if !secret.Enabled() {
+			hasCipher := strings.Contains(body.Settings["device_config"], "enc:v1:")
+			if !hasCipher {
+				for _, mt := range body.MonitorTargets {
+					if secret.IsEncrypted(mt.SSHPass) {
+						hasCipher = true
+						break
+					}
+				}
+			}
+			if hasCipher {
+				warning = "备份包含加密凭据，但本机未配置 NAV_SECRET_KEY，相关 SSH 密码将无法解密"
+				slog.Warn("备份导入: 加密凭据但 NAV_SECRET_KEY 未配置")
+			}
+		}
+
 		// Docker 元数据不走 DB 事务：放到 Commit 成功之后写盘，
 		// 避免 DB 回滚而元数据已被覆盖；错误至少要暴露给用户
 		if body.DockerMetadata != nil {
@@ -323,6 +347,10 @@ func (h *Handler) ImportBackup() http.HandlerFunc {
 			}
 		}
 
-		model.RespondJSON(w, http.StatusOK, map[string]any{"success": true})
+		resp := map[string]any{"success": true}
+		if warning != "" {
+			resp["warning"] = warning
+		}
+		model.RespondJSON(w, http.StatusOK, resp)
 	}
 }

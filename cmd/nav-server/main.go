@@ -84,18 +84,36 @@ func recoveryMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// securityHeadersMiddleware 注入基础安全响应头。
-// Docker 合一模式走静态导出（next.config 的 headers() 不生效），必须由 Go 侧兜底。
+// cspPolicy 与 next.config.ts 保持一致（Docker 合一模式走静态导出，
+// next.config 的 headers() 不生效，CSP 必须由 Go 侧兜底）。
+// 'unsafe-inline' 是 Next.js hydration 所必需；connect-src 放行任意
+// http(s) 是因为云同步端点（S3/WebDAV/自建）由用户配置、无法预先枚举。
+const cspPolicy = "default-src 'self'; " +
+	"script-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.github.com https://*.vercel.com https://cdnjs.cloudflare.com https://static.cloudflareinsights.com; " +
+	"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; " +
+	"img-src 'self' data: https://* http://*; " +
+	"font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; " +
+	"connect-src 'self' https: http:; " +
+	"form-action 'self'; " +
+	"frame-src 'self'"
+
+// securityHeadersMiddleware 注入安全响应头。
 func securityHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		// /_next/static 内容寻址，可长期缓存
+		// HTTPS 反代场景生效；纯 HTTP 部署浏览器按规范忽略该头，无副作用
+		h.Set("Strict-Transport-Security", "max-age=31536000")
 		if strings.HasPrefix(r.URL.Path, "/_next/static/") {
+			// 内容寻址的构建产物，可长期缓存
 			h.Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else if strings.HasPrefix(r.URL.Path, "/api/") {
+			// API 响应含登录态与配置数据，禁止缓存落盘
+			h.Set("Cache-Control", "no-store")
 		}
+		h.Set("Content-Security-Policy", cspPolicy)
 		next.ServeHTTP(w, r)
 	})
 }

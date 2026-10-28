@@ -104,10 +104,10 @@ func newActionToken() string {
 
 var (
 	proposedContainerRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
-	simpleTokenRe       = regexp.MustCompile(`^[a-zA-Z0-9@._-]+$`) // systemd unit 名等
-	pathTokenRe         = regexp.MustCompile(`^[a-zA-Z0-9/._-]+$`) // ls 路径参数
-	digitsRe            = regexp.MustCompile(`^[0-9]+$`)           // ping 次数
-	hostTokenRe         = regexp.MustCompile(`^[a-zA-Z0-9.-]+$`)   // ping 主机
+	simpleTokenRe       = regexp.MustCompile(`^[a-zA-Z0-9@._-]+$`)          // systemd unit 名等
+	pathTokenRe         = regexp.MustCompile(`^[a-zA-Z0-9/._-]+$`)          // ls 路径参数
+	digitsRe            = regexp.MustCompile(`^[0-9]+$`)                    // ping 次数
+	hostTokenRe         = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.-]*$`) // ping 主机（首字符不得为 "-"，防选项注入）
 )
 
 func simpleTokenParam(rest string) error {
@@ -200,7 +200,15 @@ func (h *CmdHandler) validateProposal(cmd string) (kind, target, exec, display s
 		if h.Devices == nil {
 			return "", "", "", "", fmt.Errorf("设备管理未启用")
 		}
-		if h.Devices.Find(alias) == nil {
+		// 精确匹配（Manager.Find 是子串匹配，"as" 会命中 "nas"，可能打错机器）
+		exact := false
+		for _, d := range h.Devices.List() {
+			if d.Name == alias {
+				exact = true
+				break
+			}
+		}
+		if !exact {
 			return "", "", "", "", fmt.Errorf("设备 %q 不在设备列表中", alias)
 		}
 		if err := validateSSHCmd(rest); err != nil {

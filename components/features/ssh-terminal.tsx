@@ -160,8 +160,10 @@ export function SSHTerminalPanel() {
     ws.onclose = () => term.writeln("\r\n\x1b[31m连接已关闭\x1b[0m");
     ws.onerror = () => term.writeln("\r\n\x1b[31m连接错误\x1b[0m");
 
+    // 协议分帧：终端输入以二进制帧发送；文本帧仅承载 resize 控制消息。
+    // 否则粘贴恰好形如 resize JSON 的文本会被服务端误当控制命令吞掉
     term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) ws.send(data);
+      if (ws.readyState === WebSocket.OPEN) ws.send(new TextEncoder().encode(data));
     });
     term.onResize(({ cols, rows }) => {
       if (ws.readyState === WebSocket.OPEN) {

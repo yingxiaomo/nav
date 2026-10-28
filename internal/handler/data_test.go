@@ -262,3 +262,47 @@ func TestPutData_InvalidJSON(t *testing.T) {
 		t.Errorf("expected 400, got %d", rec.Code)
 	}
 }
+
+// 回归锁定：笔记/待办属敏感个人数据，仅登录后随 /api/v1/data 下发；
+// 匿名首页只应拿到书签导航内容。
+func TestGetData_HidesNotesTodosForAnonymous(t *testing.T) {
+	h := setupHandler(t)
+	now := model.Now()
+
+	if _, err := h.DB.Exec(`INSERT INTO notes (id, title, content, updated_at) VALUES ('n1', '私密笔记', '内容', ?)`, now); err != nil {
+		t.Fatalf("seed note: %v", err)
+	}
+	if _, err := h.DB.Exec(`INSERT INTO todos (id, text, completed, created_at) VALUES ('t1', '私密任务', 0, ?)`, now); err != nil {
+		t.Fatalf("seed todo: %v", err)
+	}
+	if _, err := h.DB.Exec(`INSERT INTO settings (key, value) VALUES ('session_secret', 'test-secret')`); err != nil {
+		t.Fatalf("seed session_secret: %v", err)
+	}
+
+	// 匿名请求：notes/todos 必须不下发
+	rec := httptest.NewRecorder()
+	h.GetData()(rec, httptest.NewRequest("GET", "/api/v1/data", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	var anon dataExport
+	if err := json.NewDecoder(rec.Body).Decode(&anon); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(anon.Notes) != 0 || len(anon.Todos) != 0 {
+		t.Errorf("匿名响应不得携带笔记/待办, got notes=%d todos=%d", len(anon.Notes), len(anon.Todos))
+	}
+
+	// 登录请求：完整下发
+	req := httptest.NewRequest("GET", "/api/v1/data", nil)
+	req.AddCookie(&http.Cookie{Name: session.CookieName, Value: session.Sign("u1", "test-secret")})
+	recAuth := httptest.NewRecorder()
+	h.GetData()(recAuth, req)
+	var authed dataExport
+	if err := json.NewDecoder(recAuth.Body).Decode(&authed); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(authed.Notes) != 1 || len(authed.Todos) != 1 {
+		t.Errorf("登录后应完整下发, got notes=%d todos=%d", len(authed.Notes), len(authed.Todos))
+	}
+}

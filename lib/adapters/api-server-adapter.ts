@@ -35,10 +35,18 @@ export class ApiServerAdapter implements StorageAdapter {
     }
   }
 
+  /**
+   * 响应必须是 JSON：SPA 回退的静态托管会把任意路径回退成 index.html
+   * （200 + text/html），只看状态码会把失败误判为成功。
+   */
+  private static isJsonResponse(res: Response): boolean {
+    return (res.headers.get('content-type') || '').includes('application/json');
+  }
+
   async save(data: DataSchema): Promise<boolean> {
     try {
       const res = await this.request('/api/v1/data', { method: 'PUT', body: JSON.stringify(data) });
-      return res.ok;
+      return res.ok && ApiServerAdapter.isJsonResponse(res);
     } catch (err) {
       console.warn('[ApiServerAdapter] save failed:', err);
       return false;
@@ -50,7 +58,9 @@ export class ApiServerAdapter implements StorageAdapter {
     if (this.config.token) headers['Authorization'] = `Bearer ${this.config.token}`;
     const url = this.baseUrl ? `${this.baseUrl}/api/v1/health` : '/api/v1/health';
     const res = await fetch(url, { headers });
-    if (!res.ok) throw new Error(`后端连接失败 (${res.status})`);
+    if (!res.ok || !ApiServerAdapter.isJsonResponse(res)) {
+      throw new Error(`后端连接失败 (${res.status})`);
+    }
   }
 
   async uploadFile(file: File, filename: string, onProgress?: (progress: number) => void): Promise<string> {

@@ -258,6 +258,13 @@ func (h *Handler) GetData() http.HandlerFunc {
 			return
 		}
 
+		// 笔记/待办属敏感个人数据，仅登录后下发（匿名首页只展示书签导航）
+		_, hasSession := checkSession(r, h.Secrets)
+		if !hasSession {
+			todos = nil
+			notes = nil
+		}
+
 		model.RespondJSON(w, http.StatusOK, dataExport{
 			Settings:    siteSettings,
 			Categories:  exportCats,

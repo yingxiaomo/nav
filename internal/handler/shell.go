@@ -13,6 +13,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/ssh"
+
+	navsession "github.com/YingXiaoMo/nav/internal/session"
 )
 
 var upgrader = websocket.Upgrader{
@@ -35,15 +37,20 @@ var upgrader = websocket.Upgrader{
 }
 
 // wsWriter 对 WebSocket 写操作加互斥：gorilla/websocket 要求同一时刻
-// 只有一个 goroutine 调用写方法，并发写会导致 panic 或帧损坏
+// 只有一个 goroutine 调用写方法，并发写会导致 panic 或帧损坏。
+// 每次写带 30s 超时：客户端停止读取 TCP 时写会永久阻塞，
+// 没有deadline 会让泵 goroutine 和 SSH 会话永久泄漏。
 type wsWriter struct {
 	mu   sync.Mutex
 	conn *websocket.Conn
 }
 
+const wsWriteTimeout = 30 * time.Second
+
 func (ww *wsWriter) writeMessage(msgType int, data []byte) error {
 	ww.mu.Lock()
 	defer ww.mu.Unlock()
+	_ = ww.conn.SetWriteDeadline(time.Now().Add(wsWriteTimeout))
 	return ww.conn.WriteMessage(msgType, data)
 }
 
@@ -67,6 +74,10 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 			return
 		}
 		defer conn.Close()
+
+		// 单帧上限：resize/auth 控制帧与终端粘贴均远小于 1MB，
+		// 防止恶意超大帧整块读入内存（OOM 放大）
+		conn.SetReadLimit(1 << 20)
 
 		ww := &wsWriter{conn: conn}
 
@@ -168,8 +179,25 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 
 		_ = ww.writeMessage(websocket.TextMessage, []byte("\x1b[32mSSH 已连接 "+user+"@"+addr+"\x1b[0m\r\n"))
 
+		// 会话凭据留存，stdin 每条消息复核：登出/改密轮换密钥后，
+		// 已建立的终端连接立即失效（否则被窃 cookie 开出的终端在登出后仍存活）
+		var cookieValue string
+		if c, err := r.Cookie(navsession.CookieName); err == nil {
+			cookieValue = c.Value
+		}
+		sessionValid := func() bool {
+			if h.Secrets == nil {
+				return true
+			}
+			return navsession.Verify(cookieValue, h.Secrets.Get(r.Context())) != ""
+		}
+
 		var wg sync.WaitGroup
-		wg.Add(2)
+		wg.Add(3)
+		closeAll := func() {
+			_ = session.Close()
+			_ = conn.Close()
+		}
 
 		// stdout → WebSocket
 		go func() {
@@ -178,7 +206,10 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 			for {
 				n, err := stdout.Read(buf)
 				if n > 0 {
-					_ = ww.writeMessage(websocket.BinaryMessage, buf[:n])
+					if werr := ww.writeMessage(websocket.BinaryMessage, buf[:n]); werr != nil {
+						closeAll()
+						return
+					}
 				}
 				if err != nil {
 					return
@@ -193,7 +224,10 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 			for {
 				n, err := stderr.Read(buf)
 				if n > 0 {
-					_ = ww.writeMessage(websocket.BinaryMessage, buf[:n])
+					if werr := ww.writeMessage(websocket.BinaryMessage, buf[:n]); werr != nil {
+						closeAll()
+						return
+					}
 				}
 				if err != nil {
 					return
@@ -201,13 +235,25 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 			}
 		}()
 
-		// WebSocket → stdin
+		// WebSocket → stdin。
+		// 协议分帧：二进制帧 = 终端输入；文本帧 = 控制消息（resize）。
+		// 这样用户粘贴恰好形如 resize JSON 的文本不会被误当控制命令吞掉。
 		go func() {
+			defer wg.Done()
 			for {
-				_, msg, err := conn.ReadMessage()
+				msgType, msg, err := conn.ReadMessage()
 				if err != nil {
 					_ = session.Close()
 					return
+				}
+				if !sessionValid() {
+					_ = ww.writeMessage(websocket.TextMessage, []byte("\r\n会话已失效，连接关闭\r\n"))
+					closeAll()
+					return
+				}
+				if msgType == websocket.BinaryMessage {
+					_, _ = stdin.Write(msg)
+					continue
 				}
 				var resize struct {
 					Type   string `json:"type"`
@@ -227,13 +273,14 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 					if cols > 0 && rows > 0 {
 						_ = session.WindowChange(rows, cols)
 					}
-					continue
 				}
-				_, _ = stdin.Write(msg)
+				// 其他文本帧忽略
 			}
 		}()
 
 		_ = session.Wait()
+		// 立即关连接解除各泵阻塞，不等到 defer（写阻塞路径下 defer 不够及时）
+		_ = conn.Close()
 		wg.Wait()
 	}
 }

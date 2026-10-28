@@ -33,9 +33,14 @@ func (p *SecretProvider) Get(ctx context.Context) string {
 		return ""
 	}
 	p.mu.Lock()
-	p.secret = loaded
+	// 复查后再回填：若加载期间发生了 Invalidate（密钥轮换），
+	// 不得把读到的旧密钥写进缓存，否则刚被登出的会话重新变为有效
+	if p.secret == "" {
+		p.secret = loaded
+	}
+	current := p.secret
 	p.mu.Unlock()
-	return loaded
+	return current
 }
 
 // Invalidate 丢弃缓存（密钥轮换后调用）。nil 接收者安全（可选依赖）。

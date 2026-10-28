@@ -64,6 +64,8 @@ func TestValidateSSHCmd(t *testing.T) {
 		"ping -c 0 192.168.0.1",           // 次数为 0
 		"ping -c 100 192.168.0.1",         // 次数过大
 		"ping -c 3 192.168.0.1 -f",        // 多余参数
+		"ping -c 99 -i0.01",               // 选项注入 host 位（flood 间隔）
+		"ping -c 99 -f 192.168.0.1",       // flood 选项占 host 位
 	}
 	for _, cmd := range rejected {
 		if err := validateSSHCmd(cmd); err == nil {
@@ -86,9 +88,12 @@ func TestValidateProposal(t *testing.T) {
 		t.Errorf("ssh nas df -h 应放行, got kind=%s target=%s exec=%s err=%v", kind, target, exec, err)
 	}
 
-	// 不存在的设备别名必须拒绝
+	// 不存在的设备别名必须拒绝（含子串别名：Manager.Find 是子串匹配，校验必须精确）
 	if _, _, _, _, err := h.validateProposal("ssh nonexistent uptime"); err == nil {
 		t.Error("不存在的设备别名应被拒绝")
+	}
+	if _, _, _, _, err := h.validateProposal("ssh as uptime"); err == nil {
+		t.Error("子串别名（as ⊂ nas）应被拒绝，防止打错机器")
 	}
 
 	bad := []string{

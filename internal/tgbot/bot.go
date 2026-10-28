@@ -189,53 +189,69 @@ func (b *Bot) pollLoop() {
 			b.offset = u.ID + 1
 			b.mu.Unlock()
 
-			// inline keyboard 回调（/ask 确认执行）
-			if u.CallbackQuery != nil {
-				b.handleCallbackQuery(u.CallbackQuery)
-				continue
-			}
-
-			if u.Message == nil || u.Message.Text == "" {
-				continue
-			}
-
-			fromID := fmt.Sprintf("%d", u.Message.From.ID)
-			if u.Message.Chat != nil {
-				fromID = fmt.Sprintf("%d", u.Message.Chat.ID)
-			}
-
-			// 仅处理授权 chat_id 的命令：机器人可对内网设备执行 SSH / Docker
-			// 操作，未授权来源必须拒绝（否则任何 Telegram 用户都能远程控制）。
-			if !b.isAuthorized(fromID) {
-				slog.Warn("TG 未授权来源，已忽略", "from", fromID)
-				continue
-			}
-
-			text := strings.TrimSpace(u.Message.Text)
-			if !strings.HasPrefix(text, "/") {
-				continue
-			}
-
-			parts := strings.Fields(text)
-			cmd := parts[0]
-			args := parts[1:]
-
-			slog.Info("TG 命令", "from", fromID, "cmd", cmd)
-
-			// /ask 等需要携带确认按钮的命令走 keyboard 路径
-			if kr, ok := b.cmd.(KeyboardResponder); ok {
-				if resp, buttons, has := kr.HandleTGKeyboard(fromID, cmd, args); has {
-					b.SendMessageWithKeyboard(fromID, resp, buttons)
-					continue
-				}
-			}
-
-			resp := b.cmd.HandleTG(fromID, cmd, args)
-			b.SendMessage(fromID, resp)
+			// 每条 update 独立 goroutine 处理（带 panic 兜底）：
+			// /ask 的 LLM 调用与 SSH 执行最长 30s，同步处理会阻塞整个 pollLoop，
+			// 让所有 chat 的后续命令与确认回调排队
+			u := u
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						slog.Error("TG update 处理 panic", "panic", r, "update", u.ID)
+					}
+				}()
+				b.processUpdate(u)
+			}()
 		}
 
 		time.Sleep(1 * time.Second)
 	}
+}
+
+// processUpdate 处理单条 update（消息命令或 inline keyboard 回调）
+func (b *Bot) processUpdate(u tgUpdate) {
+	// inline keyboard 回调（/ask 确认执行）
+	if u.CallbackQuery != nil {
+		b.handleCallbackQuery(u.CallbackQuery)
+		return
+	}
+
+	if u.Message == nil || u.Message.Text == "" {
+		return
+	}
+
+	fromID := fmt.Sprintf("%d", u.Message.From.ID)
+	if u.Message.Chat != nil {
+		fromID = fmt.Sprintf("%d", u.Message.Chat.ID)
+	}
+
+	// 仅处理授权 chat_id 的命令：机器人可对内网设备执行 SSH / Docker
+	// 操作，未授权来源必须拒绝（否则任何 Telegram 用户都能远程控制）。
+	if !b.isAuthorized(fromID) {
+		slog.Warn("TG 未授权来源，已忽略", "from", fromID)
+		return
+	}
+
+	text := strings.TrimSpace(u.Message.Text)
+	if !strings.HasPrefix(text, "/") {
+		return
+	}
+
+	parts := strings.Fields(text)
+	cmd := parts[0]
+	args := parts[1:]
+
+	slog.Info("TG 命令", "from", fromID, "cmd", cmd)
+
+	// /ask 等需要携带确认按钮的命令走 keyboard 路径
+	if kr, ok := b.cmd.(KeyboardResponder); ok {
+		if resp, buttons, has := kr.HandleTGKeyboard(fromID, cmd, args); has {
+			b.SendMessageWithKeyboard(fromID, resp, buttons)
+			return
+		}
+	}
+
+	resp := b.cmd.HandleTG(fromID, cmd, args)
+	b.SendMessage(fromID, resp)
 }
 
 // handleCallbackQuery 处理 /ask 的确认/取消按钮：

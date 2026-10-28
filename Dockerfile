@@ -25,7 +25,7 @@ COPY --from=gb /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=gb /nav-server /nav-server
 COPY --from=frontend /app/out ./public
 VOLUME /app/data
-ENV PORT=8642 DATABASE_URL=/app/data/nav.db UPLOAD_DIR=/app/data/uploads CORS_ORIGIN=*
+ENV PORT=8642 DATABASE_URL=/app/data/nav.db UPLOAD_DIR=/app/data/uploads
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
   CMD ["/nav-server", "healthcheck"]
 EXPOSE 8642

@@ -94,13 +94,28 @@ func TestSessionAuth_PublicRead(t *testing.T) {
 		"/api/v1/categories",
 		"/api/v1/bookmarks",
 		"/api/v1/bookmarks/abc",
-		"/api/v1/todos",
-		"/api/v1/notes",
-		"/api/v1/admin/monitor/all",
 	}
 	for _, p := range public {
 		if code := do(t, handler, "GET", p, ""); code != http.StatusOK {
 			t.Errorf("GET %s: expected 200 (public read), got %d", p, code)
+		}
+	}
+}
+
+// TestSessionAuth_SensitiveReadsRequireAuth locks the login-gating policy:
+// 笔记/待办/监控面板（内网拓扑与个人数据）匿名一律 401。
+func TestSessionAuth_SensitiveReadsRequireAuth(t *testing.T) {
+	handler, _ := setupAuthTest(t)
+
+	sensitive := []string{
+		"/api/v1/todos",
+		"/api/v1/notes",
+		"/api/v1/notes/abc",
+		"/api/v1/admin/monitor/all",
+	}
+	for _, p := range sensitive {
+		if code := do(t, handler, "GET", p, ""); code != http.StatusUnauthorized {
+			t.Errorf("GET %s: expected 401 (sensitive, login required), got %d", p, code)
 		}
 	}
 }

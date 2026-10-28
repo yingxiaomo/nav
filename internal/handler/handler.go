@@ -85,7 +85,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/upload", http.HandlerFunc(h.Upload()))
 	mux.Handle("GET /api/v1/parse", http.HandlerFunc(ParseURLHandler()))
 	mux.Handle("GET /api/v1/suggest", http.HandlerFunc(SuggestHandler()))
-	mux.Handle("GET /api/v1/search", http.HandlerFunc(SearchHandler(h.DB)))
+	mux.Handle("GET /api/v1/search", http.HandlerFunc(h.SearchHandler()))
 
 	// Admin — Docker
 	mux.Handle("GET /api/v1/admin/docker/containers", http.HandlerFunc(h.DockerContainers()))

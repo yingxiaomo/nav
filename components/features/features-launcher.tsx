@@ -7,6 +7,7 @@ import { TodoWidget } from "@/components/features/todo-widget";
 import { NoteWidget } from "@/components/features/note-widget";
 import { Todo, Note } from "@/lib/types";
 import { useUIStore } from "@/lib/stores";
+import { useAuthStatus } from "@/lib/hooks/use-auth-status";
 
 interface FeaturesLauncherProps {
   todos: Todo[];
@@ -18,6 +19,11 @@ interface FeaturesLauncherProps {
 export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }: FeaturesLauncherProps) {
   const { activePanel, togglePanel, setActivePanel, backendAvailable } = useUIStore();
   const sidebarCollapsed = useUIStore(s => s.sidebarCollapsed);
+  const auth = useAuthStatus();
+
+  // 笔记/待办属敏感个人数据：后端模式仅登录后展示入口；
+  // 静态部署模式（无后端）数据来自本地/云同步，不门控
+  const showPersonalWidgets = !backendAvailable || auth.loggedIn;
 
   return (
     <>
@@ -25,6 +31,7 @@ export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }:
       <div className="fixed top-6 z-50 max-md:hidden flex gap-3 transition-[left] duration-300"
         style={{ left: sidebarCollapsed ? '1.5rem' : 'calc(360px + 1.5rem)' }}
       >
+        {showPersonalWidgets && (
         <Button
           variant="outline"
           onClick={() => togglePanel('todo')}
@@ -33,7 +40,9 @@ export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }:
           <ListTodo className="w-5 h-5 shrink-0 text-blue-400" />
           <span className="text-sm">待办</span>
         </Button>
+        )}
 
+        {showPersonalWidgets && (
         <Button
           variant="outline"
           onClick={() => togglePanel('note')}
@@ -42,6 +51,7 @@ export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }:
           <NotebookPen className="w-5 h-5 shrink-0 text-amber-400" />
           <span className="text-sm">笔记</span>
         </Button>
+        )}
 
         {backendAvailable && (
         <Button

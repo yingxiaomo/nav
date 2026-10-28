@@ -56,18 +56,19 @@ func (h *CmdHandler) HandleTG(fromID, cmd string, args []string) string {
 }
 
 // HandleTGKeyboard 可选接口（KeyboardResponder）：/ask 需要携带确认按钮。
-// 返回 ok=false 时 Bot 回退到普通 HandleTG 路径。
+// 确认 token 编入按钮的 callback_data（"askrun:<token>"），旧提议的按钮
+// 因 token 不匹配自动失效。返回 ok=false 时 Bot 回退到普通 HandleTG 路径。
 func (h *CmdHandler) HandleTGKeyboard(fromID, cmd string, args []string) (text string, buttons []InlineButton, ok bool) {
 	if cmd != "/ask" {
 		return "", nil, false
 	}
-	text, withButtons := h.handleAsk(fromID, args)
-	if !withButtons {
+	text, token := h.handleAsk(fromID, args)
+	if token == "" {
 		return text, nil, true
 	}
 	return text, []InlineButton{
-		{Text: "✅ 执行", Data: cbConfirm},
-		{Text: "❌ 取消", Data: cbCancel},
+		{Text: "✅ 执行", Data: cbConfirm + ":" + token},
+		{Text: "❌ 取消", Data: cbCancel + ":" + token},
 	}, true
 }
 

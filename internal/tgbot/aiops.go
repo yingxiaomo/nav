@@ -11,6 +11,8 @@ package tgbot
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"regexp"
 	"strings"
@@ -42,7 +44,7 @@ const (
 
 // pendingAction 待确认的执行动作（每个 chat 同时最多一个）
 type pendingAction struct {
-	msgID    int    // 绑定的 TG 消息 ID，防止旧消息上的按钮操作新提议
+	token    string // 随机 token，随确认按钮下发；旧消息上的按钮因 token 不匹配而失效
 	display  string // 展示给用户的原始提议（执行时二次校验的依据）
 	kind     string // "docker" | "ssh"
 	target   string // 容器名 / 设备别名
@@ -66,13 +68,36 @@ func (s *aiopsState) setPending(chatID string, pa *pendingAction) {
 	s.pending[chatID] = pa
 }
 
-// takePending 取出并删除待确认动作（消费即失效，防双击重复执行）
+// takePending 取出并删除待确认动作（取消路径用）
 func (s *aiopsState) takePending(chatID string) *pendingAction {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	pa := s.pending[chatID]
 	delete(s.pending, chatID)
 	return pa
+}
+
+// takePendingIfToken 仅当 token 匹配时取出并删除待确认动作。
+// 原子执行：旧提议的按钮不会误消费新提议，且并发双击只有一次能通过。
+func (s *aiopsState) takePendingIfToken(chatID, token string) *pendingAction {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	pa := s.pending[chatID]
+	if pa == nil || pa.token != token {
+		return nil
+	}
+	delete(s.pending, chatID)
+	return pa
+}
+
+// newActionToken 生成确认 token（crypto/rand，不可猜测）
+func newActionToken() string {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		// rand 失败极罕见；退化为时间戳，仍保证同 chat 内提议互不相同
+		return fmt.Sprintf("t%x", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b)
 }
 
 // ===== 提议校验 =====
@@ -239,24 +264,25 @@ func (h *CmdHandler) statusSnapshot() string {
 
 // ===== /ask 处理 =====
 
-// handleAsk AI 诊断问答。返回回复文本，以及是否需要附带确认按钮（有合法提议时）。
-func (h *CmdHandler) handleAsk(fromID string, args []string) (string, bool) {
+// handleAsk AI 诊断问答。
+// 返回回复文本、确认 token（有合法提议时非空，随按钮 callback_data 下发）。
+func (h *CmdHandler) handleAsk(fromID string, args []string) (text string, token string) {
 	if h.LLM.APIKey == "" {
-		return "AI 未配置，请在设置中填写 API Key", false
+		return "AI 未配置，请在设置中填写 API Key", ""
 	}
 	question := strings.Join(args, " ")
 	if question == "" {
-		return "用法: /ask 你的问题，如「postgres 容器怎么挂了」「NAS 磁盘还剩多少」", false
+		return "用法: /ask 你的问题，如「postgres 容器怎么挂了」「NAS 磁盘还剩多少」", ""
 	}
 
 	prompt := fmt.Sprintf("%s\n\n[实时状态快照]\n%s\n\n[问题]\n%s", askSystemPrompt, h.statusSnapshot(), question)
 	reply, err := CallLLM(h.LLM, prompt)
 	if err != nil {
-		return "AI 调用失败: " + err.Error(), false
+		return "AI 调用失败: " + err.Error(), ""
 	}
 
 	// 解析提议行：取最后一个 [RUN] 前缀行
-	text := reply
+	text = reply
 	proposal := ""
 	if idx := strings.LastIndex(reply, proposalPrefix); idx >= 0 {
 		line := reply[idx+len(proposalPrefix):]
@@ -267,46 +293,61 @@ func (h *CmdHandler) handleAsk(fromID string, args []string) (string, bool) {
 		text = strings.TrimSpace(reply[:idx])
 	}
 	if proposal == "" {
-		return text, false
+		return text, ""
 	}
 
 	kind, target, exec, display, err := h.validateProposal(proposal)
 	if err != nil {
-		return text + "\n\n（AI 提议了一条命令，但未通过白名单校验已忽略: " + err.Error() + "）", false
+		return text + "\n\n（AI 提议了一条命令，但未通过白名单校验已忽略: " + err.Error() + "）", ""
 	}
 
+	token = newActionToken()
 	h.aiops.setPending(fromID, &pendingAction{
+		token:    token,
 		display:  display,
 		kind:     kind,
 		target:   target,
 		exec:     exec,
 		expireAt: time.Now().Add(pendingTTL),
 	})
-	return text + "\n\n建议执行: " + display + "\n（2 分钟内点击下方按钮确认）", true
+	return text + "\n\n建议执行: " + display + "\n（2 分钟内点击下方按钮确认）", token
 }
 
 // HandleCallback 处理 inline keyboard 回调（Bot 校验 chat 白名单后调用）。
+// data 形如 "askrun:<token>" / "askcancel:<token>"。
 // 返回给用户的执行结果文本。
-func (h *CmdHandler) HandleCallback(chatID string, msgID int, data string) string {
-	if data == cbCancel {
-		h.aiops.takePending(chatID)
+func (h *CmdHandler) HandleCallback(chatID string, data string) string {
+	action, token, _ := strings.Cut(data, ":")
+	switch action {
+	case cbCancel:
+		if h.aiops.takePending(chatID) == nil {
+			return "当前没有待确认的操作"
+		}
 		return "已取消"
-	}
-	if data != cbConfirm {
+
+	case cbConfirm:
+		// token 匹配才消费：旧消息上的按钮不会误伤新提议，并发双击只有一次通过
+		pa := h.aiops.takePendingIfToken(chatID, token)
+		if pa == nil {
+			return "该确认已失效（过期或已被处理），请重新 /ask"
+		}
+		if time.Now().After(pa.expireAt) {
+			return "该确认已过期，请重新 /ask"
+		}
+		// 二次校验：以提议原文重新走一遍白名单，防状态漂移
+		kind, target, exec, display, err := h.validateProposal(pa.display)
+		if err != nil {
+			return "命令未通过校验，已拒绝: " + err.Error()
+		}
+		return h.executeAction(kind, target, exec, display)
+
+	default:
 		return ""
 	}
+}
 
-	pa := h.aiops.takePending(chatID)
-	if pa == nil || pa.msgID != msgID || time.Now().After(pa.expireAt) {
-		return "该确认已失效（过期或已被处理），请重新 /ask"
-	}
-
-	// 二次校验：以提议原文重新走一遍白名单，防状态漂移
-	kind, target, exec, display, err := h.validateProposal(pa.display)
-	if err != nil {
-		return "命令未通过校验，已拒绝: " + err.Error()
-	}
-
+// executeAction 执行已确认的动作（docker API 或 SSH）
+func (h *CmdHandler) executeAction(kind, target, exec, display string) string {
 	switch kind {
 	case "docker":
 		if h.Docker == nil {
@@ -314,6 +355,7 @@ func (h *CmdHandler) HandleCallback(chatID string, msgID int, data string) strin
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
+		var err error
 		switch exec {
 		case "start":
 			err = h.Docker.StartContainer(ctx, target)

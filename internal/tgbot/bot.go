@@ -44,7 +44,7 @@ type KeyboardResponder interface {
 // CallbackHandler 可选接口：处理 inline keyboard 回调
 // （Bot 负责校验 chat 白名单，实现方负责校验动作本身）。
 type CallbackHandler interface {
-	HandleCallback(chatID string, msgID int, data string) string
+	HandleCallback(chatID string, data string) string
 }
 
 // InlineButton inline keyboard 按钮
@@ -257,7 +257,7 @@ func (b *Bot) handleCallbackQuery(cb *tgCallbackQuery) {
 		return
 	}
 
-	resp := ch.HandleCallback(chatID, cb.Message.ID, cb.Data)
+	resp := ch.HandleCallback(chatID, cb.Data)
 	if resp != "" {
 		b.SendMessage(chatID, resp)
 	}

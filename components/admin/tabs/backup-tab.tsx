@@ -85,7 +85,12 @@ export default function BackupTab({ showConfirm }: { showConfirm: (opts: Omit<Co
         setSvrImporting(true); setSvrMsg('');
         const text = await file.text();
         const { ok, data } = await req('POST', `${API}/admin/backup`, JSON.parse(text));
-        setSvrMsg(ok ? '✅ 已恢复（管理员密码等内部密钥已保留）' : `❌ ${(data as { error?: string }).error || '恢复失败'}`);
+        if (ok) {
+          const warn = (data as { warning?: string }).warning;
+          setSvrMsg(warn ? `✅ 已恢复（注意: ${warn}）` : '✅ 已恢复（管理员密码等内部密钥已保留）');
+        } else {
+          setSvrMsg(`❌ ${(data as { error?: string }).error || '恢复失败'}`);
+        }
         setSvrImporting(false);
       },
     });

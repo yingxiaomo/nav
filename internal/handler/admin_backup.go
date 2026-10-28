@@ -203,8 +203,8 @@ func (h *Handler) ImportBackup() http.HandlerFunc {
 		}
 
 		for key, value := range body.Settings {
-			// 备份文件不可覆盖会话密钥；设备配置密码按入库要求静态加密。
-			// （session_secret 由下方"保留现有设置"循环原样恢复）
+			// 备份文件不可覆盖会话密钥（保护键由"保留现有设置"循环以现值恢复）；
+			// 设备配置密码按入库要求静态加密。
 			if protectedSettings[key] {
 				slog.Warn("备份导入: 跳过受保护设置键", "key", key)
 				continue
@@ -278,8 +278,20 @@ func (h *Handler) ImportBackup() http.HandlerFunc {
 			}
 		}
 
-		// 保留导入未覆盖的现有设置
+		// 保留导入未覆盖的现有设置。保护键（session_secret）始终以导入前的
+		// 现值恢复：Go 导出的备份文件里带有该键，若在下面的循环里被
+		// "备份已提供"跳过，则 DELETE 之后无人恢复 → 导入完成即全员登出。
 		for key, value := range existingSettings {
+			if protectedSettings[key] {
+				if _, err := tx.ExecContext(r.Context(),
+					"INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?",
+					key, value, value); err != nil {
+					slog.Error("备份导入: 恢复保护键失败", "error", err, "key", key)
+					model.RespondError(w, http.StatusInternalServerError, "恢复失败")
+					return
+				}
+				continue
+			}
 			if _, exists := body.Settings[key]; exists {
 				continue // 备份已提供此设置
 			}

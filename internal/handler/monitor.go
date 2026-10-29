@@ -90,6 +90,11 @@ func (h *Handler) UpdateCheck() http.HandlerFunc {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return
 		}
+		// 与 Create 同样限制 URL scheme（防 javascript: 等协议进入
+		// 监控面板的 href 链接）
+		if input.URL != "" && !strings.HasPrefix(input.URL, "http://") && !strings.HasPrefix(input.URL, "https://") {
+			input.URL = "http://" + input.URL
+		}
 
 		if err := h.HealthChecker.UpdateTarget(id, input); err != nil {
 			if strings.Contains(err.Error(), "不存在") {

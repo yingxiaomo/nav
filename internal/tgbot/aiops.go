@@ -46,7 +46,7 @@ const (
 type pendingAction struct {
 	token      string // 随机 token，随确认按钮下发；旧消息上的按钮因 token 不匹配而失效
 	fromUserID string // 发起人（Telegram user ID）：群聊场景仅发起人可确认/取消
-	createdAt  int64  // 创建时间戳：慢请求晚到时不得覆盖更新的提议（goroutine 乱序防护）
+	seq        uint64 // 分发序号：慢请求晚到时不得覆盖更新的提议（goroutine 乱序防护）
 	display    string // 展示给用户的原始提议（执行时二次校验的依据）
 	kind       string // "docker" | "ssh"
 	target     string // 容器名 / 设备别名
@@ -69,7 +69,7 @@ func (s *aiopsState) setPending(chatID string, pa *pendingAction) {
 	if s.pending == nil {
 		s.pending = make(map[string]*pendingAction)
 	}
-	if old, ok := s.pending[chatID]; ok && old.createdAt > pa.createdAt {
+	if old, ok := s.pending[chatID]; ok && old.seq > pa.seq {
 		return
 	}
 	s.pending[chatID] = pa
@@ -91,15 +91,19 @@ func (s *aiopsState) peekPending(chatID string) *pendingAction {
 	return s.pending[chatID]
 }
 
-// takePendingForUser 原子地校验（token + 发起人）并删除待确认动作。
+// takePendingForUser 原子地校验（发起人 + 可选 token）并删除待确认动作。
 // 校验、匹配与删除在同一临界区：peek/take 两段式存在窗口——
 // peek 后新提议替换、take 就会误删新提议（历史 bug）。
+// token 为空表示不校验 token（/cancel 文本命令路径）；
 // 发起人不匹配时返回 nil 且不删除（按钮保留给真正发起人）。
 func (s *aiopsState) takePendingForUser(chatID, userID, token string) *pendingAction {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	pa := s.pending[chatID]
-	if pa == nil || pa.token != token {
+	if pa == nil {
+		return nil
+	}
+	if token != "" && pa.token != token {
 		return nil
 	}
 	if pa.fromUserID != "" && pa.fromUserID != userID {
@@ -295,10 +299,9 @@ func (h *CmdHandler) statusSnapshot() string {
 // userID 为发起人（Telegram user ID），待确认动作与其绑定：
 // 群聊场景仅发起人可点确认/取消。
 // 返回回复文本、确认 token（有合法提议时非空，随按钮 callback_data 下发）。
-func (h *CmdHandler) handleAsk(chatID, userID string, args []string) (text string, token string) {
-	// 请求时间在入口捕获：createdAt 若在 LLM 返回后才生成，
-	// 较慢的旧请求会拿到更晚的时间戳、反而覆盖新提议（乱序防护失效）
-	requestAt := time.Now().UnixMilli()
+func (h *CmdHandler) handleAsk(chatID, userID string, seq uint64, args []string) (text string, token string) {
+	// seq 由 Bot 分发时生成并传入：若在 LLM 返回后才生成，
+	// 较慢的旧请求会拿到更晚的序号、反而覆盖新提议（乱序防护失效）
 	if h.LLM.APIKey == "" {
 		return "AI 未配置，请在设置中填写 API Key", ""
 	}
@@ -339,7 +342,7 @@ func (h *CmdHandler) handleAsk(chatID, userID string, args []string) (text strin
 	h.aiops.setPending(chatID, &pendingAction{
 		token:      token,
 		fromUserID: userID,
-		createdAt:  requestAt,
+		seq:        seq,
 		display:    display,
 		kind:       kind,
 		target:     target,
@@ -363,6 +366,12 @@ func (h *CmdHandler) HandleCallback(chatID, userID, data string) (string, bool) 
 	case cbCancel:
 		pa := h.aiops.takePendingForUser(chatID, userID, token)
 		if pa == nil {
+			// 区分"非发起人"（pending 仍在，保留按钮给发起人）与"已失效"
+			if cur := h.aiops.peekPending(chatID); cur != nil && (token == "" || cur.token == token) {
+				if cur.fromUserID != "" && cur.fromUserID != userID {
+					return "只有发起人可以取消该操作", false
+				}
+			}
 			return "该操作已失效或不存在（可能已被新提议取代）", true
 		}
 		return "已取消", true

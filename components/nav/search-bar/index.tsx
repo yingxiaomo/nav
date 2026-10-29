@@ -10,6 +10,7 @@ import { openExternalUrl } from "@/lib/utils/url";
 import { request } from "@/lib/utils/api";
 import Fuse, { type IFuseOptions } from "fuse.js";
 import { STORAGE_CONFIG_KEY } from "@/lib/adapters/storage";
+import { useUIStore } from "@/lib/stores";
 
 const ENGINES = [
   { name: "Google", url: "https://www.google.com/search?q=" },
@@ -157,34 +158,34 @@ export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
       if (val.trim().length >= 2) {
         try {
           const configRaw = localStorage.getItem(STORAGE_CONFIG_KEY);
-          if (configRaw) {
-            const sc = JSON.parse(configRaw);
-            if (sc.type === 'api-server' && sc.apiServer?.baseUrl) {
-              const baseUrl = sc.apiServer.baseUrl.replace(/\/$/, '');
-              const token = sc.apiServer.token;
-              const headers: Record<string, string> = {};
-              if (token) headers['Authorization'] = `Bearer ${token}`;
-              const suggest = await request<{ suggestions?: string[] }>(baseUrl, `/api/v1/suggest?q=${encodeURIComponent(val.trim())}&source=google`, { headers });
-              if (suggest.ok) {
-                setWebSuggestions(suggest.data.suggestions || []);
-                hasWebResults = (suggest.data.suggestions?.length ?? 0) > 0;
-              } else {
-                setWebSuggestions([]);
-              }
-              // 后端聚合搜索（书签/笔记/监控），失败时保留空结果
-              const search = await request<unknown>(baseUrl, `/api/v1/search?q=${encodeURIComponent(val.trim())}`, { headers });
-              if (search.ok) {
-                const results = search.data;
-                const globals: SuggestionItem[] = (Array.isArray(results) ? results : [])
-                  .filter((r): r is Record<string, unknown> => !!r && typeof r === "object" && "title" in r)
-                  .map((r) => ({ kind: "global" as const, title: String(r.title), url: typeof r.url === "string" ? r.url : undefined, type: typeof r.type === "string" ? r.type : "", icon: typeof r.icon === "string" ? r.icon : undefined }));
-                setGlobalResults(globals);
-                hasGlobalResults = globals.length > 0;
-              } else {
-                setGlobalResults([]);
-              }
+          // api-server 空 baseUrl = 同源模式（Docker 零配置部署）：请求打到本站后端
+          const sc = configRaw ? JSON.parse(configRaw) : null;
+          const isApiServer = sc?.type === 'api-server' &&
+            (sc.apiServer?.baseUrl || useUIStore.getState().deployMode === 'backend');
+          if (sc && isApiServer) {
+            const baseUrl = (sc.apiServer?.baseUrl || '').replace(/\/$/, '');
+            const token = sc.apiServer?.token;
+            const headers: Record<string, string> = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            const suggest = await request<{ suggestions?: string[] }>(baseUrl, `/api/v1/suggest?q=${encodeURIComponent(val.trim())}&source=google`, { headers });
+            if (suggest.ok) {
+              setWebSuggestions(suggest.data.suggestions || []);
+              hasWebResults = (suggest.data.suggestions?.length ?? 0) > 0;
             } else {
               setWebSuggestions([]);
+            }
+            // 后端聚合搜索（书签/笔记/监控）；失败时保留空结果并记录——
+            // 便于区分"没有结果"与"后端故障"
+            const search = await request<unknown>(baseUrl, `/api/v1/search?q=${encodeURIComponent(val.trim())}`, { headers });
+            if (search.ok) {
+              const results = search.data;
+              const globals: SuggestionItem[] = (Array.isArray(results) ? results : [])
+                .filter((r): r is Record<string, unknown> => !!r && typeof r === "object" && "title" in r)
+                .map((r) => ({ kind: "global" as const, title: String(r.title), url: typeof r.url === "string" ? r.url : undefined, type: typeof r.type === "string" ? r.type : "", icon: typeof r.icon === "string" ? r.icon : undefined }));
+              setGlobalResults(globals);
+              hasGlobalResults = globals.length > 0;
+            } else {
+              console.warn("[search] 后端聚合搜索失败", search.status);
               setGlobalResults([]);
             }
           } else {

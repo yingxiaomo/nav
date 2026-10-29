@@ -260,6 +260,9 @@ func run(ctx context.Context, cfg Config) error {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		srv.Shutdown(shutdownCtx)
+		if tgBot != nil {
+			tgBot.Stop()
+		}
 		healthChecker.Stop()
 		slog.Info("服务已完全关闭")
 	}()

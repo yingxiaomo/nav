@@ -111,6 +111,7 @@ type SiteSettings struct {
 	WallpaperList []string `json:"wallpaperList"`
 	BlurLevel     string   `json:"blurLevel"`
 	ShowFeatures  *bool    `json:"showFeatures,omitempty"`
+	ShowMonitor   *bool    `json:"showMonitor,omitempty"`
 	HomeLayout    string   `json:"homeLayout,omitempty"`
 	Theme         string   `json:"theme,omitempty"`
 }

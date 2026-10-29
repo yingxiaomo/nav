@@ -149,6 +149,7 @@ func settingsMapToSiteSettings(m map[string]string) model.SiteSettings {
 		WallpaperList: strsVal(m, "wallpaperList"),
 		BlurLevel:     strVal(m, "blurLevel", "medium"),
 		ShowFeatures:  boolPtrVal(m, "showFeatures"),
+		ShowMonitor:   boolPtrVal(m, "showMonitor"),
 		HomeLayout:    strVal(m, "homeLayout", ""),
 		Theme:         strVal(m, "theme", ""),
 	}

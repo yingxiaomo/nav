@@ -33,14 +33,15 @@ type Bot struct {
 // CommandHandler 处理 /command。chatID 用于回消息与白名单，
 // userID 为实际发起人（私聊两者相同；群聊不同，用于发起人绑定）
 type CommandHandler interface {
-	HandleTG(chatID, userID, cmd string, args []string) string
+	HandleTG(chatID, userID string, seq uint64, cmd string, args []string) string
 }
 
 // KeyboardResponder 可选接口：回复需要携带 inline keyboard（/ask 确认按钮）。
 // userID 为消息发起人（区别于 chatID：群聊场景两者不同），用于把待确认
-// 动作绑定到发起人。ok=false 时 Bot 回退到普通 HandleTG 路径。
+// 动作绑定到发起人。seq 为按 Telegram 顺序的 update 序号（乱序防护）。
+// ok=false 时 Bot 回退到普通 HandleTG 路径。
 type KeyboardResponder interface {
-	HandleTGKeyboard(chatID, userID, cmd string, args []string) (text string, buttons []InlineButton, ok bool)
+	HandleTGKeyboard(chatID, userID string, seq uint64, cmd string, args []string) (text string, buttons []InlineButton, ok bool)
 }
 
 // CallbackHandler 可选接口：处理 inline keyboard 回调
@@ -110,6 +111,9 @@ func (b *Bot) SendMessageWithKeyboard(chatID, text string, buttons []InlineButto
 	if len(buttons) == 0 {
 		b.SendMessage(chatID, text)
 		return
+	}
+	if runes := []rune(text); len(runes) > 4000 {
+		text = string(runes[:4000]) + "\n…（消息过长已截断）"
 	}
 	payload, _ := json.Marshal(map[string]any{
 		"chat_id":      chatID,
@@ -205,6 +209,9 @@ func (b *Bot) pollLoop() {
 	// 并发上限是全局的：若在每轮 getUpdates 循环内创建，
 	// 长任务跨批次存活时总并发会持续超过上限（历史 bug）
 	sem := make(chan struct{}, 8)
+	// update 序号：在分发 goroutine 之前生成（保证与 Telegram 顺序一致），
+	// 用于 /ask 乱序防护——时间戳在并发 goroutine 里不可靠
+	updateSeq := uint64(0)
 	for {
 		select {
 		case <-b.stopCh:
@@ -228,6 +235,8 @@ func (b *Bot) pollLoop() {
 			// /ask 的 LLM 调用与 SSH 执行最长 30s，同步处理会阻塞整个 pollLoop；
 			// 信号量限制并发，防止大量 /ask 放大 LLM 费用与资源消耗
 			u := u
+			updateSeq++
+			seq := updateSeq
 			sem <- struct{}{}
 			go func() {
 				defer func() {
@@ -236,7 +245,7 @@ func (b *Bot) pollLoop() {
 						slog.Error("TG update 处理 panic", "panic", r, "update", u.ID)
 					}
 				}()
-				b.processUpdate(u)
+				b.processUpdate(u, seq)
 			}()
 		}
 
@@ -244,8 +253,9 @@ func (b *Bot) pollLoop() {
 	}
 }
 
-// processUpdate 处理单条 update（消息命令或 inline keyboard 回调）
-func (b *Bot) processUpdate(u tgUpdate) {
+// processUpdate 处理单条 update（消息命令或 inline keyboard 回调）。
+// seq 为按 Telegram 顺序分发的序号，供 /ask 乱序防护使用。
+func (b *Bot) processUpdate(u tgUpdate, seq uint64) {
 	// inline keyboard 回调（/ask 确认执行）
 	if u.CallbackQuery != nil {
 		b.handleCallbackQuery(u.CallbackQuery)
@@ -287,7 +297,8 @@ func (b *Bot) processUpdate(u tgUpdate) {
 
 	if isGroup {
 		switch cmd {
-		case "/docker", "/device", "/wake", "/ai":
+		case "/docker", "/device", "/wake", "/ai", "/organize":
+			// /organize 会批量改写书签数据库并消耗 LLM 配额，同样仅限私聊
 			b.SendMessage(fromID, "该命令仅支持私聊使用（安全限制）")
 			return
 		}
@@ -297,13 +308,13 @@ func (b *Bot) processUpdate(u tgUpdate) {
 
 	// /ask 等需要携带确认按钮的命令走 keyboard 路径
 	if kr, ok := b.cmd.(KeyboardResponder); ok {
-		if resp, buttons, has := kr.HandleTGKeyboard(fromID, userID, cmd, args); has {
+		if resp, buttons, has := kr.HandleTGKeyboard(fromID, userID, seq, cmd, args); has {
 			b.SendMessageWithKeyboard(fromID, resp, buttons)
 			return
 		}
 	}
 
-	resp := b.cmd.HandleTG(fromID, userID, cmd, args)
+	resp := b.cmd.HandleTG(fromID, userID, seq, cmd, args)
 	b.SendMessage(fromID, resp)
 }
 

@@ -126,9 +126,15 @@ func (h *Handler) DockerLogs() http.HandlerFunc {
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
 
-		// 清除服务器写超时（默认 30s），否则 follow 日志流会在 30 秒后被掐断。
-		if err := http.NewResponseController(w).SetWriteDeadline(time.Time{}); err != nil {
-			slog.Debug("清除写超时失败（不影响短日志）", "error", err)
+		// 写超时逐次滚动设置（每次写 30s），而非永久清除——永久裸写时
+		// 慢客户端停止读取会无限阻塞 handler，占死日志流名额（历史 bug）
+		rc := http.NewResponseController(w)
+		writeEvent := func(payload string) error {
+			if err := rc.SetWriteDeadline(time.Now().Add(30 * time.Second)); err != nil {
+				slog.Debug("设置写超时失败", "error", err)
+			}
+			_, err := fmt.Fprint(w, payload)
+			return err
 		}
 
 		if svc == nil {
@@ -168,12 +174,15 @@ func (h *Handler) DockerLogs() http.HandlerFunc {
 		for line := range lines {
 			// 去除行尾换行符，避免在 SSE 中作为可见字符显示
 			cleaned := strings.TrimRight(line, "\n\r")
-			fmt.Fprintf(w, "data: %s\n\n", cleaned)
+			if err := writeEvent("data: " + cleaned + "\n\n"); err != nil {
+				slog.Info("日志流写入失败，断开慢客户端", "container", name, "error", err)
+				return
+			}
 			flusher.Flush()
 		}
 
 		// 发送 end 事件，前端监听 end 事件后关闭 EventSource
-		fmt.Fprintf(w, "event: end\ndata: \n\n")
+		_ = writeEvent("event: end\ndata: \n\n")
 		flusher.Flush()
 	}
 }

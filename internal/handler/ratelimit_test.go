@@ -92,14 +92,18 @@ func TestRateLimitPerIPBypass(t *testing.T) {
 			t.Fatalf("第 %d 次（IP 级阈值内）不应被拦截", i+1)
 		}
 	}
-	// 成功归还一个名额后，第 30 次仍被允许
+	// 成功归还一个名额后，净名额 29 → 第 30 次（after-success）仍放行；
+	// brand-new 是第 30 个净名额，放行后触发封锁
 	finishLoginAttempt(ip+"|rotating-0", ip, true)
 	if !beginLoginAttempt(ip+"|after-success", ip) {
 		t.Fatal("归还名额后第 30 次应放行")
 	}
-	// 第 31 次：IP 级封锁生效（即使全新用户名）
-	if beginLoginAttempt(ip+"|brand-new-user", ip) {
-		t.Fatal("IP 级限额应在 30 次尝试后拦截随机用户名轮换")
+	if !beginLoginAttempt(ip+"|brand-new-user", ip) {
+		t.Fatal("第 30 个净名额应放行（本次触发封锁）")
+	}
+	// 第 31 个净名额：IP 级封锁生效（即使全新用户名）
+	if beginLoginAttempt(ip+"|brand-new-user-2", ip) {
+		t.Fatal("封锁触发后应持续拦截随机用户名轮换")
 	}
 }
 
@@ -134,5 +138,33 @@ func TestRateLimitEntryTTL(t *testing.T) {
 	}
 	if !beginLoginAttempt(key, ip) {
 		t.Fatal("清理后应重新允许")
+	}
+}
+
+// 回归锁定：成功登录必须归还 IP 级名额。
+// 历史 bug：finishLoginAttempt 对两个 map 都用 key 查找，而 ipAttempts
+// 以 ip 为键——IP 名额从未归还，NAT 后正常用户登录 30 次即被封一小时。
+func TestRateLimitIPQuotaReturnedOnSuccess(t *testing.T) {
+	resetRateLimitState(t)
+	ip := "8.8.8.8"
+	for i := 0; i < maxIPAttempts; i++ {
+		k := fmt.Sprintf("%s|user-%d", ip, i)
+		beginLoginAttempt(k, ip)
+		finishLoginAttempt(k, ip, true) // 30 次全部成功
+	}
+	if !beginLoginAttempt(ip+"|user-final", ip) {
+		t.Fatal("30 次成功登录不应触发 IP 级封锁（回归：IP 名额未归还）")
+	}
+	// 用户名级：第 5 次输对密码应完全清除封锁，而非留下 15 分钟限制
+	resetRateLimitState(t)
+	k2, ip3 := "6.6.6.6|u", "6.6.6.6"
+	for i := 0; i < 4; i++ {
+		beginLoginAttempt(k2, ip3)
+		finishLoginAttempt(k2, ip3, false)
+	}
+	beginLoginAttempt(k2, ip3) // 第 5 次，密码正确
+	finishLoginAttempt(k2, ip3, true)
+	if !beginLoginAttempt(k2, ip3) {
+		t.Fatal("第 5 次成功后不应留下用户名级封锁")
 	}
 }

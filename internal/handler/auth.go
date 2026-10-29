@@ -171,19 +171,26 @@ func beginLoginAttempt(key, ip string) bool {
 	return true
 }
 
-// finishLoginAttempt 尝试结束后调用：成功归还名额（失败保留计入封锁）。
+// finishLoginAttempt 尝试结束后调用。
+// 成功登录：
+//   - 用户名级条目完全清除——密码都对了，未到期的封锁也无意义
+//     （第 5 次输对密码不应留下 15 分钟封锁）；
+//   - IP 级归还一个名额。注意 ipAttempts 以 ip 为键而非 key——
+//     历史 bug：两个 map 都用 key 查找，IP 名额从未归还，NAT 后
+//     正常用户登录约 30 次即被误封一小时。
 func finishLoginAttempt(key, ip string, success bool) {
 	if !success {
 		return
 	}
 	loginAttemptsMu.Lock()
 	defer loginAttemptsMu.Unlock()
-	for _, m := range []map[string]*attemptCounter{loginAttempts, ipAttempts} {
-		if e, ok := m[key]; ok && e.count > 0 {
+	delete(loginAttempts, key)
+	if e, ok := ipAttempts[ip]; ok {
+		if e.count > 0 {
 			e.count--
-			if e.count == 0 && e.until == 0 {
-				delete(m, key)
-			}
+		}
+		if e.count == 0 && e.until == 0 {
+			delete(ipAttempts, ip)
 		}
 	}
 }

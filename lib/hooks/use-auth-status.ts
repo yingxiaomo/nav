@@ -9,7 +9,7 @@ import { useUIStore } from '../stores';
  * 设计要点：
  * - 认证状态必须是全局单份——此前每个组件各自轮询各自持有状态，
  *   管理页登出后首页要等最多 60s 才感知（跨标签页更久）；
- * - backendEverAvailable（见 use-backend-check）区分"纯静态部署"与
+ * - deployMode（见 use-backend-check / ui-store）区分"纯静态部署"与
  *   "后端短暂宕机"：前者门控放行，后者保持 fail-closed；
  * - 请求失败保留上次状态并 5s 快速重试（网络抖动不闪断已登录用户）；
  * - 后端可用时窗口聚焦立即刷新（跨标签页登出后切回即感知）。

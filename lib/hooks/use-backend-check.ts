@@ -32,10 +32,10 @@ export function useBackendCheck() {
           if (cancelled) return;
           if (available) {
             failStreak = 0;
-            setBackendAvailable(true); // store 内部会把 backendEverAvailable 置真且永不回退
+            setBackendAvailable(true);
           } else {
-            // 连续 2 次失败才判离线：瞬断（如后端重启窗口）不应把
-            // 后端模式误判为静态模式，导致敏感入口错误放行/隐藏
+            // 连续 2 次失败才判离线；且 unknown 只降级到 static——
+            // 带构建标记的 backend 包在宕机时保持 backend（fail-closed）
             failStreak++;
             if (failStreak >= 2) setBackendAvailable(false);
           }

@@ -3,6 +3,9 @@ FROM node:24-alpine AS frontend
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 ENV NEXT_TELEMETRY_DISABLED=1
+# 构建期标记：此包含 Go 后端（全合一模式），前端据此启用登录门控
+# （后端宕机时 fail-closed；纯静态托管构建无此标记）
+ENV NEXT_PUBLIC_HAS_BACKEND=1
 COPY package.json ./
 RUN npm install
 COPY . .

@@ -195,7 +195,10 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 		var wg sync.WaitGroup
 		wg.Add(3)
 		closeAll := func() {
+			// 关整个 client（TCP）而非仅 session channel：远端不响应
+			// channel-close 时 session.Wait() 也能解除阻塞
 			_ = session.Close()
+			_ = client.Close()
 			_ = conn.Close()
 		}
 

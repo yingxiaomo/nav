@@ -26,7 +26,7 @@ type CmdHandler struct {
 }
 
 // HandleTG /command 入口
-func (h *CmdHandler) HandleTG(fromID, userID, cmd string, args []string) string {
+func (h *CmdHandler) HandleTG(fromID, userID string, seq uint64, cmd string, args []string) string {
 	switch cmd {
 	case "/start", "/help":
 		return "Nav Bot\n/ai [消息] - AI 对话\n/ask [问题] - AI 诊断内网（可提议命令，需确认）\n/status - 监控状态\n/wake - WOL 唤醒\n/docker - Docker 管理\n/device - 远程设备\n/organize - AI 整理书签\n/uptime - 运行时间\n/cancel - 取消待确认的操作\n/help - 帮助"
@@ -45,10 +45,13 @@ func (h *CmdHandler) HandleTG(fromID, userID, cmd string, args []string) string 
 	case "/ask":
 		// 兜底路径（KeyboardResponder 始终可用，生产不会走到这里）：
 		// 无发起人信息时以 chatID 兼作发起人
-		text, _ := h.handleAsk(fromID, fromID, args)
+		text, _ := h.handleAsk(fromID, fromID, seq, args)
 		return text
 	case "/cancel":
-		h.aiops.takePending(fromID)
+		// 绑定发起人：群聊中其他成员不得取消别人的提议
+		if h.aiops.takePendingForUser(fromID, userID, "") == nil {
+			return "当前没有可取消的待确认操作"
+		}
 		return "已取消待确认的操作"
 	case "/uptime":
 		return fmt.Sprintf("运行 %d 秒", service.GetSystemInfo().Uptime)
@@ -61,11 +64,11 @@ func (h *CmdHandler) HandleTG(fromID, userID, cmd string, args []string) string 
 // userID 为发起人（群聊场景与 chatID 不同），待确认动作与其绑定。
 // 确认 token 编入按钮的 callback_data（"askrun:<token>"），旧提议的按钮
 // 因 token 不匹配自动失效。返回 ok=false 时 Bot 回退到普通 HandleTG 路径。
-func (h *CmdHandler) HandleTGKeyboard(chatID, userID, cmd string, args []string) (text string, buttons []InlineButton, ok bool) {
+func (h *CmdHandler) HandleTGKeyboard(chatID, userID string, seq uint64, cmd string, args []string) (text string, buttons []InlineButton, ok bool) {
 	if cmd != "/ask" {
 		return "", nil, false
 	}
-	text, token := h.handleAsk(chatID, userID, args)
+	text, token := h.handleAsk(chatID, userID, seq, args)
 	if token == "" {
 		return text, nil, true
 	}

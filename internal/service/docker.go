@@ -216,7 +216,9 @@ func (s *DockerService) StreamLogs(ctx context.Context, containerID string, line
 	// 乱码/"帧过大"。先查容器 TTY 标志再选择解析方式
 	tty, err := s.containerTTY(ctx, containerID)
 	if err != nil {
-		tty = false // 查询失败按非 TTY 处理（兼容旧 daemon 行为）
+		// 不能默认非 TTY：TTY 容器的 raw 流会被误当复用头解析
+		// （乱码/"帧过大"）。查询失败直接报错，由前端重试
+		return fmt.Errorf("查询容器信息失败: %w", err)
 	}
 	// 用不带 Timeout 的流客户端：30s Timeout 会掐断 follow 长连接
 	reader, err := dockerGetRaw(ctx, s.streamCli,

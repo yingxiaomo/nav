@@ -16,13 +16,13 @@ interface FeaturesLauncherProps {
 }
 
 export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }: FeaturesLauncherProps) {
-  const { activePanel, togglePanel, setActivePanel, backendEverAvailable, authLoggedIn } = useUIStore();
+  const { activePanel, togglePanel, setActivePanel, deployMode, authLoggedIn } = useUIStore();
   const sidebarCollapsed = useUIStore(s => s.sidebarCollapsed);
 
-  // 笔记/待办属敏感个人数据：后端模式仅登录后展示入口；
-  // 门控基准是 backendEverAvailable（曾检测到后端）而非实时 backendAvailable——
-  // 后端短暂宕机时保持 fail-closed，不得降级为静态模式放行
-  const showPersonalWidgets = !backendEverAvailable || authLoggedIn;
+  // 笔记/待办属敏感个人数据：仅静态部署模式（无后端）或登录后展示入口；
+  // 门控基准是 deployMode 三态——后端宕机时保持 fail-closed，
+  // 不得降级为静态模式放行
+  const showPersonalWidgets = deployMode === 'static' || (deployMode === 'backend' && authLoggedIn);
 
   return (
     <>
@@ -52,7 +52,7 @@ export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }:
         </Button>
         )}
 
-        {backendEverAvailable && authLoggedIn && (
+        {deployMode === 'backend' && authLoggedIn && (
         <Button
           variant="outline"
           onClick={() => togglePanel('ai')}
@@ -63,7 +63,7 @@ export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }:
         </Button>
         )}
 
-        {backendEverAvailable && authLoggedIn && (
+        {deployMode === 'backend' && authLoggedIn && (
         <Button
           variant="outline"
           onClick={() => togglePanel('ssh')}

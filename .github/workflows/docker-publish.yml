@@ -16,8 +16,16 @@ permissions:
   packages: write
 
 jobs:
+  # 质量门禁：测试不过不发布（发布此前与测试是两个独立 workflow，红测照发）
+  test:
+    name: Quality gate
+    uses: ./.github/workflows/test.yml
+    permissions:
+      contents: read
+
   all-in-one:
     name: All-in-one image
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

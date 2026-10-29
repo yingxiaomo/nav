@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -315,23 +316,37 @@ func (h *Handler) ImportBackup() http.HandlerFunc {
 			return
 		}
 
-		// 跨机恢复提示：备份带加密凭据但本机未配置 NAV_SECRET_KEY 时，
-		// SSH 密码解密会失败（fail-closed 不泄露明文，但用户应知道原因）
-		var warning string
-		if !secret.Enabled() {
-			hasCipher := strings.Contains(body.Settings["device_config"], "enc:v1:")
-			if !hasCipher {
-				for _, mt := range body.MonitorTargets {
-					if secret.IsEncrypted(mt.SSHPass) {
-						hasCipher = true
+		// 跨机恢复检查：备份中的加密凭据必须能用本机 NAV_SECRET_KEY 解密。
+		// 无论目标机"未配密钥"还是"配了不同密钥"，解不开都会导致导入
+		// 显示成功而 SSH 密码随后静默不可用——必须提前告知。
+		decryptBroken := false
+		if dc := body.Settings["device_config"]; strings.Contains(dc, "enc:v1:") {
+			var devCfg remote.Config
+			if json.Unmarshal([]byte(dc), &devCfg) == nil {
+				for _, d := range devCfg.Devices {
+					if secret.IsEncrypted(d.Password) {
+						if _, err := secret.Decrypt(d.Password); err != nil {
+							decryptBroken = true
+							break
+						}
+					}
+				}
+			}
+		}
+		if !decryptBroken {
+			for _, mt := range body.MonitorTargets {
+				if secret.IsEncrypted(mt.SSHPass) {
+					if _, err := secret.Decrypt(mt.SSHPass); err != nil {
+						decryptBroken = true
 						break
 					}
 				}
 			}
-			if hasCipher {
-				warning = "备份包含加密凭据，但本机未配置 NAV_SECRET_KEY，相关 SSH 密码将无法解密"
-				slog.Warn("备份导入: 加密凭据但 NAV_SECRET_KEY 未配置")
-			}
+		}
+		warning := ""
+		if decryptBroken {
+			warning = "备份中的加密凭据无法用本机 NAV_SECRET_KEY 解密（可能来自其他机器），相关 SSH 密码将不可用"
+			slog.Warn("备份导入: 加密凭据无法用本机密钥解密")
 		}
 
 		// Docker 元数据不走 DB 事务：放到 Commit 成功之后写盘，

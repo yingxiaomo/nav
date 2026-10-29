@@ -649,4 +649,3 @@ func extractOrigin(rawURL string) string {
 
 	return proto + "://" + host
 }
-

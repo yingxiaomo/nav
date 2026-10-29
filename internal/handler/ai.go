@@ -156,4 +156,3 @@ func loadLLMConfig(ctx context.Context, db *sql.DB) (tgbot.LLMConfig, error) {
 	}
 	return cfg, nil
 }
-

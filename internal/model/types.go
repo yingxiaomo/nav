@@ -37,14 +37,14 @@ type NoteInput struct {
 }
 
 type MonitorTargetInput struct {
-	Name    string `json:"name"`
-	URL     string `json:"url"`
-	Icon    string `json:"icon,omitempty"`
-	MAC     string `json:"mac,omitempty"`
-	Timeout int    `json:"timeout,omitempty"`
-	SSHUser   string  `json:"sshUser,omitempty"`
-	SSHPass   string  `json:"sshPass,omitempty"`
-	CheckType string  `json:"checkType,omitempty"`
+	Name      string `json:"name"`
+	URL       string `json:"url"`
+	Icon      string `json:"icon,omitempty"`
+	MAC       string `json:"mac,omitempty"`
+	Timeout   int    `json:"timeout,omitempty"`
+	SSHUser   string `json:"sshUser,omitempty"`
+	SSHPass   string `json:"sshPass,omitempty"`
+	CheckType string `json:"checkType,omitempty"`
 }
 
 // ===== 数据库模型类型 =====
@@ -74,15 +74,15 @@ type Bookmark struct {
 // ===== API 响应类型（精确匹配 TypeScript 接口）=====
 
 type LinkItem struct {
-	ID          string      `json:"id"`
-	Title       string      `json:"title"`
-	URL         string      `json:"url"`
-	Icon        string      `json:"icon,omitempty"`
-	Description string      `json:"description,omitempty"`
-	Type        string      `json:"type,omitempty"`
-	Children    []LinkItem  `json:"children,omitempty"`
-	UpdatedAt   int64       `json:"updatedAt,omitempty"`
-	Order       int         `json:"order,omitempty"`
+	ID          string     `json:"id"`
+	Title       string     `json:"title"`
+	URL         string     `json:"url"`
+	Icon        string     `json:"icon,omitempty"`
+	Description string     `json:"description,omitempty"`
+	Type        string     `json:"type,omitempty"`
+	Children    []LinkItem `json:"children,omitempty"`
+	UpdatedAt   int64      `json:"updatedAt,omitempty"`
+	Order       int        `json:"order,omitempty"`
 }
 
 type Todo struct {
@@ -133,11 +133,10 @@ type MonitorTarget struct {
 	MAC       string `json:"mac,omitempty"`
 	Timeout   int    `json:"timeout"`
 	CreatedAt int64  `json:"createdAt"`
-	SSHUser   string  `json:"sshUser,omitempty"`
-	SSHPass   string  `json:"sshPass,omitempty"`
-	CheckType string  `json:"checkType,omitempty"`
+	SSHUser   string `json:"sshUser,omitempty"`
+	SSHPass   string `json:"sshPass,omitempty"`
+	CheckType string `json:"checkType,omitempty"`
 }
-
 
 type CheckResult struct {
 	ID        string `json:"id"`

@@ -44,12 +44,14 @@ const (
 
 // pendingAction 待确认的执行动作（每个 chat 同时最多一个）
 type pendingAction struct {
-	token    string // 随机 token，随确认按钮下发；旧消息上的按钮因 token 不匹配而失效
-	display  string // 展示给用户的原始提议（执行时二次校验的依据）
-	kind     string // "docker" | "ssh"
-	target   string // 容器名 / 设备别名
-	exec     string // docker 子动作 / ssh 命令
-	expireAt time.Time
+	token      string // 随机 token，随确认按钮下发；旧消息上的按钮因 token 不匹配而失效
+	fromUserID string // 发起人（Telegram user ID）：群聊场景仅发起人可确认/取消
+	createdAt  int64  // 创建时间戳：慢请求晚到时不得覆盖更新的提议（goroutine 乱序防护）
+	display    string // 展示给用户的原始提议（执行时二次校验的依据）
+	kind       string // "docker" | "ssh"
+	target     string // 容器名 / 设备别名
+	exec       string // docker 子动作 / ssh 命令
+	expireAt   time.Time
 }
 
 // aiopsState /ask 的运行时状态
@@ -58,12 +60,17 @@ type aiopsState struct {
 	pending map[string]*pendingAction // key: chatID
 }
 
-// setPending 注册待确认动作（替换同 chat 旧提议）
+// setPending 注册待确认动作（替换同 chat 旧提议）。
+// 乱序防护：每条 update 独立 goroutine 处理，较早发起的慢 LLM 请求可能
+// 在较新请求之后完成——时间戳更旧的提议不得覆盖更新的提议。
 func (s *aiopsState) setPending(chatID string, pa *pendingAction) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.pending == nil {
 		s.pending = make(map[string]*pendingAction)
+	}
+	if old, ok := s.pending[chatID]; ok && old.createdAt > pa.createdAt {
+		return
 	}
 	s.pending[chatID] = pa
 }
@@ -75,6 +82,13 @@ func (s *aiopsState) takePending(chatID string) *pendingAction {
 	pa := s.pending[chatID]
 	delete(s.pending, chatID)
 	return pa
+}
+
+// peekPending 只读查看待确认动作（不消费）
+func (s *aiopsState) peekPending(chatID string) *pendingAction {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.pending[chatID]
 }
 
 // takePendingIfToken 仅当 token 匹配时取出并删除待确认动作。
@@ -273,8 +287,10 @@ func (h *CmdHandler) statusSnapshot() string {
 // ===== /ask 处理 =====
 
 // handleAsk AI 诊断问答。
+// userID 为发起人（Telegram user ID），待确认动作与其绑定：
+// 群聊场景仅发起人可点确认/取消。
 // 返回回复文本、确认 token（有合法提议时非空，随按钮 callback_data 下发）。
-func (h *CmdHandler) handleAsk(fromID string, args []string) (text string, token string) {
+func (h *CmdHandler) handleAsk(chatID, userID string, args []string) (text string, token string) {
 	if h.LLM.APIKey == "" {
 		return "AI 未配置，请在设置中填写 API Key", ""
 	}
@@ -289,16 +305,16 @@ func (h *CmdHandler) handleAsk(fromID string, args []string) (text string, token
 		return "AI 调用失败: " + err.Error(), ""
 	}
 
-	// 解析提议行：取最后一个 [RUN] 前缀行
+	// 解析提议行：必须是回复的最后一个非空行，否则视为正文不解析——
+	// 防止 LLM 在"不要执行，例如：[RUN] xxx"之类的引用语境里反转安全语义
 	text = reply
 	proposal := ""
-	if idx := strings.LastIndex(reply, proposalPrefix); idx >= 0 {
-		line := reply[idx+len(proposalPrefix):]
-		if nl := strings.IndexAny(line, "\r\n"); nl >= 0 {
-			line = line[:nl]
-		}
-		proposal = strings.TrimSpace(line)
-		text = strings.TrimSpace(reply[:idx])
+	trimmed := strings.TrimRight(reply, " \t\r\n")
+	replyLines := strings.Split(trimmed, "\n")
+	last := strings.TrimSpace(replyLines[len(replyLines)-1])
+	if strings.HasPrefix(last, proposalPrefix) {
+		proposal = strings.TrimSpace(strings.TrimPrefix(last, proposalPrefix))
+		text = strings.TrimSpace(strings.Join(replyLines[:len(replyLines)-1], "\n"))
 	}
 	if proposal == "" {
 		return text, ""
@@ -310,40 +326,57 @@ func (h *CmdHandler) handleAsk(fromID string, args []string) (text string, token
 	}
 
 	token = newActionToken()
-	h.aiops.setPending(fromID, &pendingAction{
-		token:    token,
-		display:  display,
-		kind:     kind,
-		target:   target,
-		exec:     exec,
-		expireAt: time.Now().Add(pendingTTL),
+	h.aiops.setPending(chatID, &pendingAction{
+		token:      token,
+		fromUserID: userID,
+		createdAt:  time.Now().UnixMilli(),
+		display:    display,
+		kind:       kind,
+		target:     target,
+		exec:       exec,
+		expireAt:   time.Now().Add(pendingTTL),
 	})
 	return text + "\n\n建议执行: " + display + "\n（2 分钟内点击下方按钮确认）", token
 }
 
 // HandleCallback 处理 inline keyboard 回调（Bot 校验 chat 白名单后调用）。
+// userID 为点击按钮的人：确认/取消仅限发起人（群聊场景防止他人操作）。
 // data 形如 "askrun:<token>" / "askcancel:<token>"。
 // 返回给用户的执行结果文本。
-func (h *CmdHandler) HandleCallback(chatID string, data string) string {
+func (h *CmdHandler) HandleCallback(chatID, userID, data string) string {
 	action, token, _ := strings.Cut(data, ":")
 	switch action {
 	case cbCancel:
-		if h.aiops.takePending(chatID) == nil {
-			return "当前没有待确认的操作"
+		// 取消同样绑定 token + 发起人：旧消息上的按钮不得误删新提议
+		pa := h.aiops.peekPending(chatID)
+		if pa == nil || pa.token != token {
+			return "该操作已失效或不存在（可能已被新提议取代）"
 		}
+		if pa.fromUserID != "" && userID != pa.fromUserID {
+			return "只有发起人可以确认或取消该操作"
+		}
+		h.aiops.takePending(chatID)
 		return "已取消"
 
 	case cbConfirm:
-		// token 匹配才消费：旧消息上的按钮不会误伤新提议，并发双击只有一次通过
-		pa := h.aiops.takePendingIfToken(chatID, token)
-		if pa == nil {
+		// 发起人绑定：群聊场景仅发起人可确认；token 匹配才消费
+		// （旧消息上的按钮不会误伤新提议，并发双击只有一次通过）
+		pa := h.aiops.peekPending(chatID)
+		if pa == nil || pa.token != token {
 			return "该确认已失效（过期或已被处理），请重新 /ask"
 		}
-		if time.Now().After(pa.expireAt) {
+		if pa.fromUserID != "" && userID != pa.fromUserID {
+			return "只有发起人可以确认该操作"
+		}
+		consumed := h.aiops.takePendingIfToken(chatID, token)
+		if consumed == nil {
+			return "该确认已失效（过期或已被处理），请重新 /ask"
+		}
+		if time.Now().After(consumed.expireAt) {
 			return "该确认已过期，请重新 /ask"
 		}
 		// 二次校验：以提议原文重新走一遍白名单，防状态漂移
-		kind, target, exec, display, err := h.validateProposal(pa.display)
+		kind, target, exec, display, err := h.validateProposal(consumed.display)
 		if err != nil {
 			return "命令未通过校验，已拒绝: " + err.Error()
 		}

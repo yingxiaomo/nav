@@ -16,6 +16,7 @@ export function useBackendCheck() {
 
   useEffect(() => {
     let cancelled = false;
+    let failStreak = 0;
     const check = () =>
       fetch("/api/v1/health")
         .then(async (r) => {
@@ -28,10 +29,21 @@ export function useBackendCheck() {
           }
         })
         .then((available) => {
-          if (!cancelled) setBackendAvailable(available);
+          if (cancelled) return;
+          if (available) {
+            failStreak = 0;
+            setBackendAvailable(true);
+          } else {
+            // 连续 2 次失败才判离线：瞬断（如后端重启窗口）不应把
+            // 后端模式误判为静态模式，导致敏感入口错误放行/隐藏
+            failStreak++;
+            if (failStreak >= 2) setBackendAvailable(false);
+          }
         })
         .catch(() => {
-          if (!cancelled) setBackendAvailable(false);
+          if (cancelled) return;
+          failStreak++;
+          if (failStreak >= 2) setBackendAvailable(false);
         });
 
     check();

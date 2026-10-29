@@ -239,7 +239,9 @@ func run(ctx context.Context, cfg Config) error {
 	}
 
 	// 所有路由注册完毕后再包认证与安全中间件
+	// OriginCheck：同站跨源 CSRF 防护（同机其他端口服务可带 SameSite Cookie）
 	muxWithAuth := middleware.SessionAuth(secrets)(mux)
+	muxWithAuth = middleware.OriginCheck(muxWithAuth)
 	muxWithAuth = securityHeadersMiddleware(muxWithAuth)
 	rootHandler := recoveryMiddleware(muxWithAuth)
 

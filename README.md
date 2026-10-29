@@ -141,6 +141,7 @@ npx gh-pages -d out          # 或手动把 out/ 推到 gh-pages 分支
 - **SSH 主机密钥 TOFU**——首次连接记录指纹，之后指纹变化即拒绝（防中间人）。
 - 会话用 HMAC-SHA256 签名；密码 bcrypt 哈希；登录按 IP+用户名限流（5 次失败锁 15 分钟）。
 - **全功能冒烟测试**——CI 在每次推送时启动真实服务实例，走查认证 / 门控 / CRUD / 上传 / 监控 / 备份往返 / 限流等核心功能面（`cmd/nav-server/smoke_test.go`）。
+- **已知限制：ICMP ping**——监控的 `ping` 检查类型依赖系统 `ping` 命令，scratch 运行镜像内没有；Docker 部署请使用 `http` 检查类型（静态二进制原生支持）。
 
 ## 🏗️ 技术栈
 

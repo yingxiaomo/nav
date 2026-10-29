@@ -241,8 +241,19 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 		go func() {
 			defer wg.Done()
 			for {
+				// 30s 读超时兼做会话复核：即使终端只输出不输入（如 tail -f），
+				// 登出/改密轮换密钥后也会在下一个超时点被关闭
+				_ = conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 				msgType, msg, err := conn.ReadMessage()
 				if err != nil {
+					if ne, ok := err.(net.Error); ok && ne.Timeout() {
+						if sessionValid() {
+							continue
+						}
+						_ = ww.writeMessage(websocket.TextMessage, []byte("\r\n会话已失效，连接关闭\r\n"))
+						closeAll()
+						return
+					}
 					_ = session.Close()
 					return
 				}

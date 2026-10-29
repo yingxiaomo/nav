@@ -16,7 +16,7 @@ const bookmarkCols = `id, category_id, parent_id, title, url, icon, description,
 
 func scanBookmark(scanner interface {
 	Scan(dest ...any) error
-	}, b *model.Bookmark) error {
+}, b *model.Bookmark) error {
 	var desc sql.NullString
 	var parentID sql.NullString
 	if err := scanner.Scan(&b.ID, &b.CategoryID, &parentID, &b.Title, &b.URL, &b.Icon, &desc, &b.Order, &b.CreatedAt, &b.IsFolder); err != nil {

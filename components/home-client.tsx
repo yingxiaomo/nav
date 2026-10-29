@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useMemo, Suspense, lazy } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { ClockWidget } from "@/components/nav/clock";
 import { SearchBar } from "@/components/nav/search-bar";
 import { LinkGrid, type FolderModalHandle } from "@/components/nav/link-grid";
@@ -82,6 +82,17 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
   const auth = useAuthStatus();
   // 监控浮层展示内网拓扑，仅登录后渲染；静态模式（无后端）不涉及
   const showMonitorFloater = data.settings.showMonitor !== false && (!auth.backendAvailable || auth.loggedIn);
+
+  // 登录态翻转时：失效数据缓存（旧会话的笔记/待办不得跨会话呈现）并关闭敏感面板
+  const queryClient = useQueryClient();
+  const prevLoggedIn = useRef(auth.loggedIn);
+  useEffect(() => {
+    if (prevLoggedIn.current !== auth.loggedIn) {
+      prevLoggedIn.current = auth.loggedIn;
+      queryClient.invalidateQueries({ queryKey: ["navData"] });
+      setActivePanel(null);
+    }
+  }, [auth.loggedIn, queryClient, setActivePanel]);
 
   // 检测后端是否可用（静态部署时禁用后端功能），定期重试
   useBackendCheck();
@@ -332,14 +343,14 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
           />
         )}
         <ErrorBoundary name="ai-panel" fallback={null}>
-          {activePanel === 'ai' && (
+          {auth.backendAvailable && auth.loggedIn && activePanel === 'ai' && (
             <ResizablePanel title="AI 助手" icon={<Brain className="w-5 h-5 text-purple-500" />} defaultWidth={650} defaultHeight={520} onClose={() => togglePanel('ai')} zIndex={101} onFocus={() => setActivePanel('ai')}>
               <AIPanel />
             </ResizablePanel>
           )}
         </ErrorBoundary>
         <ErrorBoundary name="ssh-terminal" fallback={null}>
-          {activePanel === 'ssh' && (
+          {auth.backendAvailable && auth.loggedIn && activePanel === 'ssh' && (
             <ResizablePanel title="SSH 终端" icon={<TerminalSquare className="w-5 h-5 text-green-500" />} defaultWidth={960} defaultHeight={540} onClose={() => togglePanel('ssh')} zIndex={101} onFocus={() => setActivePanel('ssh')}>
               <SSHTerminalPanel />
             </ResizablePanel>

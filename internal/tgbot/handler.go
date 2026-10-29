@@ -43,7 +43,9 @@ func (h *CmdHandler) HandleTG(fromID, cmd string, args []string) string {
 	case "/ai":
 		return h.handleAI(fromID, args)
 	case "/ask":
-		text, _ := h.handleAsk(fromID, args)
+		// 兜底路径（KeyboardResponder 始终可用，生产不会走到这里）：
+		// 无发起人信息时以 chatID 兼作发起人
+		text, _ := h.handleAsk(fromID, fromID, args)
 		return text
 	case "/cancel":
 		h.aiops.takePending(fromID)
@@ -56,13 +58,14 @@ func (h *CmdHandler) HandleTG(fromID, cmd string, args []string) string {
 }
 
 // HandleTGKeyboard 可选接口（KeyboardResponder）：/ask 需要携带确认按钮。
+// userID 为发起人（群聊场景与 chatID 不同），待确认动作与其绑定。
 // 确认 token 编入按钮的 callback_data（"askrun:<token>"），旧提议的按钮
 // 因 token 不匹配自动失效。返回 ok=false 时 Bot 回退到普通 HandleTG 路径。
-func (h *CmdHandler) HandleTGKeyboard(fromID, cmd string, args []string) (text string, buttons []InlineButton, ok bool) {
+func (h *CmdHandler) HandleTGKeyboard(chatID, userID, cmd string, args []string) (text string, buttons []InlineButton, ok bool) {
 	if cmd != "/ask" {
 		return "", nil, false
 	}
-	text, token := h.handleAsk(fromID, args)
+	text, token := h.handleAsk(chatID, userID, args)
 	if token == "" {
 		return text, nil, true
 	}

@@ -10,16 +10,16 @@ import (
 // hostname-string check are still blocked once resolved to a concrete IP.
 func TestIsPrivateIP(t *testing.T) {
 	private := []string{
-		"127.0.0.1",       // loopback
-		"10.0.0.5",        // private A
-		"172.16.3.4",      // private B
-		"192.168.1.1",     // private C
-		"169.254.169.254", // link-local (cloud metadata)
-		"0.0.0.0",         // unspecified
-		"100.64.0.1",      // CGNAT
-		"::1",             // IPv6 loopback
-		"fe80::1",         // IPv6 link-local
-		"fc00::1",         // IPv6 ULA
+		"127.0.0.1",        // loopback
+		"10.0.0.5",         // private A
+		"172.16.3.4",       // private B
+		"192.168.1.1",      // private C
+		"169.254.169.254",  // link-local (cloud metadata)
+		"0.0.0.0",          // unspecified
+		"100.64.0.1",       // CGNAT
+		"::1",              // IPv6 loopback
+		"fe80::1",          // IPv6 link-local
+		"fc00::1",          // IPv6 ULA
 		"::ffff:127.0.0.1", // IPv4-mapped loopback
 		"::ffff:10.0.0.1",  // IPv4-mapped private
 	}

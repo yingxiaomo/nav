@@ -374,7 +374,6 @@ func (h *HealthChecker) getTargets() []model.MonitorTarget {
 	return targets
 }
 
-
 // recordHistory 将一次检查结果写入 check_history，供在线率统计。
 func (h *HealthChecker) recordHistory(r model.CheckResult) {
 	var latency any
@@ -427,6 +426,7 @@ func (h *HealthChecker) GetUptimeAll() map[string]float64 {
 	}
 	return result
 }
+
 // AddTarget creates a new monitor target and triggers an immediate check.
 // Returns the created target and any error.
 func (h *HealthChecker) AddTarget(input model.MonitorTargetInput) (*model.MonitorTarget, error) {
@@ -486,7 +486,6 @@ func (h *HealthChecker) UpdateTarget(id string, input model.MonitorTargetInput) 
 
 	return nil
 }
-
 
 // CheckNow 对指定 ID 的目标立即执行一次健康检查，并更新内存结果。
 // 返回目标信息；如果目标不存在返回 nil。

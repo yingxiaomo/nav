@@ -10,6 +10,7 @@ on:
       - "LICENSE"
   pull_request:
     branches: [main]
+  workflow_call: # 供 docker-publish 复用作为发布前质量门禁
 
 permissions:
   contents: read

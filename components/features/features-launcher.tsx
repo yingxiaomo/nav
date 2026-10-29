@@ -53,7 +53,7 @@ export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }:
         </Button>
         )}
 
-        {backendAvailable && (
+        {backendAvailable && auth.loggedIn && (
         <Button
           variant="outline"
           onClick={() => togglePanel('ai')}
@@ -64,7 +64,7 @@ export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }:
         </Button>
         )}
 
-        {backendAvailable && (
+        {backendAvailable && auth.loggedIn && (
         <Button
           variant="outline"
           onClick={() => togglePanel('ssh')}
@@ -76,9 +76,10 @@ export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }:
         )}
       </div>
 
-      {/* Panels — remain centered */}
+      {/* Panels — remain centered。已打开的敏感面板同样受登录态门控：
+          共享浏览器场景下登出后，残留面板必须立即消失 */}
       <div className="flex justify-center w-full">
-        {activePanel === 'todo' && (
+        {showPersonalWidgets && activePanel === 'todo' && (
           <ResizablePanel
             title="待办清单"
             icon={<ListTodo className="w-5 h-5 text-blue-500" />}
@@ -92,7 +93,7 @@ export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }:
           </ResizablePanel>
         )}
 
-        {activePanel === 'note' && (
+        {showPersonalWidgets && activePanel === 'note' && (
           <ResizablePanel
             title="随手笔记"
             icon={<NotebookPen className="w-5 h-5 text-amber-500" />}

@@ -14,42 +14,42 @@ import (
 
 // knownDockerDomains maps well-known Docker image names to their official domains.
 var knownDockerDomains = map[string]string{
-	"nginx":        "nginx.org",
-	"redis":        "redis.io",
-	"postgres":     "postgresql.org",
-	"mysql":        "mysql.com",
-	"mariadb":      "mariadb.org",
-	"mongo":        "mongodb.com",
-	"node":         "nodejs.org",
-	"python":       "python.org",
-	"alpine":       "alpinelinux.org",
-	"ubuntu":       "ubuntu.com",
-	"debian":       "debian.org",
-	"centos":       "centos.org",
-	"grafana":      "grafana.com",
-	"prometheus":   "prometheus.io",
-	"traefik":      "traefik.io",
-	"portainer":    "portainer.io",
-	"jenkins":      "jenkins.io",
-	"gitlab":       "gitlab.com",
-	"nextcloud":    "nextcloud.com",
+	"nginx":         "nginx.org",
+	"redis":         "redis.io",
+	"postgres":      "postgresql.org",
+	"mysql":         "mysql.com",
+	"mariadb":       "mariadb.org",
+	"mongo":         "mongodb.com",
+	"node":          "nodejs.org",
+	"python":        "python.org",
+	"alpine":        "alpinelinux.org",
+	"ubuntu":        "ubuntu.com",
+	"debian":        "debian.org",
+	"centos":        "centos.org",
+	"grafana":       "grafana.com",
+	"prometheus":    "prometheus.io",
+	"traefik":       "traefik.io",
+	"portainer":     "portainer.io",
+	"jenkins":       "jenkins.io",
+	"gitlab":        "gitlab.com",
+	"nextcloud":     "nextcloud.com",
 	"homeassistant": "home-assistant.io",
-	"openwrt":      "openwrt.org",
-	"pihole":       "pi-hole.net",
-	"adguard":      "adguard.com",
-	"jellyfin":     "jellyfin.org",
-	"emby":         "emby.media",
-	"plex":         "plex.tv",
-	"transmission": "transmissionbt.com",
-	"qbittorrent":  "qbittorrent.org",
-	"sonarr":       "sonarr.tv",
-	"radarr":       "radarr.video",
-	"jackett":      "jackett.io",
-	"navidrome":    "navidrome.org",
-	"firefly":      "firefly-iii.org",
-	"outline":      "getoutline.com",
-	"frp":          "gofrp.org",
-	"ddns":         "ddns.org",
+	"openwrt":       "openwrt.org",
+	"pihole":        "pi-hole.net",
+	"adguard":       "adguard.com",
+	"jellyfin":      "jellyfin.org",
+	"emby":          "emby.media",
+	"plex":          "plex.tv",
+	"transmission":  "transmissionbt.com",
+	"qbittorrent":   "qbittorrent.org",
+	"sonarr":        "sonarr.tv",
+	"radarr":        "radarr.video",
+	"jackett":       "jackett.io",
+	"navidrome":     "navidrome.org",
+	"firefly":       "firefly-iii.org",
+	"outline":       "getoutline.com",
+	"frp":           "gofrp.org",
+	"ddns":          "ddns.org",
 }
 
 // ===== Handlers =====
@@ -126,9 +126,29 @@ func (h *Handler) DockerLogs() http.HandlerFunc {
 		}
 
 		lines := make(chan string)
+		// 会话复核：登出/改密轮换密钥后 30s 内断开日志流——
+		// SSE 连接本身不感知会话轮换，需要主动撤销
+		streamCtx, cancelStream := context.WithCancel(r.Context())
+		defer cancelStream()
+		go func() {
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-streamCtx.Done():
+					return
+				case <-ticker.C:
+					if _, ok := checkSession(r, h.Secrets); !ok {
+						slog.Info("会话已失效，断开容器日志流", "container", name)
+						cancelStream()
+						return
+					}
+				}
+			}
+		}()
 		go func() {
 			defer close(lines)
-			if err := svc.StreamLogs(r.Context(), name, lines); err != nil && err != context.Canceled {
+			if err := svc.StreamLogs(streamCtx, name, lines); err != nil && err != context.Canceled {
 				slog.Warn("Docker 日志流结束", "container", name, "error", err)
 			}
 		}()
@@ -215,7 +235,9 @@ func (h *Handler) dockerRestartContainer(name string, w http.ResponseWriter, r *
 // 探测逻辑在 service.FetchDockerIcon（含 SSRF 防护），此处只做参数解析。
 func FetchDockerIcon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		type request struct{ Image string `json:"image"` }
+		type request struct {
+			Image string `json:"image"`
+		}
 		var req request
 		if !model.DecodeJSON(r, &req) || req.Image == "" {
 			model.RespondJSON(w, http.StatusOK, map[string]any{"icon": nil})
@@ -239,7 +261,11 @@ func (h *Handler) SetDockerMetadata() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := r.PathValue("name")
 
-		type request struct{ Icon string `json:"icon,omitempty"`; Label string `json:"label,omitempty"`; URL string `json:"url,omitempty"` }
+		type request struct {
+			Icon  string `json:"icon,omitempty"`
+			Label string `json:"label,omitempty"`
+			URL   string `json:"url,omitempty"`
+		}
 		var req request
 		if !model.DecodeJSON(r, &req) {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
@@ -260,7 +286,9 @@ func (h *Handler) SetDockerMetadata() http.HandlerFunc {
 // Accepts {"order": ["containerName1", "containerName2", ...]} to set display order.
 func (h *Handler) ReorderContainers() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req struct{ Order []string `json:"order"` }
+		var req struct {
+			Order []string `json:"order"`
+		}
 		if !model.DecodeJSON(r, &req) {
 			model.RespondError(w, http.StatusBadRequest, "请求体格式错误")
 			return

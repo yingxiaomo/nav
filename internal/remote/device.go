@@ -126,12 +126,19 @@ func (m *Manager) Remove(name string) bool {
 	return false
 }
 
-// Find 查找设备（返回副本避免竞态）
+// Find 查找设备：先精确匹配，未命中再退回子串匹配（返回副本避免竞态）。
+// 精确优先：别名 "as" 不能因子串命中 "nas" 而打错机器。
 func (m *Manager) Find(keyword string) *Device {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	for i := range m.cfg.Devices {
-		if m.cfg.Devices[i].Name == keyword || strings.Contains(m.cfg.Devices[i].Name, keyword) {
+		if m.cfg.Devices[i].Name == keyword {
+			d := m.cfg.Devices[i]
+			return &d
+		}
+	}
+	for i := range m.cfg.Devices {
+		if strings.Contains(m.cfg.Devices[i].Name, keyword) {
 			d := m.cfg.Devices[i]
 			return &d
 		}

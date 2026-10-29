@@ -103,8 +103,9 @@ func TestSmoke(t *testing.T) {
 	// ── 7. 搜索与 LIKE 转义 ──
 	_, body = doJSON(t, anon, http.MethodGet, base+"/api/v1/search?q=Smoke", nil)
 	expect(t, "匿名搜索到书签", strings.Contains(body, `"type":"bookmark"`), body)
-	_, body = doJSON(t, anon, http.MethodGet, base+"/api/v1/search?q=%25", nil)
-	expect(t, "LIKE 转义（%不放大）", !strings.Contains(body, `"type"`), body)
+	st, body = doJSON(t, anon, http.MethodGet, base+"/api/v1/search?q=%25", nil)
+	expect(t, "LIKE 转义（%不放大）", st == http.StatusOK && !strings.Contains(body, `"type"`),
+		fmt.Sprintf("%d %s", st, body))
 	st, _ = doJSON(t, anon, http.MethodGet, base+"/api/v1/suggest?q=Smo", nil)
 	expect(t, "suggest 200", st == http.StatusOK, st)
 
@@ -180,14 +181,16 @@ func TestSmoke(t *testing.T) {
 	expect(t, "导入后 cookie 仍有效（保护键回归）", st == http.StatusOK && strings.Contains(body, `"loggedIn":true`), body)
 
 	// ── 12. 登录限流（5 连败封锁，回归） ──
+	// 用户名带随机后缀：限流计数是进程级状态，-count=2 重跑时不能被上一轮污染
+	probeUser := fmt.Sprintf("smoke-limit-%d", time.Now().UnixNano())
 	var lastStatus int
 	for i := 0; i < 5; i++ {
 		lastStatus, _ = doJSON(t, anon, http.MethodPost, base+"/api/v1/auth/login",
-			map[string]string{"username": "smoke-limit-probe", "password": "wrong"})
+			map[string]string{"username": probeUser, "password": "wrong"})
 		expect(t, fmt.Sprintf("限流第 %d 次 401", i+1), lastStatus == http.StatusUnauthorized, lastStatus)
 	}
 	lastStatus, _ = doJSON(t, anon, http.MethodPost, base+"/api/v1/auth/login",
-		map[string]string{"username": "smoke-limit-probe", "password": "wrong"})
+		map[string]string{"username": probeUser, "password": "wrong"})
 	expect(t, "第 6 次 429（回归：限流曾从未生效）", lastStatus == http.StatusTooManyRequests, lastStatus)
 
 	// ── 13. AI 未配置错误路径（处理器把错误包成 200 + reply 文案） ──

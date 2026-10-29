@@ -28,19 +28,30 @@ export function useAuthStatus(): AuthStatusState {
   useEffect(() => {
     if (!backendAvailable) return;
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     const fetchStatus = () => {
       fetch('/api/v1/auth/status', { credentials: 'include' })
         .then((r) => r.json())
         .then((d) => {
           if (!cancelled) setState({ loggedIn: !!d.loggedIn, setupRequired: !!d.setupRequired });
         })
-        .catch(() => {});
+        .catch(() => {
+          // 请求失败保留上次状态（网络抖动不应把已登录用户闪断为未登录），
+          // 但 5s 后快速重试以尽快收敛
+          if (!cancelled && !retryTimer) {
+            retryTimer = setTimeout(() => {
+              retryTimer = undefined;
+              fetchStatus();
+            }, 5000);
+          }
+        });
     };
     fetchStatus();
     const timer = setInterval(fetchStatus, 60_000);
     return () => {
       cancelled = true;
       clearInterval(timer);
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, [backendAvailable]);
 

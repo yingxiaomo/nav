@@ -64,9 +64,10 @@ func (e *SSHExec) ExecSSH(host, username, password, cmd string) (string, error) 
 	}
 	defer session.Close()
 
-	var stdout, stderr bytes.Buffer
-	session.Stdout = &stdout
-	session.Stderr = &stderr
+	stdout := newLimitedBuffer()
+	stderr := newLimitedBuffer()
+	session.Stdout = stdout
+	session.Stderr = stderr
 
 	// 命令级超时：一条 sleep 999999 之类的命令不应把 HTTP 请求或 TG pollLoop 永久挂住。
 	// Close 会使 Run 立即失败，goroutine 经带缓冲 channel 退出，不会泄漏。
@@ -87,11 +88,44 @@ func (e *SSHExec) ExecSSH(host, username, password, cmd string) (string, error) 
 	}
 
 	out := strings.TrimSpace(stdout.String())
+	if stdout.overflow || stderr.overflow {
+		out += "\n…（输出超限已截断）"
+	}
 	if out == "" {
 		out = "✅ 命令执行完成（无输出）"
 	}
 	return truncate(out, 2000), nil
 }
+
+// maxSSHOutput 限制单命令输出缓冲：journalctl/ls -R 级输出若不设上限，
+// 30 秒内可吃掉数百 MB 内存（截断发生在读完之后就来不及了）。
+const maxSSHOutput = 64 * 1024
+
+// limitedBuffer 超限后丢弃后续写入（保留开头），Write 恒报告成功——
+// SSH 会话不因缓冲上限而中断。
+type limitedBuffer struct {
+	buf      bytes.Buffer
+	max      int
+	overflow bool
+}
+
+func newLimitedBuffer() *limitedBuffer {
+	return &limitedBuffer{max: maxSSHOutput}
+}
+
+func (l *limitedBuffer) Write(p []byte) (int, error) {
+	if remain := l.max - l.buf.Len(); remain > 0 {
+		if len(p) > remain {
+			l.buf.Write(p[:remain])
+			l.overflow = true
+		} else {
+			l.buf.Write(p)
+		}
+	}
+	return len(p), nil
+}
+
+func (l *limitedBuffer) String() string { return l.buf.String() }
 
 func truncate(s string, n int) string {
 	runes := []rune(s)

@@ -121,12 +121,14 @@ func newDockerClient() (*http.Client, error) {
 
 // newDockerStreamClient 创建用于流式响应（日志 follow）的 http.Client。
 // 不设 Timeout：http.Client.Timeout 覆盖"读响应体全过程"，会掐断长连接流；
-// 流的生命周期由请求方 context 控制。
+// 流的生命周期由请求方 context 控制。ResponseHeaderTimeout 仅约束响应头
+// 到达——daemon 接受连接后若不返回头，请求不至于永久卡住。
 func newDockerStreamClient() (*http.Client, error) {
 	tr, err := newDockerTransport()
 	if err != nil {
 		return nil, err
 	}
+	tr.ResponseHeaderTimeout = 10 * time.Second
 	return &http.Client{Transport: tr}, nil
 }
 

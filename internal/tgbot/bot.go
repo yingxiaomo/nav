@@ -36,15 +36,16 @@ type CommandHandler interface {
 }
 
 // KeyboardResponder 可选接口：回复需要携带 inline keyboard（/ask 确认按钮）。
-// ok=false 时 Bot 回退到普通 HandleTG 路径。
+// userID 为消息发起人（区别于 chatID：群聊场景两者不同），用于把待确认
+// 动作绑定到发起人。ok=false 时 Bot 回退到普通 HandleTG 路径。
 type KeyboardResponder interface {
-	HandleTGKeyboard(fromID, cmd string, args []string) (text string, buttons []InlineButton, ok bool)
+	HandleTGKeyboard(chatID, userID, cmd string, args []string) (text string, buttons []InlineButton, ok bool)
 }
 
 // CallbackHandler 可选接口：处理 inline keyboard 回调
-// （Bot 负责校验 chat 白名单，实现方负责校验动作本身）。
+// （Bot 负责校验 chat 白名单，实现方负责校验动作本身与发起人）。
 type CallbackHandler interface {
-	HandleCallback(chatID string, data string) string
+	HandleCallback(chatID, userID, data string) string
 }
 
 // InlineButton inline keyboard 按钮
@@ -118,8 +119,13 @@ func (b *Bot) postAPI(method string, payload []byte) {
 		slog.Warn("TG 发送失败", "method", method, "error", err)
 		return
 	}
-	io.Copy(io.Discard, resp.Body)
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 	resp.Body.Close()
+	// 非 2xx 说明消息没有送达（如按钮消息失败）——不能当成功静默吞掉
+	if resp.StatusCode != http.StatusOK {
+		slog.Warn("TG API 非 2xx", "method", method, "status", resp.StatusCode,
+			"body", strings.TrimSpace(string(body)))
+	}
 }
 
 // Start 开始长轮询消息
@@ -184,17 +190,21 @@ func (b *Bot) pollLoop() {
 			continue
 		}
 
+		sem := make(chan struct{}, 8)
+
 		for _, u := range updates {
 			b.mu.Lock()
 			b.offset = u.ID + 1
 			b.mu.Unlock()
 
-			// 每条 update 独立 goroutine 处理（带 panic 兜底）：
-			// /ask 的 LLM 调用与 SSH 执行最长 30s，同步处理会阻塞整个 pollLoop，
-			// 让所有 chat 的后续命令与确认回调排队
+			// 每条 update 独立 goroutine 处理（带 panic 兜底 + 并发上限）：
+			// /ask 的 LLM 调用与 SSH 执行最长 30s，同步处理会阻塞整个 pollLoop；
+			// 信号量限制并发，防止大量 /ask 放大 LLM 费用与资源消耗
 			u := u
+			sem <- struct{}{}
 			go func() {
 				defer func() {
+					<-sem
 					if r := recover(); r != nil {
 						slog.Error("TG update 处理 panic", "panic", r, "update", u.ID)
 					}
@@ -223,6 +233,8 @@ func (b *Bot) processUpdate(u tgUpdate) {
 	if u.Message.Chat != nil {
 		fromID = fmt.Sprintf("%d", u.Message.Chat.ID)
 	}
+	// 发起人 ID（区别于 chatID：私聊两者相同，群聊不同）
+	userID := fmt.Sprintf("%d", u.Message.From.ID)
 
 	// 仅处理授权 chat_id 的命令：机器人可对内网设备执行 SSH / Docker
 	// 操作，未授权来源必须拒绝（否则任何 Telegram 用户都能远程控制）。
@@ -244,7 +256,7 @@ func (b *Bot) processUpdate(u tgUpdate) {
 
 	// /ask 等需要携带确认按钮的命令走 keyboard 路径
 	if kr, ok := b.cmd.(KeyboardResponder); ok {
-		if resp, buttons, has := kr.HandleTGKeyboard(fromID, cmd, args); has {
+		if resp, buttons, has := kr.HandleTGKeyboard(fromID, userID, cmd, args); has {
 			b.SendMessageWithKeyboard(fromID, resp, buttons)
 			return
 		}
@@ -255,7 +267,7 @@ func (b *Bot) processUpdate(u tgUpdate) {
 }
 
 // handleCallbackQuery 处理 /ask 的确认/取消按钮：
-// 与命令相同，先过 chat 白名单，再交给 handler 校验并执行
+// 与命令相同，先过 chat 白名单，再交给 handler 校验发起人与动作
 func (b *Bot) handleCallbackQuery(cb *tgCallbackQuery) {
 	if cb.Message == nil || cb.Message.Chat == nil {
 		b.AnswerCallback(cb.ID, "无效的确认")
@@ -273,7 +285,8 @@ func (b *Bot) handleCallbackQuery(cb *tgCallbackQuery) {
 		return
 	}
 
-	resp := ch.HandleCallback(chatID, cb.Data)
+	userID := fmt.Sprintf("%d", cb.From.ID)
+	resp := ch.HandleCallback(chatID, userID, cb.Data)
 	if resp != "" {
 		b.SendMessage(chatID, resp)
 	}
@@ -296,8 +309,11 @@ type tgUpdate struct {
 }
 
 type tgCallbackQuery struct {
-	ID      string `json:"id"`
-	Data    string `json:"data"`
+	ID   string `json:"id"`
+	Data string `json:"data"`
+	From struct {
+		ID int `json:"id"`
+	} `json:"from"`
 	Message *struct {
 		ID   int `json:"message_id"`
 		Chat *struct {

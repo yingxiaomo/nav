@@ -11,7 +11,7 @@ import { deepEqual } from '../utils/common';
 import { mergeCategories, mergeItems } from '../utils/data-merge';
 import { useStorageConfig } from './use-storage-config';
 
-const LOCAL_DATA_KEY = "clean-nav-local-data";
+export const LOCAL_DATA_KEY = "clean-nav-local-data";
 const LAST_SYNC_KEY = "clean-nav-sync-data";
 
 const fetchRemoteData = async (config: StorageConfig, getAdapter: (config: StorageConfig) => Promise<StorageAdapter | null>): Promise<DataSchema | null> => {

@@ -91,13 +91,18 @@ func (s *aiopsState) peekPending(chatID string) *pendingAction {
 	return s.pending[chatID]
 }
 
-// takePendingIfToken 仅当 token 匹配时取出并删除待确认动作。
-// 原子执行：旧提议的按钮不会误消费新提议，且并发双击只有一次能通过。
-func (s *aiopsState) takePendingIfToken(chatID, token string) *pendingAction {
+// takePendingForUser 原子地校验（token + 发起人）并删除待确认动作。
+// 校验、匹配与删除在同一临界区：peek/take 两段式存在窗口——
+// peek 后新提议替换、take 就会误删新提议（历史 bug）。
+// 发起人不匹配时返回 nil 且不删除（按钮保留给真正发起人）。
+func (s *aiopsState) takePendingForUser(chatID, userID, token string) *pendingAction {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	pa := s.pending[chatID]
 	if pa == nil || pa.token != token {
+		return nil
+	}
+	if pa.fromUserID != "" && pa.fromUserID != userID {
 		return nil
 	}
 	delete(s.pending, chatID)
@@ -291,6 +296,9 @@ func (h *CmdHandler) statusSnapshot() string {
 // 群聊场景仅发起人可点确认/取消。
 // 返回回复文本、确认 token（有合法提议时非空，随按钮 callback_data 下发）。
 func (h *CmdHandler) handleAsk(chatID, userID string, args []string) (text string, token string) {
+	// 请求时间在入口捕获：createdAt 若在 LLM 返回后才生成，
+	// 较慢的旧请求会拿到更晚的时间戳、反而覆盖新提议（乱序防护失效）
+	requestAt := time.Now().UnixMilli()
 	if h.LLM.APIKey == "" {
 		return "AI 未配置，请在设置中填写 API Key", ""
 	}
@@ -299,8 +307,10 @@ func (h *CmdHandler) handleAsk(chatID, userID string, args []string) (text strin
 		return "用法: /ask 你的问题，如「postgres 容器怎么挂了」「NAS 磁盘还剩多少」", ""
 	}
 
-	prompt := fmt.Sprintf("%s\n\n[实时状态快照]\n%s\n\n[问题]\n%s", askSystemPrompt, h.statusSnapshot(), question)
-	reply, err := CallLLM(h.LLM, prompt)
+	// 安全规则走 system message 与用户内容（快照+问题）分层：
+	// 快照里的容器名/设备名/用户问题即使含注入文本，也无法冒充系统指令
+	reply, err := CallLLMWithSystem(h.LLM, askSystemPrompt,
+		fmt.Sprintf("[实时状态快照]\n%s\n\n[问题]\n%s", h.statusSnapshot(), question))
 	if err != nil {
 		return "AI 调用失败: " + err.Error(), ""
 	}
@@ -329,7 +339,7 @@ func (h *CmdHandler) handleAsk(chatID, userID string, args []string) (text strin
 	h.aiops.setPending(chatID, &pendingAction{
 		token:      token,
 		fromUserID: userID,
-		createdAt:  time.Now().UnixMilli(),
+		createdAt:  requestAt,
 		display:    display,
 		kind:       kind,
 		target:     target,
@@ -342,48 +352,42 @@ func (h *CmdHandler) handleAsk(chatID, userID string, args []string) (text strin
 // HandleCallback 处理 inline keyboard 回调（Bot 校验 chat 白名单后调用）。
 // userID 为点击按钮的人：确认/取消仅限发起人（群聊场景防止他人操作）。
 // data 形如 "askrun:<token>" / "askcancel:<token>"。
-// 返回给用户的执行结果文本。
-func (h *CmdHandler) HandleCallback(chatID, userID, data string) string {
+// 返回用户可见文本 + 是否应清除该消息上的按钮
+// （按钮已作废/消费时清除；非发起人的点击被拒绝时保留给发起人）。
+func (h *CmdHandler) HandleCallback(chatID, userID, data string) (string, bool) {
 	action, token, _ := strings.Cut(data, ":")
+
+	// 原子消费：token + 发起人 + 删除在同一临界区完成——
+	// peek/take 两段式存在窗口（peek 后新提议替换，take 误删新提议）
 	switch action {
 	case cbCancel:
-		// 取消同样绑定 token + 发起人：旧消息上的按钮不得误删新提议
-		pa := h.aiops.peekPending(chatID)
-		if pa == nil || pa.token != token {
-			return "该操作已失效或不存在（可能已被新提议取代）"
+		pa := h.aiops.takePendingForUser(chatID, userID, token)
+		if pa == nil {
+			return "该操作已失效或不存在（可能已被新提议取代）", true
 		}
-		if pa.fromUserID != "" && userID != pa.fromUserID {
-			return "只有发起人可以确认或取消该操作"
-		}
-		h.aiops.takePending(chatID)
-		return "已取消"
+		return "已取消", true
 
 	case cbConfirm:
-		// 发起人绑定：群聊场景仅发起人可确认；token 匹配才消费
-		// （旧消息上的按钮不会误伤新提议，并发双击只有一次通过）
-		pa := h.aiops.peekPending(chatID)
-		if pa == nil || pa.token != token {
-			return "该确认已失效（过期或已被处理），请重新 /ask"
+		pa := h.aiops.takePendingForUser(chatID, userID, token)
+		if pa == nil {
+			// 区分"不是发起人"与"已失效"：前者保留按钮给发起人
+			if cur := h.aiops.peekPending(chatID); cur != nil && cur.token == token && cur.fromUserID != "" && cur.fromUserID != userID {
+				return "只有发起人可以确认该操作", false
+			}
+			return "该确认已失效（过期或已被处理），请重新 /ask", true
 		}
-		if pa.fromUserID != "" && userID != pa.fromUserID {
-			return "只有发起人可以确认该操作"
-		}
-		consumed := h.aiops.takePendingIfToken(chatID, token)
-		if consumed == nil {
-			return "该确认已失效（过期或已被处理），请重新 /ask"
-		}
-		if time.Now().After(consumed.expireAt) {
-			return "该确认已过期，请重新 /ask"
+		if time.Now().After(pa.expireAt) {
+			return "该确认已过期，请重新 /ask", true
 		}
 		// 二次校验：以提议原文重新走一遍白名单，防状态漂移
-		kind, target, exec, display, err := h.validateProposal(consumed.display)
+		kind, target, exec, display, err := h.validateProposal(pa.display)
 		if err != nil {
-			return "命令未通过校验，已拒绝: " + err.Error()
+			return "命令未通过校验，已拒绝: " + err.Error(), true
 		}
-		return h.executeAction(kind, target, exec, display)
+		return h.executeAction(kind, target, exec, display), true
 
 	default:
-		return ""
+		return "", false
 	}
 }
 

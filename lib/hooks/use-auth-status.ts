@@ -1,43 +1,37 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useUIStore } from '../stores';
 
-interface AuthStatusState {
-  /** 是否已登录管理后台（仅后端模式下有意义） */
-  loggedIn: boolean;
-  /** 是否需要初始化管理员 */
-  setupRequired: boolean;
-  /** 后端是否可用（静态部署模式恒为 false） */
-  backendAvailable: boolean;
-}
-
 /**
- * 获取当前登录状态（公开端点 /api/v1/auth/status，60s 轮询）。
+ * 登录状态轮询（写入共享 zustand 状态，所有组件读同一份）。
  *
- * 用于首页敏感入口的门控：后端模式下笔记/待办/监控面板仅登录后展示；
- * 静态部署模式（无后端）数据来自本地/云同步，不门控。
+ * 设计要点：
+ * - 认证状态必须是全局单份——此前每个组件各自轮询各自持有状态，
+ *   管理页登出后首页要等最多 60s 才感知（跨标签页更久）；
+ * - backendEverAvailable（见 use-backend-check）区分"纯静态部署"与
+ *   "后端短暂宕机"：前者门控放行，后者保持 fail-closed；
+ * - 请求失败保留上次状态并 5s 快速重试（网络抖动不闪断已登录用户）；
+ * - 后端可用时窗口聚焦立即刷新（跨标签页登出后切回即感知）。
  */
-export function useAuthStatus(): AuthStatusState {
+export function useAuthStatus() {
   const backendAvailable = useUIStore((s) => s.backendAvailable);
-  const [state, setState] = useState<Omit<AuthStatusState, 'backendAvailable'>>({
-    loggedIn: false,
-    setupRequired: false,
-  });
+  const setAuthStatus = useUIStore((s) => s.setAuthStatus);
+  const loggedIn = useUIStore((s) => s.authLoggedIn);
 
   useEffect(() => {
     if (!backendAvailable) return;
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
     const fetchStatus = () => {
       fetch('/api/v1/auth/status', { credentials: 'include' })
         .then((r) => r.json())
         .then((d) => {
-          if (!cancelled) setState({ loggedIn: !!d.loggedIn, setupRequired: !!d.setupRequired });
+          if (!cancelled) setAuthStatus(!!d.loggedIn);
         })
         .catch(() => {
-          // 请求失败保留上次状态（网络抖动不应把已登录用户闪断为未登录），
-          // 但 5s 后快速重试以尽快收敛
+          // 失败保留上次状态，5s 后快速重试以尽快收敛
           if (!cancelled && !retryTimer) {
             retryTimer = setTimeout(() => {
               retryTimer = undefined;
@@ -46,14 +40,22 @@ export function useAuthStatus(): AuthStatusState {
           }
         });
     };
+
     fetchStatus();
     const timer = setInterval(fetchStatus, 60_000);
+    const onFocus = () => {
+      if (document.visibilityState === 'visible') fetchStatus();
+    };
+    document.addEventListener('visibilitychange', onFocus);
+    window.addEventListener('focus', onFocus);
     return () => {
       cancelled = true;
       clearInterval(timer);
       if (retryTimer) clearTimeout(retryTimer);
+      document.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('focus', onFocus);
     };
-  }, [backendAvailable]);
+  }, [backendAvailable, setAuthStatus]);
 
-  return { ...state, backendAvailable };
+  return { loggedIn };
 }

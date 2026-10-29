@@ -26,7 +26,7 @@ type CmdHandler struct {
 }
 
 // HandleTG /command 入口
-func (h *CmdHandler) HandleTG(fromID, cmd string, args []string) string {
+func (h *CmdHandler) HandleTG(fromID, userID, cmd string, args []string) string {
 	switch cmd {
 	case "/start", "/help":
 		return "Nav Bot\n/ai [消息] - AI 对话\n/ask [问题] - AI 诊断内网（可提议命令，需确认）\n/status - 监控状态\n/wake - WOL 唤醒\n/docker - Docker 管理\n/device - 远程设备\n/organize - AI 整理书签\n/uptime - 运行时间\n/cancel - 取消待确认的操作\n/help - 帮助"

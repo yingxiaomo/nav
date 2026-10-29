@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -40,20 +41,33 @@ func (h *Handler) SearchHandler() http.HandlerFunc {
 		seen := make(map[string]bool)
 		db := h.DB
 
+		// 数据库错误必须如实返回 500：伪装成 200 [] 会让前端/监控
+		// 无法区分"没有结果"与"搜索服务故障"
+		fail := func(stage string, err error) {
+			slog.Error("搜索查询失败", "stage", stage, "error", err)
+			model.RespondError(w, http.StatusInternalServerError, "搜索失败")
+		}
+
 		// 搜索书签（标题和 URL）
 		rows, err := db.QueryContext(r.Context(),
 			"SELECT title, url, COALESCE(icon,'') FROM bookmarks WHERE LOWER(title) LIKE ? ESCAPE '\\' OR LOWER(url) LIKE ? ESCAPE '\\' LIMIT 10",
 			pattern, pattern,
 		)
-		if err == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var title, url, icon string
-				if err := rows.Scan(&title, &url, &icon); err == nil && !seen[url] {
-					seen[url] = true
-					results = append(results, SearchResult{Title: title, URL: url, Type: "bookmark", Icon: icon})
-				}
+		if err != nil {
+			fail("bookmarks", err)
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var title, url, icon string
+			if err := rows.Scan(&title, &url, &icon); err == nil && !seen[url] {
+				seen[url] = true
+				results = append(results, SearchResult{Title: title, URL: url, Type: "bookmark", Icon: icon})
 			}
+		}
+		if err := rows.Err(); err != nil {
+			fail("bookmarks-rows", err)
+			return
 		}
 
 		// 笔记与监控目标（内网拓扑）仅登录后可搜
@@ -63,18 +77,24 @@ func (h *Handler) SearchHandler() http.HandlerFunc {
 				"SELECT title, content FROM notes WHERE LOWER(title) LIKE ? ESCAPE '\\' OR LOWER(content) LIKE ? ESCAPE '\\' LIMIT 5",
 				pattern, pattern,
 			)
-			if err == nil {
-				defer noteRows.Close()
-				for noteRows.Next() {
-					var title, content string
-					if err := noteRows.Scan(&title, &content); err == nil {
-						key := "note:" + title
-						if !seen[key] {
-							seen[key] = true
-							results = append(results, SearchResult{Title: title, Type: "note"})
-						}
+			if err != nil {
+				fail("notes", err)
+				return
+			}
+			defer noteRows.Close()
+			for noteRows.Next() {
+				var title, content string
+				if err := noteRows.Scan(&title, &content); err == nil {
+					key := "note:" + title
+					if !seen[key] {
+						seen[key] = true
+						results = append(results, SearchResult{Title: title, Type: "note"})
 					}
 				}
+			}
+			if err := noteRows.Err(); err != nil {
+				fail("notes-rows", err)
+				return
 			}
 
 			// 搜索监控目标
@@ -82,15 +102,21 @@ func (h *Handler) SearchHandler() http.HandlerFunc {
 				"SELECT name, url, COALESCE(icon,'') FROM monitor_targets WHERE LOWER(name) LIKE ? ESCAPE '\\' OR LOWER(url) LIKE ? ESCAPE '\\' LIMIT 5",
 				pattern, pattern,
 			)
-			if err == nil {
-				defer monRows.Close()
-				for monRows.Next() {
-					var name, url, icon string
-					if err := monRows.Scan(&name, &url, &icon); err == nil && !seen[url] {
-						seen[url] = true
-						results = append(results, SearchResult{Title: name, URL: url, Type: "monitor", Icon: icon})
-					}
+			if err != nil {
+				fail("monitor", err)
+				return
+			}
+			defer monRows.Close()
+			for monRows.Next() {
+				var name, url, icon string
+				if err := monRows.Scan(&name, &url, &icon); err == nil && !seen[url] {
+					seen[url] = true
+					results = append(results, SearchResult{Title: name, URL: url, Type: "monitor", Icon: icon})
 				}
+			}
+			if err := monRows.Err(); err != nil {
+				fail("monitor-rows", err)
+				return
 			}
 		}
 

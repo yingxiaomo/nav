@@ -107,10 +107,15 @@ func checkSession(r *http.Request, secrets *session.SecretProvider) (string, boo
 
 // ===== Rate limiting for login =====
 
-// 两级计数器：
-//   - 用户名级（IP|username）：5 次失败锁 15 分钟，防定向爆破单账号
-//   - IP 级（仅 IP）：30 次失败锁 1 小时，防攻击者轮换随机用户名绕过
+// 两级尝试计数器：
+//   - 用户名级（IP|username）：5 次/15 分钟，防定向爆破单账号
+//   - IP 级（仅 IP）：30 次/1 小时，防攻击者轮换随机用户名绕过
 //     用户名级键（每个新用户名都是新键），同时限制 bcrypt 的 CPU 消耗
+//
+// 原子性：必须用 beginLoginAttempt 单次临界区完成"校验+登记名额"。
+// 分离的 check/record 两段式存在并发窗口——大量并发请求会在全部检查
+// 通过后、失败记录前同时打到 bcrypt（历史漏洞：80 并发全部穿透）。
+// 尝试名额制（成功登录归还名额）让计数天然在检查时同步完成。
 type attemptCounter struct {
 	count       int
 	until       int64
@@ -138,7 +143,7 @@ func blocked(m map[string]*attemptCounter, key string, now int64) bool {
 	return ok && e.until > now
 }
 
-func recordFailure(m map[string]*attemptCounter, key string, max int, block time.Duration, now int64) {
+func bump(m map[string]*attemptCounter, key string, max int, block time.Duration, now int64) {
 	e, ok := m[key]
 	if !ok {
 		e = &attemptCounter{}
@@ -152,25 +157,35 @@ func recordFailure(m map[string]*attemptCounter, key string, max int, block time
 	}
 }
 
-// checkRateLimit 校验用户名级与 IP 级两道限额，任一命中即拒绝
-func checkRateLimit(key, ip string) bool {
+// beginLoginAttempt 原子地校验限额并登记一次尝试名额。
+// 返回 false 表示命中限流（应返回 429）。
+func beginLoginAttempt(key, ip string) bool {
 	loginAttemptsMu.Lock()
 	defer loginAttemptsMu.Unlock()
 	now := time.Now().UnixMilli()
-	return !blocked(loginAttempts, key, now) && !blocked(ipAttempts, ip, now)
+	if blocked(loginAttempts, key, now) || blocked(ipAttempts, ip, now) {
+		return false
+	}
+	bump(loginAttempts, key, maxAttempts, blockDuration, now)
+	bump(ipAttempts, ip, maxIPAttempts, ipBlockDuration, now)
+	return true
 }
 
-// recordLoginAttempt 记录一次登录结果（成功清用户名级计数，失败两级累计）
-func recordLoginAttempt(key, ip string, success bool) {
-	loginAttemptsMu.Lock()
-	defer loginAttemptsMu.Unlock()
-	now := time.Now().UnixMilli()
-	if success {
-		delete(loginAttempts, key)
+// finishLoginAttempt 尝试结束后调用：成功归还名额（失败保留计入封锁）。
+func finishLoginAttempt(key, ip string, success bool) {
+	if !success {
 		return
 	}
-	recordFailure(loginAttempts, key, maxAttempts, blockDuration, now)
-	recordFailure(ipAttempts, ip, maxIPAttempts, ipBlockDuration, now)
+	loginAttemptsMu.Lock()
+	defer loginAttemptsMu.Unlock()
+	for _, m := range []map[string]*attemptCounter{loginAttempts, ipAttempts} {
+		if e, ok := m[key]; ok && e.count > 0 {
+			e.count--
+			if e.count == 0 && e.until == 0 {
+				delete(m, key)
+			}
+		}
+	}
 }
 
 // dummyHash 用于"用户不存在"分支的耗时对齐：用户存在时走 bcrypt（约 100ms），
@@ -206,11 +221,14 @@ func (h *Handler) Login() http.HandlerFunc {
 		// 纯 IP 键会让攻击者用 5 次错误密码锁死全部用户（登录 DoS）
 		limitKey := ip + "|" + body.Username
 
-		if !checkRateLimit(limitKey, ip) {
+		// 原子校验+登记尝试名额（见 beginLoginAttempt 的并发说明）
+		if !beginLoginAttempt(limitKey, ip) {
 			slog.Warn("登录限流", "ip", ip)
 			model.RespondError(w, http.StatusTooManyRequests, "登录尝试过于频繁，请 15 分钟后再试")
 			return
 		}
+
+		recordLoginAttempt := func(success bool) { finishLoginAttempt(limitKey, ip, success) }
 
 		user, err := queries.GetUserByUsername(r.Context(), db, body.Username)
 		if err != nil {
@@ -221,20 +239,20 @@ func (h *Handler) Login() http.HandlerFunc {
 		if user == nil {
 			// 跑一次 dummy bcrypt，让响应耗时与"用户存在但密码错误"一致
 			_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(body.Password))
-			recordLoginAttempt(limitKey, ip, false)
+			recordLoginAttempt(false)
 			slog.Warn("登录失败 - 用户不存在", "ip", ip, "username", body.Username)
 			model.RespondError(w, http.StatusUnauthorized, "用户名或密码错误")
 			return
 		}
 
 		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(body.Password)); err != nil {
-			recordLoginAttempt(limitKey, ip, false)
+			recordLoginAttempt(false)
 			slog.Warn("登录失败 - 密码错误", "ip", ip, "username", body.Username)
 			model.RespondError(w, http.StatusUnauthorized, "用户名或密码错误")
 			return
 		}
 
-		recordLoginAttempt(limitKey, ip, true)
+		recordLoginAttempt(true)
 
 		secret, _ := queries.GetSetting(r.Context(), db, "session_secret")
 		if secret == "" {
@@ -365,7 +383,7 @@ func (h *Handler) ChangePassword() http.HandlerFunc {
 		// 限流 key 必须剥离端口，否则每次连接的随机源端口会被视为不同 IP，限流失效
 		ip := ipFromRemote(r.RemoteAddr)
 		pwKey := ip + "|__change-password"
-		if !checkRateLimit(pwKey, ip) {
+		if !beginLoginAttempt(pwKey, ip) {
 			slog.Warn("修改密码限流", "ip", ip)
 			model.RespondError(w, http.StatusTooManyRequests, "操作过于频繁，请 15 分钟后再试")
 			return
@@ -404,13 +422,13 @@ func (h *Handler) ChangePassword() http.HandlerFunc {
 		}
 
 		if err := bcrypt.CompareHashAndPassword([]byte(pwHash), []byte(body.CurrentPassword)); err != nil {
-			recordLoginAttempt(pwKey, ip, false)
+			finishLoginAttempt(pwKey, ip, false)
 			slog.Warn("修改密码 - 当前密码错误", "ip", ip)
 			model.RespondError(w, http.StatusForbidden, "当前密码错误")
 			return
 		}
 
-		recordLoginAttempt(pwKey, ip, true)
+		finishLoginAttempt(pwKey, ip, true)
 
 		newHash, err := bcrypt.GenerateFromPassword([]byte(body.NewPassword), bcrypt.DefaultCost)
 		if err != nil {

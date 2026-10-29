@@ -30,9 +30,10 @@ type Bot struct {
 	stopCh chan struct{}
 }
 
-// CommandHandler 处理 /command
+// CommandHandler 处理 /command。chatID 用于回消息与白名单，
+// userID 为实际发起人（私聊两者相同；群聊不同，用于发起人绑定）
 type CommandHandler interface {
-	HandleTG(fromID string, cmd string, args []string) string
+	HandleTG(chatID, userID, cmd string, args []string) string
 }
 
 // KeyboardResponder 可选接口：回复需要携带 inline keyboard（/ask 确认按钮）。
@@ -43,9 +44,11 @@ type KeyboardResponder interface {
 }
 
 // CallbackHandler 可选接口：处理 inline keyboard 回调
-// （Bot 负责校验 chat 白名单，实现方负责校验动作本身与发起人）。
+// （Bot 负责校验 chat 白名单，实现方负责校验发起人与动作本身）。
+// clearKeyboard=false 表示按钮仍在使用中（如非发起人的点击被拒绝），
+// Bot 不得移除发起人正在使用的确认按钮。
 type CallbackHandler interface {
-	HandleCallback(chatID, userID, data string) string
+	HandleCallback(chatID, userID, data string) (text string, clearKeyboard bool)
 }
 
 // InlineButton inline keyboard 按钮
@@ -75,15 +78,33 @@ func (b *Bot) apiURL(method string) string {
 	return fmt.Sprintf("https://api.telegram.org/bot%s/%s", b.cfg.Token, method)
 }
 
-// SendMessage 发送消息。
+// sanitizeErr 剥离网络错误里的 Bot Token：*url.Error 会携带完整请求 URL，
+// DNS/TLS/代理连接失败时 Token 可能随 err 进入容器日志——拿到 Token
+// 即可接管整个 Bot。
+func (b *Bot) sanitizeErr(err error) string {
+	if err == nil {
+		return ""
+	}
+	if b.cfg.Token == "" {
+		return err.Error()
+	}
+	return strings.ReplaceAll(err.Error(), b.cfg.Token, "****")
+}
+
+// SendMessage 发送消息（超长自动截断到 Telegram 4096 字符上限内）。
 // 不使用 parse_mode=HTML：回复内容含用户数据/AI 输出/容器名等，
 // 用 HTML 模式既是注入面（恶意命名的容器可伪造排版）也容易因未转义字符发送失败。
 func (b *Bot) SendMessage(chatID, text string) {
+	if runes := []rune(text); len(runes) > 4000 {
+		text = string(runes[:4000]) + "\n…（消息过长已截断）"
+	}
 	payload, _ := json.Marshal(map[string]string{"chat_id": chatID, "text": text})
 	b.postAPI("sendMessage", payload)
 }
 
 // SendMessageWithKeyboard 发送带 inline keyboard 的消息。
+// 按钮发送失败时降级为纯文本 + 提示（否则提议已注册而按钮从未送达，
+// 用户看不到按钮、旧提议也已失效——状态死锁）。
 // buttons 为空时退化为普通消息。
 func (b *Bot) SendMessageWithKeyboard(chatID, text string, buttons []InlineButton) {
 	if len(buttons) == 0 {
@@ -95,7 +116,10 @@ func (b *Bot) SendMessageWithKeyboard(chatID, text string, buttons []InlineButto
 		"text":         text,
 		"reply_markup": map[string]any{"inline_keyboard": [][]InlineButton{buttons}},
 	})
-	b.postAPI("sendMessage", payload)
+	if err := b.postAPI("sendMessage", payload); err != nil {
+		slog.Warn("按钮消息发送失败，降级纯文本", "error", b.sanitizeErr(err))
+		b.SendMessage(chatID, text+"\n\n（按钮发送失败，请发送 /cancel 取消本次操作）")
+	}
 }
 
 // AnswerCallback 应答 callback query（消除客户端转圈，并可弹提示）
@@ -113,11 +137,11 @@ func (b *Bot) ClearKeyboard(chatID string, messageID int) {
 	b.postAPI("editMessageReplyMarkup", payload)
 }
 
-func (b *Bot) postAPI(method string, payload []byte) {
+func (b *Bot) postAPI(method string, payload []byte) error {
 	resp, err := b.client.Post(b.apiURL(method), "application/json", bytes.NewReader(payload))
 	if err != nil {
-		slog.Warn("TG 发送失败", "method", method, "error", err)
-		return
+		slog.Warn("TG 发送失败", "method", method, "error", b.sanitizeErr(err))
+		return err
 	}
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 	resp.Body.Close()
@@ -125,7 +149,9 @@ func (b *Bot) postAPI(method string, payload []byte) {
 	if resp.StatusCode != http.StatusOK {
 		slog.Warn("TG API 非 2xx", "method", method, "status", resp.StatusCode,
 			"body", strings.TrimSpace(string(body)))
+		return fmt.Errorf("telegram api %d", resp.StatusCode)
 	}
+	return nil
 }
 
 // Start 开始长轮询消息
@@ -176,6 +202,9 @@ func (b *Bot) isAuthorized(chatID string) bool {
 }
 
 func (b *Bot) pollLoop() {
+	// 并发上限是全局的：若在每轮 getUpdates 循环内创建，
+	// 长任务跨批次存活时总并发会持续超过上限（历史 bug）
+	sem := make(chan struct{}, 8)
 	for {
 		select {
 		case <-b.stopCh:
@@ -185,12 +214,10 @@ func (b *Bot) pollLoop() {
 
 		updates, err := b.getUpdates()
 		if err != nil {
-			slog.Debug("TG poll error", "error", err)
+			slog.Debug("TG poll error", "error", b.sanitizeErr(err))
 			time.Sleep(3 * time.Second)
 			continue
 		}
-
-		sem := make(chan struct{}, 8)
 
 		for _, u := range updates {
 			b.mu.Lock()
@@ -243,6 +270,12 @@ func (b *Bot) processUpdate(u tgUpdate) {
 		return
 	}
 
+	// 群聊授权模型：白名单是 chat 级的，群内所有成员都能发消息——
+	// 状态变更/敏感命令（SSH/Docker/WOL/LLM 消耗）仅限私聊，
+	// 防群成员绕过 /ask 的白名单+人工确认直接执行。
+	// /status /uptime /ask /help 等只读或绑定发起人的命令不受限。
+	isGroup := u.Message.Chat != nil && u.Message.From.ID != u.Message.Chat.ID
+
 	text := strings.TrimSpace(u.Message.Text)
 	if !strings.HasPrefix(text, "/") {
 		return
@@ -252,7 +285,15 @@ func (b *Bot) processUpdate(u tgUpdate) {
 	cmd := parts[0]
 	args := parts[1:]
 
-	slog.Info("TG 命令", "from", fromID, "cmd", cmd)
+	if isGroup {
+		switch cmd {
+		case "/docker", "/device", "/wake", "/ai":
+			b.SendMessage(fromID, "该命令仅支持私聊使用（安全限制）")
+			return
+		}
+	}
+
+	slog.Info("TG 命令", "from", fromID, "user", userID, "cmd", cmd)
 
 	// /ask 等需要携带确认按钮的命令走 keyboard 路径
 	if kr, ok := b.cmd.(KeyboardResponder); ok {
@@ -262,12 +303,14 @@ func (b *Bot) processUpdate(u tgUpdate) {
 		}
 	}
 
-	resp := b.cmd.HandleTG(fromID, cmd, args)
+	resp := b.cmd.HandleTG(fromID, userID, cmd, args)
 	b.SendMessage(fromID, resp)
 }
 
 // handleCallbackQuery 处理 /ask 的确认/取消按钮：
-// 与命令相同，先过 chat 白名单，再交给 handler 校验发起人与动作
+// 与命令相同，先过 chat 白名单，再交给 handler 校验发起人与动作。
+// clearKeyboard 仅在按钮已"作废/消费"时为 true——非发起人的点击
+// 不得清掉发起人还在使用的按钮。
 func (b *Bot) handleCallbackQuery(cb *tgCallbackQuery) {
 	if cb.Message == nil || cb.Message.Chat == nil {
 		b.AnswerCallback(cb.ID, "无效的确认")
@@ -286,12 +329,14 @@ func (b *Bot) handleCallbackQuery(cb *tgCallbackQuery) {
 	}
 
 	userID := fmt.Sprintf("%d", cb.From.ID)
-	resp := ch.HandleCallback(chatID, userID, cb.Data)
+	resp, clear := ch.HandleCallback(chatID, userID, cb.Data)
 	if resp != "" {
 		b.SendMessage(chatID, resp)
 	}
 	b.AnswerCallback(cb.ID, "")
-	b.ClearKeyboard(chatID, cb.Message.ID)
+	if clear {
+		b.ClearKeyboard(chatID, cb.Message.ID)
+	}
 }
 
 type tgUpdate struct {

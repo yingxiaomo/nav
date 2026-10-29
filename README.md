@@ -161,12 +161,13 @@ npx gh-pages -d out          # 或手动把 out/ 推到 gh-pages 分支
 | `DATABASE_URL` | `./data/nav.db` | SQLite 数据库路径 |
 | `UPLOAD_DIR` | `./data/uploads` | 文件上传目录 |
 | `DATA_DIR` | `./data` | 数据目录（Docker 元数据、SSH 主机密钥等） |
-| `CORS_ORIGIN` | `*` | 允许的 CORS 来源 |
 | `NAV_SECRET_KEY` | *(未设置)* | 可选。设置后，敏感凭证（SSH / 设备密码）以 AES-256-GCM 加密落库。用任意强随机串即可（如 `openssl rand -hex 32`）。不设则明文存储（向后兼容）。更换此值会使已加密的旧凭证无法解密。 |
 
 > 以上仅全合一（后端）模式相关；静态托管无需任何环境变量。
 
-## 🛠️ 开发
+**反向代理部署注意**：登录限流按连接源地址统计（反代会把所有访客归并为代理 IP，可能触发集体限流）；CSRF 的 Origin 校验要求代理**不重写 Host 头**（Origin 必须与到达后端的 Host 一致，否则合法写请求会被 403）。建议反代透传 Host 与客户端 IP，或直接暴露端口。
+
+## 🛠️ 开放
 
 本地开发、目录结构、扩展点（新增云同步适配器 / API 端点 / admin 标签页）与安全约定见 **[CONTRIBUTING.md](./CONTRIBUTING.md)**。
 

@@ -199,6 +199,29 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 			_ = conn.Close()
 		}
 
+		// 会话撤销 ticker：登出/改密轮换密钥后 30s 内主动断开——
+		// 包括 tail -f 这类只输出不输入的会话。关闭连接会让各泵的
+		// Read/Write 以错误返回（不能用读超时续读，见上方 pump 注释）。
+		done := make(chan struct{})
+		defer close(done)
+		go func() {
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-done:
+					return
+				case <-ticker.C:
+					if !sessionValid() {
+						slog.Info("SSH 会话已失效，断开连接", "addr", addr)
+						_ = ww.writeMessage(websocket.TextMessage, []byte("\r\n会话已失效，连接关闭\r\n"))
+						closeAll()
+						return
+					}
+				}
+			}
+		}()
+
 		// stdout → WebSocket
 		go func() {
 			defer wg.Done()
@@ -238,22 +261,18 @@ func (h *Handler) SSHWebSocket() http.HandlerFunc {
 		// WebSocket → stdin。
 		// 协议分帧：二进制帧 = 终端输入；文本帧 = 控制消息（resize）。
 		// 这样用户粘贴恰好形如 resize JSON 的文本不会被误当控制命令吞掉。
+		//
+		// 注意：这里绝不能用 SetReadDeadline+超时续读做会话复核——
+		// gorilla/websocket 规定读出错（含超时）后连接读状态已损坏，
+		// 继续读 1000 次会 panic("repeated read on failed websocket
+		// connection")，且发生在 pump goroutine，recovery 中间件救不了
+		// （历史 Critical bug）。会话撤销由下方 ticker goroutine 主动
+		// 关闭连接实现（关闭会让 ReadMessage 以正常错误返回）。
 		go func() {
 			defer wg.Done()
 			for {
-				// 30s 读超时兼做会话复核：即使终端只输出不输入（如 tail -f），
-				// 登出/改密轮换密钥后也会在下一个超时点被关闭
-				_ = conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 				msgType, msg, err := conn.ReadMessage()
 				if err != nil {
-					if ne, ok := err.(net.Error); ok && ne.Timeout() {
-						if sessionValid() {
-							continue
-						}
-						_ = ww.writeMessage(websocket.TextMessage, []byte("\r\n会话已失效，连接关闭\r\n"))
-						closeAll()
-						return
-					}
 					_ = session.Close()
 					return
 				}

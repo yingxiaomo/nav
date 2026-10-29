@@ -122,7 +122,7 @@ func TestHandleCallback(t *testing.T) {
 	h := &CmdHandler{Devices: newTestDeviceManager(t, "nas")}
 
 	// 无待确认动作
-	if resp := h.HandleCallback("chat1", "u1", cbConfirm+":abc"); !strings.Contains(resp, "失效") {
+	if resp, _ := h.HandleCallback("chat1", "u1", cbConfirm+":abc"); !strings.Contains(resp, "失效") {
 		t.Errorf("无待确认时应提示失效, got %q", resp)
 	}
 
@@ -136,12 +136,12 @@ func TestHandleCallback(t *testing.T) {
 	mkPending("A", time.Now().Add(time.Minute))
 
 	// 错误 token → 失效，且不得消费掉 pending
-	if resp := h.HandleCallback("chat1", "u1", cbConfirm+":B"); !strings.Contains(resp, "失效") {
+	if resp, _ := h.HandleCallback("chat1", "u1", cbConfirm+":B"); !strings.Contains(resp, "失效") {
 		t.Errorf("token 不匹配应提示失效, got %q", resp)
 	}
 
 	// 正确 token → 进入执行阶段（fakeExecutor 返回 test-output）
-	resp := h.HandleCallback("chat1", "u1", cbConfirm+":A")
+	resp, _ := h.HandleCallback("chat1", "u1", cbConfirm+":A")
 	if strings.Contains(resp, "失效") || strings.Contains(resp, "校验") {
 		t.Errorf("合法确认应进入执行阶段, got %q", resp)
 	}
@@ -150,36 +150,36 @@ func TestHandleCallback(t *testing.T) {
 	}
 
 	// 消费后再次确认 → 失效（防双击重复执行）
-	if resp := h.HandleCallback("chat1", "u1", cbConfirm+":A"); !strings.Contains(resp, "失效") {
+	if resp, _ := h.HandleCallback("chat1", "u1", cbConfirm+":A"); !strings.Contains(resp, "失效") {
 		t.Errorf("消费后再次确认应提示失效, got %q", resp)
 	}
 
 	// 过期提议 → 提示过期
 	mkPending("C", time.Now().Add(-time.Minute))
-	if resp := h.HandleCallback("chat1", "u1", cbConfirm+":C"); !strings.Contains(resp, "过期") {
+	if resp, _ := h.HandleCallback("chat1", "u1", cbConfirm+":C"); !strings.Contains(resp, "过期") {
 		t.Errorf("过期提议应提示过期, got %q", resp)
 	}
 
 	// 旧提议的 token 不得误伤新提议：pending 已换为 D，用旧 A 确认应失效
 	mkPending("D", time.Now().Add(time.Minute))
-	if resp := h.HandleCallback("chat1", "u1", cbConfirm+":A"); !strings.Contains(resp, "失效") {
+	if resp, _ := h.HandleCallback("chat1", "u1", cbConfirm+":A"); !strings.Contains(resp, "失效") {
 		t.Errorf("旧 token 应失效, got %q", resp)
 	}
-	if resp := h.HandleCallback("chat1", "u1", cbConfirm+":D"); strings.Contains(resp, "失效") {
+	if resp, _ := h.HandleCallback("chat1", "u1", cbConfirm+":D"); strings.Contains(resp, "失效") {
 		t.Errorf("旧 token 失效不应消费新提议, got %q", resp)
 	}
 
 	// 取消
 	mkPending("E", time.Now().Add(time.Minute))
-	if resp := h.HandleCallback("chat1", "u1", cbCancel+":E"); resp != "已取消" {
+	if resp, _ := h.HandleCallback("chat1", "u1", cbCancel+":E"); resp != "已取消" {
 		t.Errorf("取消应返回已取消, got %q", resp)
 	}
-	if resp := h.HandleCallback("chat1", "u1", cbCancel+":X"); !strings.Contains(resp, "失效") {
+	if resp, _ := h.HandleCallback("chat1", "u1", cbCancel+":X"); !strings.Contains(resp, "失效") {
 		t.Errorf("无 pending 时取消应提示失效, got %q", resp)
 	}
 
 	// 未知 action → 空串（Bot 不发消息）
-	if resp := h.HandleCallback("chat1", "u1", "bogus:x"); resp != "" {
+	if resp, _ := h.HandleCallback("chat1", "u1", "bogus:x"); resp != "" {
 		t.Errorf("未知回调应返回空串, got %q", resp)
 	}
 }
@@ -194,11 +194,11 @@ func TestHandleCallbackInitiatorBinding(t *testing.T) {
 	})
 
 	// 非发起人点击 → 拒绝且不消费
-	if resp := h.HandleCallback("chat1", "200", cbConfirm+":T"); !strings.Contains(resp, "发起人") {
+	if resp, _ := h.HandleCallback("chat1", "200", cbConfirm+":T"); !strings.Contains(resp, "发起人") {
 		t.Errorf("非发起人确认应被拒绝, got %q", resp)
 	}
 	// 发起人确认 → 进入执行
-	if resp := h.HandleCallback("chat1", "100", cbConfirm+":T"); strings.Contains(resp, "发起人") || strings.Contains(resp, "失效") {
+	if resp, _ := h.HandleCallback("chat1", "100", cbConfirm+":T"); strings.Contains(resp, "发起人") || strings.Contains(resp, "失效") {
 		t.Errorf("发起人确认应放行, got %q", resp)
 	}
 }

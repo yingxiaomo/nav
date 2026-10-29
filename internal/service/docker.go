@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bufio"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -105,6 +106,22 @@ func formatPorts(ports []dockerPortJSON) string {
 	return strings.Join(parts, ", ")
 }
 
+// dockerInspectTTY 仅取容器 inspect 的 TTY 标志（决定日志流格式）
+type dockerInspectTTY struct {
+	Config struct {
+		Tty bool `json:"Tty"`
+	} `json:"Config"`
+}
+
+// containerTTY 查询容器是否以 TTY 模式运行
+func (s *DockerService) containerTTY(ctx context.Context, id string) (bool, error) {
+	insp, err := dockerGet[dockerInspectTTY](ctx, s.cli, "/containers/"+id+"/json")
+	if err != nil {
+		return false, err
+	}
+	return insp.Config.Tty, nil
+}
+
 // ContainerStats 返回所有运行中容器的实时 CPU 和内存统计。
 func (s *DockerService) ContainerStats(ctx context.Context) ([]model.DockerStat, error) {
 	containers, err := dockerGet[[]dockerContainerJSON](ctx, s.cli, "/containers/json?all=false")
@@ -195,6 +212,12 @@ func (s *DockerService) StreamLogs(ctx context.Context, containerID string, line
 	if err := validateContainerRef(containerID); err != nil {
 		return err
 	}
+	// TTY 容器的日志是 raw 文本流（无 8 字节复用头）——按头解析会出现
+	// 乱码/"帧过大"。先查容器 TTY 标志再选择解析方式
+	tty, err := s.containerTTY(ctx, containerID)
+	if err != nil {
+		tty = false // 查询失败按非 TTY 处理（兼容旧 daemon 行为）
+	}
 	// 用不带 Timeout 的流客户端：30s Timeout 会掐断 follow 长连接
 	reader, err := dockerGetRaw(ctx, s.streamCli,
 		"/containers/"+containerID+"/logs?stdout=true&stderr=true&follow=true&tail=100")
@@ -202,6 +225,20 @@ func (s *DockerService) StreamLogs(ctx context.Context, containerID string, line
 		return fmt.Errorf("获取容器日志失败: %w", err)
 	}
 	defer reader.Close()
+
+	// TTY 容器：raw 文本流，按行读取（无复用头）
+	if tty {
+		scanner := bufio.NewScanner(reader)
+		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		for scanner.Scan() {
+			select {
+			case lines <- scanner.Text():
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+		return scanner.Err()
+	}
 
 	// 读取复用流：8 字节头 + 负载
 	hdr := make([]byte, 8)

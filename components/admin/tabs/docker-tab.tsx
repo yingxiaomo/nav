@@ -40,7 +40,7 @@ export default function DockerTab() {
     const es = new EventSource(`${API}/admin/docker/logs/${encodeURIComponent(name)}`, { withCredentials: true });
 
     es.onmessage = (e) => {
-      setLogs(prev => [...prev, e.data]);
+      setLogs(prev => [...prev.slice(-1999), e.data]); // 上限 2000 行，防长日志流内存无限增长
     };
 
     es.addEventListener('end', () => { es.close(); });

@@ -22,6 +22,7 @@ import { Brain, TerminalSquare } from "lucide-react";
 import { useWallpaper, useNavData, useKeyboardShortcuts, useBackendCheck } from "@/lib";
 import { openExternalUrl } from "@/lib/utils/url";
 import { useUIStore } from "@/lib/stores";
+import { LOCAL_DATA_KEY } from "@/lib/hooks/use-nav-data";
 import { useAuthStatus } from "@/lib/hooks/use-auth-status";
 import { CommandPalette } from "@/components/features/command-palette";
 import { AIPanel } from "@/components/features/ai-panel";
@@ -78,21 +79,28 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const folderNavRef = useRef<FolderModalHandle>(null);
-  const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels, isCheatSheetOpen, setCheatSheetOpen, setCommandPaletteOpen, isCommandPaletteOpen, togglePanel, setActivePanel } = useUIStore();
-  const auth = useAuthStatus();
-  // 监控浮层展示内网拓扑，仅登录后渲染；静态模式（无后端）不涉及
-  const showMonitorFloater = data.settings.showMonitor !== false && (!auth.backendAvailable || auth.loggedIn);
+  const { isSettingsOpen, setSettingsOpen, activePanel, closeAllPanels, isCheatSheetOpen, setCheatSheetOpen, setCommandPaletteOpen, isCommandPaletteOpen, togglePanel, setActivePanel, backendEverAvailable, authLoggedIn } = useUIStore();
+  useAuthStatus(); // 登录状态轮询（写入共享 store，本组件与其他组件读同一份）
 
-  // 登录态翻转时：失效数据缓存（旧会话的笔记/待办不得跨会话呈现）并关闭敏感面板
+  // 监控浮层展示内网拓扑，仅登录后渲染；静态模式（无后端）不涉及。
+  // 基准是 backendEverAvailable（曾检测到后端）：后端宕机保持 fail-closed
+  const showMonitorFloater = data.settings.showMonitor !== false && (!backendEverAvailable || authLoggedIn);
+
+  // 登录态翻转时：失效并清除数据缓存（旧会话的笔记/待办不得跨会话呈现）、
+  // 关闭敏感面板；登出时清掉本地持久化的敏感数据
   const queryClient = useQueryClient();
-  const prevLoggedIn = useRef(auth.loggedIn);
+  const prevLoggedIn = useRef(authLoggedIn);
   useEffect(() => {
-    if (prevLoggedIn.current !== auth.loggedIn) {
-      prevLoggedIn.current = auth.loggedIn;
-      queryClient.invalidateQueries({ queryKey: ["navData"] });
-      setActivePanel(null);
+    if (prevLoggedIn.current === authLoggedIn) return;
+    const loggedOut = prevLoggedIn.current && !authLoggedIn;
+    prevLoggedIn.current = authLoggedIn;
+    queryClient.invalidateQueries({ queryKey: ["navData"] });
+    queryClient.removeQueries({ queryKey: ["navData"] });
+    setActivePanel(null);
+    if (loggedOut && backendEverAvailable) {
+      localStorage.removeItem(LOCAL_DATA_KEY);
     }
-  }, [auth.loggedIn, queryClient, setActivePanel]);
+  }, [authLoggedIn, backendEverAvailable, queryClient, setActivePanel]);
 
   // 检测后端是否可用（静态部署时禁用后端功能），定期重试
   useBackendCheck();
@@ -343,14 +351,14 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
           />
         )}
         <ErrorBoundary name="ai-panel" fallback={null}>
-          {auth.backendAvailable && auth.loggedIn && activePanel === 'ai' && (
+          {backendEverAvailable && authLoggedIn && activePanel === 'ai' && (
             <ResizablePanel title="AI 助手" icon={<Brain className="w-5 h-5 text-purple-500" />} defaultWidth={650} defaultHeight={520} onClose={() => togglePanel('ai')} zIndex={101} onFocus={() => setActivePanel('ai')}>
               <AIPanel />
             </ResizablePanel>
           )}
         </ErrorBoundary>
         <ErrorBoundary name="ssh-terminal" fallback={null}>
-          {auth.backendAvailable && auth.loggedIn && activePanel === 'ssh' && (
+          {backendEverAvailable && authLoggedIn && activePanel === 'ssh' && (
             <ResizablePanel title="SSH 终端" icon={<TerminalSquare className="w-5 h-5 text-green-500" />} defaultWidth={960} defaultHeight={540} onClose={() => togglePanel('ssh')} zIndex={101} onFocus={() => setActivePanel('ssh')}>
               <SSHTerminalPanel />
             </ResizablePanel>

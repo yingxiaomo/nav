@@ -97,12 +97,24 @@ func (h *Handler) DockerStats() http.HandlerFunc {
 	}
 }
 
+// dockerLogStreams 全局并发日志流上限：每条流占用一条 Docker follow
+// 长连接 + goroutine，无上限时可被无限开流耗尽资源
+var dockerLogStreams = make(chan struct{}, 5)
+
 // DockerLogs handles GET /api/v1/admin/docker/logs/{name}.
 // It streams container logs via Server-Sent Events.
 func (h *Handler) DockerLogs() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		svc := h.DockerSvc
 		name := r.PathValue("name")
+
+		select {
+		case dockerLogStreams <- struct{}{}:
+			defer func() { <-dockerLogStreams }()
+		default:
+			model.RespondError(w, http.StatusTooManyRequests, "日志流数量已达上限，请稍后再试")
+			return
+		}
 
 		flusher, ok := w.(http.Flusher)
 		if !ok {

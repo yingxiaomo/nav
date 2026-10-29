@@ -7,7 +7,6 @@ import { TodoWidget } from "@/components/features/todo-widget";
 import { NoteWidget } from "@/components/features/note-widget";
 import { Todo, Note } from "@/lib/types";
 import { useUIStore } from "@/lib/stores";
-import { useAuthStatus } from "@/lib/hooks/use-auth-status";
 
 interface FeaturesLauncherProps {
   todos: Todo[];
@@ -17,13 +16,13 @@ interface FeaturesLauncherProps {
 }
 
 export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }: FeaturesLauncherProps) {
-  const { activePanel, togglePanel, setActivePanel, backendAvailable } = useUIStore();
+  const { activePanel, togglePanel, setActivePanel, backendEverAvailable, authLoggedIn } = useUIStore();
   const sidebarCollapsed = useUIStore(s => s.sidebarCollapsed);
-  const auth = useAuthStatus();
 
   // 笔记/待办属敏感个人数据：后端模式仅登录后展示入口；
-  // 静态部署模式（无后端）数据来自本地/云同步，不门控
-  const showPersonalWidgets = !backendAvailable || auth.loggedIn;
+  // 门控基准是 backendEverAvailable（曾检测到后端）而非实时 backendAvailable——
+  // 后端短暂宕机时保持 fail-closed，不得降级为静态模式放行
+  const showPersonalWidgets = !backendEverAvailable || authLoggedIn;
 
   return (
     <>
@@ -53,7 +52,7 @@ export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }:
         </Button>
         )}
 
-        {backendAvailable && auth.loggedIn && (
+        {backendEverAvailable && authLoggedIn && (
         <Button
           variant="outline"
           onClick={() => togglePanel('ai')}
@@ -64,7 +63,7 @@ export function FeaturesLauncher({ todos, notes, onTodosUpdate, onNotesUpdate }:
         </Button>
         )}
 
-        {backendAvailable && auth.loggedIn && (
+        {backendEverAvailable && authLoggedIn && (
         <Button
           variant="outline"
           onClick={() => togglePanel('ssh')}

@@ -71,6 +71,13 @@ type chatResponse struct {
 
 // CallLLM 单次 AI 调用（无上下文，供 handleOrganize 使用）
 func CallLLM(cfg LLMConfig, prompt string) (string, error) {
+	return CallLLMWithSystem(cfg, "你是一个智能助手，理解并返回 JSON 格式数据。", prompt)
+}
+
+// CallLLMWithSystem 单次调用，system 参数承载安全策略/角色规则。
+// 安全规则必须走 system message 与用户内容分层：拼进 user message 时，
+// 状态快照/用户问题/容器名里的注入文本与安全规则处于同一指令层级。
+func CallLLMWithSystem(cfg LLMConfig, system, prompt string) (string, error) {
 	if cfg.APIKey == "" {
 		return "", fmt.Errorf("AI 未配置")
 	}
@@ -79,7 +86,7 @@ func CallLLM(cfg LLMConfig, prompt string) (string, error) {
 	}
 	baseURL := strings.TrimRight(cfg.BaseURL, "/")
 	msgs := []chatMessage{
-		{Role: "system", Content: "你是一个智能助手，理解并返回 JSON 格式数据。"},
+		{Role: "system", Content: system},
 		{Role: "user", Content: prompt},
 	}
 	body := chatRequest{Model: cfg.Model, Messages: msgs, MaxTokens: 1000}

@@ -22,7 +22,7 @@ import { Brain, TerminalSquare } from "lucide-react";
 import { useWallpaper, useNavData, useKeyboardShortcuts, useBackendCheck } from "@/lib";
 import { openExternalUrl } from "@/lib/utils/url";
 import { useUIStore } from "@/lib/stores";
-import { LOCAL_DATA_KEY } from "@/lib/hooks/use-nav-data";
+import { clearSensitiveLocalData } from "@/lib/utils/local-cleanup";
 import { useAuthStatus } from "@/lib/hooks/use-auth-status";
 import { CommandPalette } from "@/components/features/command-palette";
 import { AIPanel } from "@/components/features/ai-panel";
@@ -98,7 +98,7 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
     queryClient.removeQueries({ queryKey: ["navData"] });
     setActivePanel(null);
     if (loggedOut && deployMode === 'backend') {
-      localStorage.removeItem(LOCAL_DATA_KEY);
+      clearSensitiveLocalData();
     }
   }, [authLoggedIn, deployMode, queryClient, setActivePanel]);
 

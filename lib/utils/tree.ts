@@ -98,6 +98,27 @@ export function findPathInTree<T>(
   return null;
 }
 
+/**
+ * 将 nodeId 及其全部祖先的 updatedAt 更新为 now。
+ *
+ * 云同步三方合并（data-merge.ts）按顶层条目（文件夹整体）的 updatedAt
+ * 判定新旧——编辑/移动/删除文件夹内部的子项时，若不 bump 祖先链，
+ * 本地未保存的内部修改会在合并时被远端旧快照覆盖丢失。
+ */
+export function bumpFolderTimestamps<T extends { id?: string; updatedAt?: number }>(
+  items: T[],
+  nodeId: string,
+  getChildren: (item: T) => T[] | undefined,
+  now: number,
+): boolean {
+  const path = findPathInTree(items, nodeId, getChildren);
+  if (!path) return false;
+  for (const item of path) {
+    (item as any).updatedAt = now;
+  }
+  return true;
+}
+
 /** 深拷贝（用于 React setState 不可变更新）*/
 export function deepClone<T>(data: T): T {
   return JSON.parse(JSON.stringify(data));

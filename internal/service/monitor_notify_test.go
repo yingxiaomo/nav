@@ -18,7 +18,7 @@ type mockNotifier struct {
 	recoveries int
 }
 
-func (m *mockNotifier) ShouldNotify(string) bool { return true }
+func (m *mockNotifier) TryNotify(string) bool      { return true }
 func (m *mockNotifier) MarkNotified(string)      {}
 func (m *mockNotifier) ClearNotified(string)     {}
 func (m *mockNotifier) Send(_, _, _ string)      { m.mu.Lock(); m.sends++; m.mu.Unlock() }

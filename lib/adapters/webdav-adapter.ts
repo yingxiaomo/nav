@@ -59,13 +59,15 @@ export class WebDavAdapter implements StorageAdapter {
         await this.client.createDirectory(wallpapersDir, { recursive: true });
       }
       const uniqueFilename = `${Date.now()}-${filename}`;
+      // 归一化 url 尾斜杠，避免拼接出 //
+      const base = this.config.url.replace(/\/+$/, '');
       const filePath = `${wallpapersDir}/${uniqueFilename}`;
       onProgress?.(20);
       const arrayBuffer = await file.arrayBuffer();
       onProgress?.(50);
       await this.client.putFileContents(filePath, arrayBuffer);
       onProgress?.(100);
-      return `${this.config.url}${filePath}`;
+      return `${base}${filePath}`;
     } catch (error) {
       console.warn("WebDAV upload error:", error);
       throw error;

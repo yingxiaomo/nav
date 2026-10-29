@@ -43,11 +43,11 @@ func TestSendTest_ServerError(t *testing.T) {
 func TestClearNotified(t *testing.T) {
 	s := NewSender(Config{Enabled: true, AppriseURL: "http://example", CooldownMinutes: 30})
 	s.MarkNotified("t1")
-	if s.ShouldNotify("t1") {
+	if s.TryNotify("t1") {
 		t.Error("冷却期内不应再次通知")
 	}
 	s.ClearNotified("t1")
-	if !s.ShouldNotify("t1") {
+	if !s.TryNotify("t1") {
 		t.Error("清除冷却后应可再次通知")
 	}
 }

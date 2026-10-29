@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { clearSensitiveLocalData } from "@/lib/utils/local-cleanup";
 import { req, API, StatusInfo, ConfirmState, TABS, TabId, Spinner } from './admin-tabs';
 
 // ── Lazy-loaded tab components ──
@@ -275,5 +276,7 @@ function LoginScreen() {
 
 async function doLogout() {
   await req('POST', `${API}/auth/logout`);
+  // 清除本浏览器持久化的敏感数据（笔记/待办/AI 对话/同步基线）
+  clearSensitiveLocalData();
   location.reload();
 }

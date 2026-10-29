@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { DataSchema, Category, LinkItem } from "@/lib/types";
-import { deepClone, findNodeInTree, removeNodeFromTree, moveNodeToTree, getAllIds } from "@/lib/utils/tree";
+import { deepClone, findNodeInTree, removeNodeFromTree, moveNodeToTree, getAllIds, bumpFolderTimestamps } from "@/lib/utils/tree";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragOverEvent, DragStartEvent, DragOverlay, defaultDropAnimationSideEffects, DropAnimation } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from "@dnd-kit/sortable";
 import { createPortal } from "react-dom";
@@ -72,6 +72,10 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   const handleBatchDelete = useCallback(() => {
     setLocalData(prev => {
       const newData = deepClone(prev);
+      // 先 bump 待删节点的祖先链（删除后路径失效）
+      for (const id of selectedIds) {
+        bumpFolderTimestamps(newData.categories as any, id, getChildren, Date.now());
+      }
       for (const id of selectedIds) removeNodeFromTree(newData.categories as any, id, getChildren);
       return newData;
     });
@@ -83,6 +87,11 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
   const handleBatchMove = useCallback((targetId: string) => {
     setLocalData(prev => {
       const newData = deepClone(prev);
+      const now = Date.now();
+      // 旧父链 bump（移出后路径失效，需在移除前）
+      for (const id of selectedIds) {
+        bumpFolderTimestamps(newData.categories as any, id, getChildren, now);
+      }
       const removed: LinkItem[] = [];
       for (const id of selectedIds) {
         const r = removeNodeFromTree(newData.categories as any, id, getChildren);
@@ -100,6 +109,8 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
         return false;
       };
       addTarget(newData.categories);
+      // 目标文件夹及其祖先 bump（新子项进入）
+      bumpFolderTimestamps(newData.categories as any, targetId, getChildren, now);
       return newData;
     });
     setSelectedIds(new Set());
@@ -152,6 +163,9 @@ export function ManageLinksTab({ localData, setLocalData }: ManageLinksTabProps)
     const updated = { ...editingLink, title, url: isFolder ? editingLink.url : (url.startsWith("http") ? url : `https://${url}`), updatedAt: Date.now() };
     setLocalData(prev => {
       const newData = deepClone(prev);
+      // bump 祖先文件夹时间戳：云同步三方合并按顶层条目 updatedAt 判新旧，
+      // 不 bump 则文件夹内部编辑会被远端旧快照覆盖丢失
+      bumpFolderTimestamps(newData.categories as any, updated.id, getChildren, Date.now());
       const found = findNodeInTree(newData.categories as any, updated.id, getChildren) as LinkItem | undefined;
       if (found) Object.assign(found, updated);
       return newData;

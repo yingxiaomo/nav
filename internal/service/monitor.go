@@ -34,7 +34,7 @@ type HealthChecker struct {
 
 // Notifier 健康检查状态变更通知接口
 type Notifier interface {
-	ShouldNotify(targetID string) bool
+	TryNotify(targetID string) bool
 	MarkNotified(targetID string)
 	ClearNotified(targetID string)
 	Send(name, url, status string)
@@ -162,10 +162,10 @@ func (h *HealthChecker) runAllChecks(ctx context.Context) {
 			if h.notify != nil {
 				switch {
 				case result.Status != "ok":
-					// 宕机：按 cooldown 告警
-					if h.notify.ShouldNotify(result.ID) {
+					// 宕机：按 cooldown 告警。检查与标记原子完成，
+					// 防未来调用方并发时重复发送
+					if h.notify.TryNotify(result.ID) {
 						h.notify.Send(result.Name, result.URL, result.Status)
-						h.notify.MarkNotified(result.ID)
 					}
 				case hadPrev && prev.Status != "ok":
 					// 宕机→恢复：一次性恢复通知，并清冷却让下次宕机立即告警
@@ -517,6 +517,11 @@ func (h *HealthChecker) DeleteTarget(id string) error {
 	h.mu.Lock()
 	delete(h.results, id)
 	h.mu.Unlock()
+
+	// 同步清理告警冷却记录，避免重建同名 id 后继承旧冷却窗口
+	if h.notify != nil {
+		h.notify.ClearNotified(id)
+	}
 
 	return nil
 }

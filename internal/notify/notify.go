@@ -41,8 +41,11 @@ func (s *Sender) enabled() bool {
 	return s.Config.Enabled && s.Config.AppriseURL != ""
 }
 
-// ShouldNotify 检查是否应该发送宕机告警（cooldown + enabled）
-func (s *Sender) ShouldNotify(targetID string) bool {
+// TryNotify 原子地检查冷却窗口并登记本次告警（检查与标记同一临界区，
+// 防并发巡检重复发送）。返回 true 表示应发送。
+// 注意：即使发送失败冷却也已生效——Apprise 宕机时不会风暴重试，
+// 下一次机会在冷却窗口之后。
+func (s *Sender) TryNotify(targetID string) bool {
 	if !s.enabled() {
 		return false
 	}
@@ -53,10 +56,12 @@ func (s *Sender) ShouldNotify(targetID string) bool {
 			return false
 		}
 	}
+	s.cooldown[targetID] = time.Now()
 	return true
 }
 
-// MarkNotified 记录通知时间
+// MarkNotified 记录通知时间（TryNotify 已原子标记，此方法保留给
+// 显式标记场景）
 func (s *Sender) MarkNotified(targetID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

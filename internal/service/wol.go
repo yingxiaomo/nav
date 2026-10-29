@@ -9,6 +9,10 @@ import (
 
 // WakeOnLAN sends a magic packet to wake up a device on the local network.
 // mac should be in the format "AA:BB:CC:DD:EE:FF" or "AA-BB-CC-DD-EE-FF".
+//
+// 注意：UDP 广播包只能在同一二层网络内传播。Docker bridge 网络发出的
+// 广播不会到达物理局域网——容器部署需要 network_mode: host 才能真正
+// 唤醒 LAN 设备（容器内"发送成功"不代表设备收到了魔法包）。
 func WakeOnLAN(mac string) error {
 	// Strip separators and parse hex
 	cleaned := strings.NewReplacer(":", "", "-", "", ".", "").Replace(mac)
@@ -37,13 +41,7 @@ func WakeOnLAN(mac string) error {
 	}
 	defer conn.Close()
 
-	// Set broadcast flag explicitly (some systems need this)
-	if err := conn.SetWriteBuffer(102); err != nil {
-		return fmt.Errorf("设置写缓冲区失败: %w", err)
-	}
-
-	_, err = conn.Write(packet)
-	if err != nil {
+	if _, err := conn.Write(packet); err != nil {
 		return fmt.Errorf("发送魔法包失败: %w", err)
 	}
 

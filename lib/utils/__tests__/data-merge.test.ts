@@ -3,8 +3,9 @@ import { mergeItems, mergeCategories } from "../data-merge";
 import type { Category, LinkItem } from "../../types/types";
 
 describe("mergeItems", () => {
-  it("远程为空时合并结果为空", () => {
-    expect(mergeItems([], [{ id: "1", title: "a", url: "https://a.com" }])).toEqual([]);
+  it("远程为空、无基线时保留本地独有项（防刷新丢数据）", () => {
+    const local = [{ id: "1", title: "a", url: "https://a.com" }];
+    expect(mergeItems([], local)).toEqual(local);
   });
 
   it("本地有空但远程有内容时取远程", () => {
@@ -33,11 +34,18 @@ describe("mergeItems", () => {
     expect(result[0].title).toBe("远程");
   });
 
-  it("本地有但远程没有的条目被丢弃（不补回）", () => {
+  it("无基线时本地独有条目保留（安全默认：不丢用户内容）", () => {
     const remote = [{ id: "1", title: "a", url: "https://a.com" }];
     const local = [{ id: "2", title: "b", url: "https://b.com" }];
-    expect(mergeItems(remote, local)).toHaveLength(1);
-    expect(mergeItems(remote, local)[0].id).toBe("1");
+    expect(mergeItems(remote, local)).toHaveLength(2);
+  });
+
+  it("有基线且基线包含该 id：远程删除生效（丢弃本地）", () => {
+    const remote = [{ id: "1", title: "a", url: "https://a.com" }];
+    const local = [{ id: "2", title: "b", url: "https://b.com" }];
+    const result = mergeItems(remote, local, undefined, new Set(["2"]));
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("1");
   });
 
   it("三方合并：本地新增（不在基线）应保留", () => {
@@ -92,11 +100,10 @@ describe("mergeCategories", () => {
     expect(result[0].links[0].title).toBe("本地链接");
   });
 
-  it("本地新增分类（远程无）应丢弃", () => {
+  it("本地新增分类（远程无、无基线）应保留", () => {
     const remote: Category[] = [{ id: "cat1", title: "远程分类", links: [] }];
     const local: Category[] = [{ id: "cat2", title: "本地分类", links: [] }];
-    expect(mergeCategories(remote, local)).toHaveLength(1);
-    expect(mergeCategories(remote, local)[0].id).toBe("cat1");
+    expect(mergeCategories(remote, local)).toHaveLength(2);
   });
 
   it("三方合并：本地新增分类（不在基线）应保留", () => {
@@ -185,11 +192,10 @@ describe("mergeCategories", () => {
     expect(result[1].id).toBe("c2");
   });
 
-  it("Todos 按 remote 驱动（本地新增不补回）", () => {
+  it("Todos 无基线时保留本地新增（防刷新丢失）", () => {
     const remote = [{ id: "t1", text: "Do this", completed: false, createdAt: 100 }];
     const local = [{ id: "t2", text: "Local only", completed: false, createdAt: 200 }];
     const result = mergeItems(remote, local);
-    expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("t1");
+    expect(result).toHaveLength(2);
   });
 });

@@ -9,7 +9,10 @@ import type { Category } from '../types/types';
  * 相同 id 两边都有 → 按 updatedAt 取较新版本（相同则可选 nestedMergeFn）。
  *
  * 本地有、远程没有的条目如何处理取决于 `baseIds`（上次成功同步时的 id 集合）：
- *   - 不传 baseIds（无同步基线）→ 沿用旧行为：信任远程，丢弃本地独有项。
+ *   - 不传 baseIds（无同步基线）→ 保留本地独有项。
+ *     （历史行为是"信任远程，丢弃本地独有"——这会让 Docker 模式下用户
+ *      刚编辑、尚未点保存的内容在刷新时被远程旧数据覆盖丢失；
+ *      对个人导航应用，复活远比丢失安全）
  *   - 传 baseIds → 三方合并：
  *       · 基线里也有该 id → 说明远程把它删了 → 丢弃；
  *       · 基线里没有该 id → 说明是本地新增（尚未同步）→ 保留，避免离线新增被覆盖丢失。
@@ -41,8 +44,8 @@ export function mergeItems<T extends { id: string; updatedAt?: number }>(
       if (index !== -1) {
         merged[index] = updatedItem;
       }
-    } else if (baseIds && !baseIds.has(localItem.id)) {
-      // 本地有、远程没有、且不在上次同步基线中 → 本地新增，保留
+    } else if (!baseIds || !baseIds.has(localItem.id)) {
+      // 本地有、远程没有：无基线时保留（安全默认）；有基线且不在基线中 → 本地新增，保留
       merged.push(localItem);
     }
     // 否则：本地有、远程没有、但基线里有 → 远程已删除，丢弃

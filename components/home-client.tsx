@@ -105,6 +105,19 @@ function HomeContent({ initialWallpapers }: { initialWallpapers: string[] }) {
   // 检测后端是否可用（静态部署时禁用后端功能），定期重试
   useBackendCheck();
 
+  // Docker 模式下未保存的编辑需手动"保存并同步"才落到后端——
+  // 刷新/关闭前拦截提醒，防止用户无感丢失编辑（static 模式数据在
+  // localStorage 中天然持久，无需拦截）
+  useEffect(() => {
+    if (deployMode !== 'backend' || !hasUnsavedChanges) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [deployMode, hasUnsavedChanges]);
+
   // 拍平所有书签（用于 Fuse.js 模糊搜索）
   const allBookmarks = useMemo(
     () => data.categories.flatMap((cat) => cat.links),

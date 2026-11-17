@@ -131,21 +131,13 @@ export function useNavData(initialWallpapers: string[]) {
   });
 
   // ── 处理远程数据 ──
+  // api-server（Docker）与静态模式统一走基线合并：后端/云端是"已保存数据"
+  // 的权威源，本地未保存的编辑通过三方合并保留。
+  // 历史 bug：api-server 模式曾直接 setData(remoteData) 跳过合并——
+  // 本地未保存的笔记/待办在刷新后被后端旧数据覆盖丢失（1cc370e 的
+  // 修复声明夸大：合并语义修复只作用于 static 分支，触不到这里）。
   useEffect(() => {
     if (remoteData) {
-      // Docker mode: backend 是唯一数据源，直接使用
-      const cfg = getEffectiveConfig();
-      if (cfg?.type === 'api-server') {
-        // Docker mode: backend is source of truth, use it directly
-        const final = { ...remoteData };
-        if (initialWallpapersRef.current.length > 0) {
-          final.settings.wallpaperList = [...initialWallpapersRef.current];
-        }
-        setTimeout(() => setData(final), 0);
-        return;
-      }
-
-      // Static mode: merge remote with local to preserve unsaved changes
       const currentData = dataRef.current;
       const localTodos = currentData.todos || [];
       const localNotes = currentData.notes || [];

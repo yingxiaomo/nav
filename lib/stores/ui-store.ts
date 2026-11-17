@@ -87,8 +87,15 @@ const useUIStore = create<UIState>((set, get) => ({
   setBackendAvailable: (available) =>
     set((s) => ({
       backendAvailable: available,
-      // 一旦确认后端存在就进入 backend 态且不回退（宕机≠静态部署）
-      deployMode: s.deployMode === 'static' ? 'static' : 'backend',
+      // 成功 → backend；失败时 unknown（无构建标记的纯静态托管）降为 static，
+      // backend 保持 backend（宕机≠静态部署，敏感门控 fail-closed）。
+      // 历史 bug：失败时 unknown 也被推进 backend，导致纯静态托管上
+      // 笔记/待办入口 30 秒后消失（7c375ca 回归）
+      deployMode: available
+        ? 'backend'
+        : s.deployMode === 'unknown'
+          ? 'static'
+          : s.deployMode,
     })),
 
   setAuthStatus: (loggedIn) => set({ authLoggedIn: loggedIn }),

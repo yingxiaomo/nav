@@ -146,7 +146,7 @@ export function SortableLinkItemCard({ item, onClick, showPinButton, isPinned, o
 
 
 /** 固定链接卡片（紧凑型，用于主页固定链接区域） */
-export function PinnedLinkCard({
+function PinnedLinkCard({
   item,
   onUnpin,
   onUpdate

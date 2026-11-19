@@ -20,10 +20,42 @@ type cpuSample struct {
 	total uint64
 }
 
+// CPU 后台采样：GetSystemInfo 的调用方（监控端点/TG/AI）并发且频繁，
+// 内联读 /proc/stat + 全局采样点会互相污染（两次相邻调用 diff 归零，
+// CPU 读数错乱——历史 bug）。后台 goroutine 每 2s 采样一次并计算使用率，
+// 调用方只读快照（与 Docker stats 快照同一模式）。
 var (
-	lastCPUSample cpuSample
-	cpuSampleMu   sync.Mutex
+	cpuUsageMu  sync.Mutex
+	cpuUsagePct = -1 // -1 = 尚无样本
+	samplerOnce sync.Once
 )
+
+// startCPUSampler 后台每 2s 采样 /proc/stat 计算使用率（进程生命周期常驻）。
+func startCPUSampler() {
+	samplerOnce.Do(func() {
+		go func() {
+			var prev cpuSample
+			hasPrev := false
+			for {
+				if cur, err := readCPUSample(); err == nil {
+					if hasPrev && cur.total > prev.total {
+						idleDelta := float64(cur.idle - prev.idle)
+						totalDelta := float64(cur.total - prev.total)
+						if totalDelta > 0 {
+							pct := int(math.Round((1 - idleDelta/totalDelta) * 100))
+							cpuUsageMu.Lock()
+							cpuUsage = pct
+							cpuUsageMu.Unlock()
+						}
+					}
+					prev = cur
+					hasPrev = true
+				}
+				time.Sleep(2 * time.Second)
+			}
+		}()
+	})
+}
 
 // readCPUSample reads the current CPU times from /proc/stat.
 func readCPUSample() (cpuSample, error) {
@@ -57,31 +89,15 @@ func readCPUSample() (cpuSample, error) {
 	return cpuSample{}, fmt.Errorf("/proc/stat 中未找到 cpu 行")
 }
 
-// calcCPUUsage calculates CPU usage percentage between last and current sample.
+// calcCPUUsage 读取后台采样器计算的 CPU 使用率（只读，无副作用）。
+// 尚无样本时返回 0（首轮显示 0%，2 秒后出值）。
 func calcCPUUsage() float64 {
-	current, err := readCPUSample()
-	if err != nil {
+	cpuUsageMu.Lock()
+	defer cpuUsageMu.Unlock()
+	if cpuUsage < 0 {
 		return 0
 	}
-
-	cpuSampleMu.Lock()
-	last := lastCPUSample
-	lastCPUSample = current
-	cpuSampleMu.Unlock()
-
-	if last.total == 0 || last.idle == 0 {
-		return 0
-	}
-
-	diffIdle := current.idle - last.idle
-	diffTotal := current.total - last.total
-
-	if diffTotal == 0 {
-		return 0
-	}
-
-	usage := (1.0 - float64(diffIdle)/float64(diffTotal)) * 100.0
-	return math.Round(usage)
+	return float64(cpuUsage)
 }
 
 // readMemoryInfo reads memory stats from /proc/meminfo.
@@ -162,6 +178,7 @@ func countCPUCores() int {
 
 // GetSystemInfo collects CPU, memory, disk, and uptime stats.
 func GetSystemInfo() model.SystemInfo {
+	startCPUSampler()
 	cpuUsage := calcCPUUsage()
 
 	memTotal, memAvailable := readMemoryInfo()

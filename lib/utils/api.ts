@@ -37,7 +37,7 @@ export interface ApiFail<T = unknown> {
 export type ApiResult<T> = ApiOk<T> | ApiFail<T>;
 
 /** 拼接 baseUrl + 路径，兼容 baseUrl 为空、末尾带斜杠、路径首部带/等情况 */
-export function joinApiUrl(baseUrl: string | null | undefined, path: string): string {
+function joinApiUrl(baseUrl: string | null | undefined, path: string): string {
   const base = (baseUrl || "").replace(/\/+$/, "");
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${base}${p}`;

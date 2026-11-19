@@ -456,11 +456,14 @@ func (h *HealthChecker) AddTarget(input model.MonitorTargetInput) (*model.Monito
 		return nil, fmt.Errorf("添加监控目标失败: %w", err)
 	}
 
-	// Trigger immediate check
-	result := h.checkTarget(context.Background(), target)
-	h.mu.Lock()
-	h.results[result.ID] = result
-	h.mu.Unlock()
+	// 首检放后台：同步检查最长阻塞 HTTP 请求 timeout 毫秒（目标多时成倍放大），
+	// 结果由下一轮巡检周期自然补全（检查间隔 60s，数据延迟可接受）
+	go func() {
+		result := h.checkTarget(context.Background(), target)
+		h.mu.Lock()
+		h.results[result.ID] = result
+		h.mu.Unlock()
+	}()
 
 	return &target, nil
 }

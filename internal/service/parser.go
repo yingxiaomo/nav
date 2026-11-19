@@ -259,32 +259,14 @@ func ParseURL(rawURL string) (*ParseResult, error) {
 func parseHTMLDocument(body []byte, baseURL string, bodyStr string) *ParseResult {
 	result := &ParseResult{}
 
-	// Try HTML tokenizer for accurate parsing
 	doc, err := html.Parse(bytes.NewReader(body))
 	if err != nil {
-		// Fallback to string-based extraction
-		return parseHTMLSimple(bodyStr, baseURL)
+		// html.Parse 按 HTML5 规范做错误恢复，对 bytes.Reader 实际不会失败；
+		// 保险起见仍按错误处理
+		return &ParseResult{}
 	}
 
 	extractFromNode(doc, result, baseURL)
-
-	// If html.Parse found nothing useful (e.g., malformed HTML), fallback to string matching
-	if result.Title == "" && result.Description == "" && result.Icon == "" {
-		fallback := parseHTMLSimple(bodyStr, baseURL)
-		if result.Title == "" {
-			result.Title = fallback.Title
-		}
-		if result.Description == "" {
-			result.Description = fallback.Description
-		}
-		if result.Icon == "" {
-			result.Icon = fallback.Icon
-		}
-		if result.Image == "" {
-			result.Image = fallback.Image
-		}
-	}
-
 	return result
 }
 
@@ -355,89 +337,6 @@ func extractFromNode(n *html.Node, result *ParseResult, baseURL string) {
 	}
 }
 
-// parseHTMLSimple uses regex-like string matching to extract metadata without
-// a full HTML parser. Used as fallback for malformed HTML.
-func parseHTMLSimple(htmlStr string, baseURL string) *ParseResult {
-	result := &ParseResult{}
-
-	// Title
-	if match := extractBetween(htmlStr, "<title", "</title>"); match != "" {
-		// Find the end of the opening tag
-		closeTag := strings.IndexByte(match, '>')
-		if closeTag >= 0 {
-			title := match[closeTag+1:]
-			title = stripHTMLTags(title)
-			title = strings.TrimSpace(title)
-			title = collapseWhitespace(title)
-			if title != "" {
-				result.Title = title
-			}
-		}
-	}
-
-	// Meta description
-	if desc := extractMetaValue(htmlStr, "description"); desc != "" {
-		result.Description = desc
-	}
-
-	// OG image
-	if ogImage := extractMetaValue(htmlStr, "og:image"); ogImage != "" {
-		result.Image = ResolveURL(ogImage, baseURL)
-	}
-	if result.Image == "" {
-		if twitterImage := extractMetaValue(htmlStr, "twitter:image"); twitterImage != "" {
-			result.Image = ResolveURL(twitterImage, baseURL)
-		}
-	}
-
-	// Icon
-	icon := extractIconHref(htmlStr)
-	if icon != "" {
-		result.Icon = ResolveURL(icon, baseURL)
-	}
-
-	return result
-}
-
-// extractBetween returns the content between startTag (searching for its '<' form
-// and skipping to the first '>' after it) and endTag (last occurrence before
-// the next opening tag or EOF).
-func extractBetween(s, start, end string) string {
-	startIdx := strings.Index(strings.ToLower(s), strings.ToLower(start))
-	if startIdx < 0 {
-		return ""
-	}
-	contentStart := startIdx + len(start)
-	return s[contentStart:]
-}
-
-// stripHTMLTags removes all HTML tags from a string.
-func stripHTMLTags(s string) string {
-	var buf strings.Builder
-	inTag := false
-	for i := 0; i < len(s); i++ {
-		if s[i] == '<' {
-			inTag = true
-			continue
-		}
-		if s[i] == '>' {
-			inTag = false
-			continue
-		}
-		if !inTag {
-			buf.WriteByte(s[i])
-		}
-	}
-	return buf.String()
-}
-
-// collapseWhitespace replaces sequences of whitespace with a single space.
-func collapseWhitespace(s string) string {
-	fields := strings.Fields(s)
-	return strings.Join(fields, " ")
-}
-
-// extractMetaValue extracts the content of a <meta> element by name or property.
 func extractMetaValue(htmlStr, name string) string {
 	lower := strings.ToLower(htmlStr)
 	searchName := strings.ToLower(name)

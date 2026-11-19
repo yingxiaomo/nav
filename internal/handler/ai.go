@@ -11,8 +11,20 @@ import (
 	"github.com/YingXiaoMo/nav/internal/db/queries"
 	"github.com/YingXiaoMo/nav/internal/model"
 	"github.com/YingXiaoMo/nav/internal/service"
+	navsession "github.com/YingXiaoMo/nav/internal/session"
 	"github.com/YingXiaoMo/nav/internal/tgbot"
 )
+
+// sessionUID 返回当前请求的会话标识（cookie 会话校验通过则返回
+// 用户 ID，否则返回 IP——无登录态时退化为按 IP 隔离）。
+func (h *Handler) sessionUID(r *http.Request) string {
+	if cookie, err := r.Cookie(navsession.CookieName); err == nil {
+		if uid := navsession.Verify(cookie.Value, h.Secrets.Get(r.Context())); uid != "" {
+			return uid
+		}
+	}
+	return ipFromRemote(r.RemoteAddr)
+}
 
 // AIChat handles POST /api/v1/ai/chat — 快速问答，无上下文
 func (h *Handler) AIChat() http.HandlerFunc {
@@ -76,8 +88,8 @@ func (h *Handler) AIConversation() http.HandlerFunc {
 			message = fmt.Sprintf("以下是当前监控数据：\n%s\n\n用户问题：%s", ctx, message)
 		}
 
-		userID := ipFromRemote(r.RemoteAddr)
-		reply := tgbot.CallLLMWithContext(cfg, userID, message)
+		uid := h.sessionUID(r)
+		reply := tgbot.CallLLMWithContext(cfg, uid, message)
 		model.RespondJSON(w, http.StatusOK, map[string]any{"reply": reply})
 	}
 }

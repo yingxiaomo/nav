@@ -45,7 +45,7 @@ func startCPUSampler() {
 						if totalDelta > 0 {
 							pct := int(math.Round((1 - idleDelta/totalDelta) * 100))
 							cpuUsageMu.Lock()
-							cpuUsage = pct
+							cpuUsagePct = pct
 							cpuUsageMu.Unlock()
 						}
 					}
@@ -95,10 +95,10 @@ func readCPUSample() (cpuSample, error) {
 func calcCPUUsage() float64 {
 	cpuUsageMu.Lock()
 	defer cpuUsageMu.Unlock()
-	if cpuUsage < 0 {
+	if cpuUsagePct < 0 {
 		return 0
 	}
-	return float64(cpuUsage)
+	return float64(cpuUsagePct)
 }
 
 // readMemoryInfo reads memory stats from /proc/meminfo.
